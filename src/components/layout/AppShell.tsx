@@ -1,9 +1,10 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useEffect } from "react";
 import { TopBar } from "./TopBar";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { useUIStore } from "../../stores/uiStore";
 import { useNoteStore } from "../../stores/noteStore";
+import { useTaskStore } from "../../stores/taskStore";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboard";
 import { NoteEditor } from "../../features/notes/NoteEditor";
 import { NoteList } from "../../features/notes/NoteList";
@@ -11,6 +12,10 @@ import { QuickSwitcher } from "../../features/notes/QuickSwitcher";
 import { SearchResults } from "../../features/search/SearchResults";
 import { SettingsPanel } from "../../features/settings/SettingsPanel";
 import { TrashView } from "../../features/notes/TrashView";
+import { TaskList } from "../../features/tasks/TaskList";
+import { TaskBoard } from "../../features/tasks/TaskBoard";
+import { TaskDetail } from "../../features/tasks/TaskDetail";
+import { TaskQuickAdd } from "../../features/tasks/TaskQuickAdd";
 import { todayISO } from "../../lib/utils";
 
 /** Root layout container with sidebar, main content, and status bar. */
@@ -27,6 +32,16 @@ export function AppShell() {
   const createNote = useNoteStore((s) => s.createNote);
   const selectNote = useNoteStore((s) => s.selectNote);
   const openDailyNote = useNoteStore((s) => s.openDailyNote);
+  const viewMode = useTaskStore((s) => s.viewMode);
+  const isDetailOpen = useTaskStore((s) => s.isDetailOpen);
+  const openQuickAdd = useTaskStore((s) => s.openQuickAdd);
+  const fetchTasks = useTaskStore((s) => s.fetchTasks);
+
+  useEffect(() => {
+    if (activeView === "tasks") {
+      fetchTasks();
+    }
+  }, [activeView, fetchTasks]);
 
   const handleNewNote = useCallback(async () => {
     const note = await createNote({
@@ -66,6 +81,12 @@ export function AppShell() {
       { key: "ArrowLeft", alt: true, handler: handleBack },
       { key: "ArrowRight", alt: true, handler: handleForward },
       { key: ",", ctrl: true, handler: () => setActiveView("settings") },
+      {
+        key: "t",
+        ctrl: true,
+        shift: true,
+        handler: () => openQuickAdd(),
+      },
     ],
     [
       handleNewNote,
@@ -74,6 +95,7 @@ export function AppShell() {
       openDailyNote,
       handleBack,
       handleForward,
+      openQuickAdd,
     ],
   );
 
@@ -126,13 +148,19 @@ export function AppShell() {
             {activeView === "search" && <SearchResults />}
             {activeView === "settings" && <SettingsPanel />}
             {activeView === "trash" && <TrashView />}
+            {activeView === "tasks" && viewMode === "list" && <TaskList />}
+            {activeView === "tasks" && viewMode === "board" && <TaskBoard />}
           </div>
+
+          {/* Task detail panel */}
+          {activeView === "tasks" && isDetailOpen && <TaskDetail />}
         </div>
       </div>
 
       <StatusBar />
 
       {quickSwitcherOpen && <QuickSwitcher />}
+      <TaskQuickAdd />
     </div>
   );
 }

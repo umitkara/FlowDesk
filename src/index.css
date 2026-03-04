@@ -103,4 +103,47 @@
   .tiptap-editor .ProseMirror mark {
     @apply rounded bg-yellow-200 px-0.5 dark:bg-yellow-800;
   }
+
+  /* Inline entity reference chips (@task[id], @note[id], @plan[id]) */
+  .entity-ref-chip {
+    @apply inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 align-baseline text-[11px] leading-tight dark:bg-gray-800;
+    cursor: default;
+    user-select: none;
+  }
+
+  .entity-ref-chip.entity-ref-task {
+    @apply bg-blue-50 dark:bg-blue-950/30;
+  }
+
+  .entity-ref-chip.entity-ref-loading {
+    @apply text-gray-400;
+  }
+
+  .entity-ref-chip.entity-ref-error {
+    @apply bg-red-50 text-red-400 dark:bg-red-950/20;
+  }
+
+  .entity-ref-checkbox {
+    @apply flex h-3 w-3 flex-shrink-0 cursor-pointer items-center justify-center rounded-sm border border-gray-300 transition-colors hover:border-gray-400 dark:border-gray-600;
+  }
+
+  .entity-ref-checkbox-done {
+    @apply border-green-500 bg-green-500 text-white;
+  }
+
+  .entity-ref-title {
+    @apply cursor-pointer font-medium text-gray-700 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400;
+  }
+
+  .entity-ref-title-done {
+    @apply text-gray-400 line-through dark:text-gray-500;
+  }
+
+  .entity-ref-status {
+    @apply text-[9px] font-medium;
+  }
+
+  .entity-ref-badge {
+    @apply rounded bg-gray-200 px-1 py-0.5 text-[9px] font-medium uppercase text-gray-500 dark:bg-gray-700 dark:text-gray-400;
+  }
 }

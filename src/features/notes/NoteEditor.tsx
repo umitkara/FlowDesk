@@ -13,6 +13,8 @@ import { useUIStore } from "../../stores/uiStore";
 import { useDebounce } from "../../hooks/useDebounce";
 import { FrontMatterPanel } from "./FrontMatterPanel";
 import { formatDate } from "../../lib/utils";
+import { TaskReferenceExtension, preprocessEntityRefs } from "./extensions/TaskReferenceExtension";
+import { syncNoteReferences } from "../../lib/ipc";
 
 /** Tiptap-based markdown editor for notes with title bar and metadata drawer. */
 export function NoteEditor() {
@@ -31,6 +33,8 @@ export function NoteEditor() {
   const debouncedSave = useDebounce((body: string) => {
     if (activeNote) {
       updateNote(activeNote.id, { body });
+      // Sync inline @task[id] references after save
+      syncNoteReferences(activeNote.id, body).catch(() => {});
     }
   }, delayMs);
 
@@ -50,8 +54,9 @@ export function NoteEditor() {
       }),
       Typography,
       CharacterCount,
+      TaskReferenceExtension,
     ],
-    content: activeNote?.body || "",
+    content: preprocessEntityRefs(activeNote?.body || ""),
     onUpdate: ({ editor: ed }) => {
       debouncedSave(ed.getHTML());
     },
@@ -65,16 +70,19 @@ export function NoteEditor() {
   // Sync editor content when switching notes
   useEffect(() => {
     if (editor && activeNote) {
+      const processed = preprocessEntityRefs(activeNote.body || "");
       const currentContent = editor.getHTML();
-      if (currentContent !== activeNote.body) {
-        editor.commands.setContent(activeNote.body || "");
+      if (currentContent !== processed) {
+        editor.commands.setContent(processed);
       }
     }
   }, [editor, activeNote?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleForceSave = useCallback(() => {
     if (editor && activeNote) {
-      updateNote(activeNote.id, { body: editor.getHTML() });
+      const body = editor.getHTML();
+      updateNote(activeNote.id, { body });
+      syncNoteReferences(activeNote.id, body).catch(() => {});
     }
   }, [editor, activeNote, updateNote]);
 

@@ -3,18 +3,21 @@ import { AppShell } from "./components/layout/AppShell";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useNoteStore } from "./stores/noteStore";
 import { useUIStore } from "./stores/uiStore";
+import { useTaskStore } from "./stores/taskStore";
 
 /** Root application component. Loads settings and initial data on mount. */
 function App() {
   const loadSettings = useSettingsStore((s) => s.loadSettings);
   const loadNotes = useNoteStore((s) => s.loadNotes);
   const loadFolderTree = useNoteStore((s) => s.loadFolderTree);
+  const fetchStickyTasks = useTaskStore((s) => s.fetchStickyTasks);
 
   useEffect(() => {
     loadSettings();
     loadNotes();
     loadFolderTree();
-  }, [loadSettings, loadNotes, loadFolderTree]);
+    fetchStickyTasks();
+  }, [loadSettings, loadNotes, loadFolderTree, fetchStickyTasks]);
 
   // Apply theme setting to the document
   const theme = useSettingsStore((s) => s.settings.theme ?? "system");
