@@ -27,6 +27,9 @@ export function Sidebar() {
   const loadFolderTree = useNoteStore((s) => s.loadFolderTree);
   const viewMode = useTaskStore((s) => s.viewMode);
   const setViewMode = useTaskStore((s) => s.setViewMode);
+  const treeMode = useTaskStore((s) => s.treeMode);
+  const setTreeMode = useTaskStore((s) => s.setTreeMode);
+  const filter = useTaskStore((s) => s.filter);
   const setFilter = useTaskStore((s) => s.setFilter);
 
   useEffect(() => {
@@ -121,10 +124,13 @@ export function Sidebar() {
           onClick={() => {
             setFilter({});
             setViewMode("list");
+            setTreeMode(false);
             setActiveView("tasks");
           }}
           className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
-            activeView === "tasks" && viewMode === "list" ? activeClass : inactiveClass
+            activeView === "tasks" && viewMode === "list" && !treeMode && filter.is_sticky !== true
+              ? activeClass
+              : inactiveClass
           }`}
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -136,6 +142,7 @@ export function Sidebar() {
           onClick={() => {
             setFilter({});
             setViewMode("board");
+            setTreeMode(false);
             setActiveView("tasks");
           }}
           className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
@@ -149,11 +156,34 @@ export function Sidebar() {
         </button>
         <button
           onClick={() => {
-            setFilter({ is_sticky: true });
+            setFilter({});
             setViewMode("list");
+            setTreeMode(true);
             setActiveView("tasks");
           }}
-          className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${inactiveClass}`}
+          className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
+            activeView === "tasks" && viewMode === "list" && treeMode
+              ? activeClass
+              : inactiveClass
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h4m0 0v4m0-4h10m0 0v4m-10 4v4m0 0h4m-4 0H3m10-4v4m0 0h4m-4 0h-4" />
+          </svg>
+          Tree View
+        </button>
+        <button
+          onClick={() => {
+            setFilter({ is_sticky: true });
+            setViewMode("list");
+            setTreeMode(false);
+            setActiveView("tasks");
+          }}
+          className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
+            activeView === "tasks" && viewMode === "list" && filter.is_sticky === true
+              ? activeClass
+              : inactiveClass
+          }`}
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />

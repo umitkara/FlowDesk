@@ -9,6 +9,9 @@ interface TaskRowProps {
   depth?: number;
   isFocused?: boolean;
   onFocus?: () => void;
+  hasChildren?: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 /** Formats a due date for display with overdue highlighting. */
@@ -30,7 +33,7 @@ function formatDueDate(dueDate: string | null): { text: string; isOverdue: boole
 }
 
 /** Individual task row for the list view with inline status/priority editing. */
-export function TaskRow({ task, depth = 0, isFocused, onFocus }: TaskRowProps) {
+export function TaskRow({ task, depth = 0, isFocused, onFocus, hasChildren, isCollapsed, onToggleCollapse }: TaskRowProps) {
   const toggleTaskStatus = useTaskStore((s) => s.toggleTaskStatus);
   const toggleTaskSelection = useTaskStore((s) => s.toggleTaskSelection);
   const selectedTaskIds = useTaskStore((s) => s.selectedTaskIds);
@@ -88,6 +91,18 @@ export function TaskRow({ task, depth = 0, isFocused, onFocus }: TaskRowProps) {
 
       {/* Title */}
       <td className="px-2 py-2" style={{ paddingLeft: `${depth * 20 + 8}px` }}>
+        <div className="flex items-center gap-1">
+          {hasChildren ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleCollapse?.(); }}
+              className="flex h-3 w-3 items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              title={isCollapsed ? "Expand" : "Collapse"}
+            >
+              {isCollapsed ? "▶" : "▼"}
+            </button>
+          ) : (
+            <span className="w-3" />
+          )}
         <button
           onClick={() => openDetail(task.id)}
           className={`text-left text-sm font-medium ${
@@ -108,6 +123,7 @@ export function TaskRow({ task, depth = 0, isFocused, onFocus }: TaskRowProps) {
             {task.completed_subtask_count}/{task.subtask_count}
           </span>
         )}
+        </div>
       </td>
 
       {/* Status — inline editable */}

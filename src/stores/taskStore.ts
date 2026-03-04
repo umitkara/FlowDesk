@@ -24,6 +24,8 @@ interface TaskState {
 
   /** Current view mode. */
   viewMode: "list" | "board";
+  /** Whether the list view is in hierarchical tree mode. */
+  treeMode: boolean;
   /** Active filter configuration. */
   filter: Partial<TaskFilter>;
   /** Active sort configuration. */
@@ -76,6 +78,8 @@ interface TaskState {
 
   /** Switch view mode. */
   setViewMode: (mode: "list" | "board") => void;
+  /** Set tree mode for list view. */
+  setTreeMode: (v: boolean) => void;
   /** Update filter and refetch. */
   setFilter: (filter: Partial<TaskFilter>) => void;
   /** Update sort and refetch. */
@@ -111,6 +115,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   stickyTasks: [],
 
   viewMode: "list",
+  treeMode: false,
   filter: {},
   sort: { field: "priority", direction: "desc" },
   isDetailOpen: false,
@@ -260,7 +265,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   clearSelection: () => set({ selectedTaskIds: new Set() }),
 
-  setViewMode: (mode) => set({ viewMode: mode }),
+  setViewMode: (mode) => set({ viewMode: mode, treeMode: false }),
+
+  setTreeMode: (v) => set({ treeMode: v }),
 
   setFilter: (filter) => {
     set({ filter });

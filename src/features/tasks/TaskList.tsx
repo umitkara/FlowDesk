@@ -2,7 +2,33 @@ import { useEffect, useState, useCallback } from "react";
 import { useTaskStore } from "../../stores/taskStore";
 import { TaskRow } from "./TaskRow";
 import { TaskFilters } from "./TaskFilters";
-import type { TaskSort } from "../../lib/types";
+import type { TaskSort, TaskWithChildren } from "../../lib/types";
+
+/** Builds a flat list of rows in depth-first order for tree display. */
+function buildTreeRows(tasks: TaskWithChildren[], collapsedIds: Set<string>) {
+  const childrenMap = new Map<string | null, TaskWithChildren[]>();
+  const visibleIds = new Set(tasks.map((t) => t.id));
+
+  for (const task of tasks) {
+    const key =
+      task.parent_task_id && visibleIds.has(task.parent_task_id)
+        ? task.parent_task_id
+        : null;
+    if (!childrenMap.has(key)) childrenMap.set(key, []);
+    childrenMap.get(key)!.push(task);
+  }
+
+  const rows: { task: TaskWithChildren; depth: number; hasChildren: boolean }[] = [];
+  function visit(parentId: string | null, depth: number) {
+    for (const task of childrenMap.get(parentId) ?? []) {
+      const kids = childrenMap.get(task.id) ?? [];
+      rows.push({ task, depth, hasChildren: kids.length > 0 });
+      if (!collapsedIds.has(task.id)) visit(task.id, depth + 1);
+    }
+  }
+  visit(null, 0);
+  return rows;
+}
 
 /** Column header configuration for task list sorting. */
 const SORTABLE_COLUMNS: { field: TaskSort["field"]; label: string; className: string }[] = [
@@ -29,8 +55,10 @@ export function TaskList() {
   const toggleTaskStatus = useTaskStore((s) => s.toggleTaskStatus);
   const deleteTask = useTaskStore((s) => s.deleteTask);
   const updateTask = useTaskStore((s) => s.updateTask);
+  const treeMode = useTaskStore((s) => s.treeMode);
 
   const [bulkTagInput, setBulkTagInput] = useState("");
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [showBulkTagInput, setShowBulkTagInput] = useState(false);
   const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
 
@@ -175,14 +203,34 @@ export function TaskList() {
               </tr>
             </thead>
             <tbody>
-              {tasks.map((task) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  isFocused={focusedTaskId === task.id}
-                  onFocus={() => setFocusedTaskId(task.id)}
-                />
-              ))}
+              {treeMode
+                ? buildTreeRows(tasks, collapsedIds).map(({ task, depth, hasChildren }) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      depth={depth}
+                      hasChildren={hasChildren}
+                      isCollapsed={collapsedIds.has(task.id)}
+                      onToggleCollapse={() => {
+                        setCollapsedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(task.id)) next.delete(task.id);
+                          else next.add(task.id);
+                          return next;
+                        });
+                      }}
+                      isFocused={focusedTaskId === task.id}
+                      onFocus={() => setFocusedTaskId(task.id)}
+                    />
+                  ))
+                : tasks.map((task) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      isFocused={focusedTaskId === task.id}
+                      onFocus={() => setFocusedTaskId(task.id)}
+                    />
+                  ))}
             </tbody>
           </table>
         )}
