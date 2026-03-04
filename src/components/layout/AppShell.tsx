@@ -17,6 +17,11 @@ import { TaskList } from "../../features/tasks/TaskList";
 import { TaskBoard } from "../../features/tasks/TaskBoard";
 import { TaskDetail } from "../../features/tasks/TaskDetail";
 import { TaskQuickAdd } from "../../features/tasks/TaskQuickAdd";
+import CalendarView from "../../features/plans/CalendarView";
+import DailyPlanView from "../../features/plans/DailyPlanView";
+import PlanDetail from "../../features/plans/PlanDetail";
+import PlanDialog from "../../features/plans/PlanDialog";
+import { usePlanStore } from "../../stores/planStore";
 import { todayISO } from "../../lib/utils";
 
 /** Root layout container with sidebar, main content, and status bar. */
@@ -37,6 +42,7 @@ export function AppShell() {
   const isDetailOpen = useTaskStore((s) => s.isDetailOpen);
   const openQuickAdd = useTaskStore((s) => s.openQuickAdd);
   const fetchTasks = useTaskStore((s) => s.fetchTasks);
+  const isPlanDetailOpen = usePlanStore((s) => s.isDetailOpen);
 
   useEffect(() => {
     if (activeView === "tasks") {
@@ -152,10 +158,15 @@ export function AppShell() {
             {activeView === "about" && <AboutPanel />}
             {activeView === "tasks" && viewMode === "list" && <TaskList />}
             {activeView === "tasks" && viewMode === "board" && <TaskBoard />}
+            {activeView === "plans" && <CalendarView />}
+            {activeView === "daily-plan" && <DailyPlanView />}
           </div>
 
           {/* Task detail panel */}
           {activeView === "tasks" && isDetailOpen && <TaskDetail />}
+
+          {/* Plan detail panel */}
+          {(activeView === "plans" || activeView === "daily-plan") && isPlanDetailOpen && <PlanDetail />}
         </div>
       </div>
 
@@ -163,6 +174,7 @@ export function AppShell() {
 
       {quickSwitcherOpen && <QuickSwitcher />}
       <TaskQuickAdd />
+      <PlanDialog />
     </div>
   );
 }

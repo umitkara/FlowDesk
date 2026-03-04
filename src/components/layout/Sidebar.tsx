@@ -4,6 +4,7 @@ import { useUIStore } from "../../stores/uiStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { FolderTree } from "../../features/notes/FolderTree";
 import { DailyCalendar } from "../../features/notes/DailyCalendar";
+import { PlanMiniCalendar } from "../../features/plans/PlanMiniCalendar";
 import { todayISO } from "../../lib/utils";
 
 /** Sidebar quick-filter identifiers. */
@@ -192,6 +193,35 @@ export function Sidebar() {
         </button>
       </div>
 
+      {/* Plans & Calendar section */}
+      <div className="space-y-0.5 border-b border-gray-200 px-2 py-2 dark:border-gray-800">
+        <div className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Plans
+        </div>
+        <button
+          onClick={() => setActiveView("plans")}
+          className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
+            activeView === "plans" ? activeClass : inactiveClass
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Calendar
+        </button>
+        <button
+          onClick={() => setActiveView("daily-plan")}
+          className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
+            activeView === "daily-plan" ? activeClass : inactiveClass
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          Daily Plan
+        </button>
+      </div>
+
       {/* Folder tree */}
       <div className="flex-1 overflow-y-auto px-2 py-2">
         <div className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
@@ -207,9 +237,13 @@ export function Sidebar() {
         />
       </div>
 
-      {/* Mini calendar */}
+      {/* Mini calendars */}
       <div className="border-t border-gray-200 p-2 dark:border-gray-800">
-        <DailyCalendar />
+        {activeView === "plans" || activeView === "daily-plan" ? (
+          <PlanMiniCalendar />
+        ) : (
+          <DailyCalendar />
+        )}
       </div>
     </div>
   );
