@@ -3,6 +3,7 @@ use crate::models::note::{
 };
 use crate::state::AppState;
 use crate::utils::errors::AppError;
+use crate::utils::text::resolve_entity_refs;
 use crate::utils::{id::generate_id, time::now_iso};
 use sha2::{Digest, Sha256};
 use tauri::State;
@@ -524,7 +525,7 @@ pub fn list_notes(
                         updated_at: row.get(8)?,
                         created_at: row.get(9)?,
                         word_count: word_count(&body),
-                        preview: body_preview(&body),
+                        preview: resolve_entity_refs(&body_preview(&body), conn),
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;

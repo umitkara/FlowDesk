@@ -192,6 +192,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // Notes
             commands::notes::create_note,
             commands::notes::get_note,
             commands::notes::update_note,
@@ -205,15 +206,39 @@ pub fn run() {
             commands::notes::get_dates_with_notes,
             commands::notes::move_note_to_folder,
             commands::notes::get_note_count,
+            // Search
             commands::search::search_notes,
+            // Export
             commands::export::export_notes,
             commands::export::export_single_note,
+            // Settings
             commands::settings::get_setting,
             commands::settings::set_setting,
             commands::settings::get_all_settings,
             commands::settings::set_many_settings,
+            // Workspaces
             commands::workspaces::list_workspaces,
             commands::workspaces::get_workspace,
+            // Tasks
+            commands::tasks::create_task,
+            commands::tasks::get_task,
+            commands::tasks::list_tasks,
+            commands::tasks::update_task,
+            commands::tasks::delete_task,
+            commands::tasks::restore_task,
+            commands::tasks::toggle_task_status,
+            commands::tasks::get_subtask_tree,
+            commands::tasks::bulk_update_task_status,
+            commands::tasks::bulk_add_task_tags,
+            commands::tasks::bulk_delete_tasks,
+            commands::tasks::get_sticky_tasks,
+            commands::tasks::move_task_status,
+            // References
+            commands::references::create_reference,
+            commands::references::delete_reference,
+            commands::references::list_references,
+            commands::references::get_backlinks,
+            commands::references::sync_note_references,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

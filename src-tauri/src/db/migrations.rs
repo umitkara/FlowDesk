@@ -31,6 +31,16 @@ pub fn run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
             "003_note_fields",
             include_str!("../../migrations/003_note_fields.sql"),
         ),
+        (
+            4,
+            "004_tasks",
+            include_str!("../../migrations/004_tasks.sql"),
+        ),
+        (
+            5,
+            "005_references",
+            include_str!("../../migrations/005_references.sql"),
+        ),
     ];
 
     for (version, name, sql) in migrations {

@@ -4,3 +4,5 @@ pub mod backup;
 pub mod export;
 /// YAML front matter parsing and reconstruction.
 pub mod frontmatter;
+/// Reference management: inline parsing, diffing, and cycle detection.
+pub mod references;
