@@ -21,6 +21,17 @@ import type {
   CreateReferenceInput,
   ReferenceFilter,
   Backlink,
+  Plan,
+  CreatePlanInput,
+  UpdatePlanInput,
+  PlanQuery,
+  PlanWithLinks,
+  PlanLinkedTask,
+  PlanLinkedNote,
+  DailyPlanSummary,
+  AgendaItem,
+  SpawnTaskInput,
+  SpawnNoteInput,
 } from "./types";
 
 // --- Notes ---
@@ -194,3 +205,56 @@ export const getBacklinks = (targetType: string, targetId: string) =>
 /** Syncs inline references for a note. */
 export const syncNoteReferences = (noteId: string, body: string) =>
   invoke<Reference[]>("sync_note_references", { noteId, body });
+
+// --- Plans ---
+
+/** Creates a new plan. */
+export const createPlan = (input: CreatePlanInput) =>
+  invoke<Plan>("create_plan", { input });
+
+/** Gets a plan by ID. */
+export const getPlan = (id: string) => invoke<Plan>("get_plan", { id });
+
+/** Updates fields on an existing plan. */
+export const updatePlan = (input: UpdatePlanInput) =>
+  invoke<Plan>("update_plan", { input });
+
+/** Soft-deletes a plan. */
+export const deletePlan = (id: string) =>
+  invoke<void>("delete_plan", { id });
+
+/** Lists plans matching the given query parameters. */
+export const listPlans = (query: PlanQuery) =>
+  invoke<Plan[]>("list_plans", { query });
+
+/** Gets the aggregated daily plan summary for a date. */
+export const getDailyPlanSummary = (workspaceId: string, date: string) =>
+  invoke<DailyPlanSummary>("get_daily_plan_summary", { workspaceId, date });
+
+/** Gets a plan with all linked entities. */
+export const getPlanWithLinks = (id: string) =>
+  invoke<PlanWithLinks>("get_plan_with_links", { id });
+
+/** Spawns a task from a plan. */
+export const spawnTaskFromPlan = (input: SpawnTaskInput) =>
+  invoke<PlanLinkedTask>("spawn_task_from_plan", { input });
+
+/** Spawns a note from a plan. */
+export const spawnNoteFromPlan = (input: SpawnNoteInput) =>
+  invoke<PlanLinkedNote>("spawn_note_from_plan", { input });
+
+/** Links an existing task to a plan. */
+export const linkTaskToPlan = (planId: string, taskId: string, relation: string) =>
+  invoke<void>("link_task_to_plan", { planId, taskId, relation });
+
+/** Removes references between a task and a plan. */
+export const unlinkTaskFromPlan = (planId: string, taskId: string) =>
+  invoke<void>("unlink_task_from_plan", { planId, taskId });
+
+/** FTS5 search across plans. */
+export const searchPlans = (workspaceId: string, query: string) =>
+  invoke<Plan[]>("search_plans", { workspaceId, query });
+
+/** Gets a unified agenda of plans and tasks in date range. */
+export const getAgenda = (workspaceId: string, startDate: string, endDate: string) =>
+  invoke<AgendaItem[]>("get_agenda", { workspaceId, startDate, endDate });

@@ -99,9 +99,9 @@ export interface SearchQuery {
   entity_types?: string[];
 }
 
-/** A single full-text search result (notes and tasks). */
+/** A single full-text search result (notes, tasks, and plans). */
 export interface SearchResult {
-  entity_type: "note" | "task";
+  entity_type: "note" | "task" | "plan";
   id: string;
   title: string | null;
   snippet: string;
@@ -266,7 +266,20 @@ export type EntityType = "note" | "task" | "plan" | "time_entry";
 export type TargetType = EntityType | "url" | "file";
 
 /** Valid relation types. */
-export type RelationType = "references" | "blocks" | "blocked_by" | "subtask_of" | "related_to";
+export type RelationType =
+  | "references"
+  | "blocks"
+  | "blocked_by"
+  | "subtask_of"
+  | "related_to"
+  | "spawned"
+  | "spawned_from"
+  | "implements"
+  | "daily_note_for"
+  | "scheduled_in"
+  | "documents"
+  | "continues"
+  | "time_logged";
 
 /** A reference (link) between two entities. */
 export interface Reference {
@@ -338,4 +351,167 @@ export const PRIORITY_CONFIG: Record<TaskPriority, PriorityConfig> = {
   medium: { label: "Medium",  color: "text-amber-400", sortOrder: 2 },
   high:   { label: "High",    color: "text-orange-500", sortOrder: 3 },
   urgent: { label: "Urgent",  color: "text-red-500",   sortOrder: 4 },
+};
+
+// --- Plan Types ---
+
+/** Valid plan type values. */
+export type PlanType = "time_block" | "event" | "daily_plan" | "milestone";
+
+/** Valid importance levels. */
+export type Importance = "low" | "medium" | "high" | "critical";
+
+/** A complete plan entity — a calendar-bound block of time. */
+export interface Plan {
+  id: string;
+  workspace_id: string;
+  title: string;
+  description: string | null;
+  start_time: string;
+  end_time: string;
+  all_day: boolean;
+  type: PlanType;
+  category: string | null;
+  color: string | null;
+  importance: Importance | null;
+  tags: string[] | null;
+  recurrence: RecurrenceRule | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+/** Input for creating a new plan. */
+export interface CreatePlanInput {
+  workspace_id: string;
+  title: string;
+  description?: string;
+  start_time: string;
+  end_time: string;
+  all_day?: boolean;
+  type?: PlanType;
+  category?: string;
+  color?: string;
+  importance?: Importance;
+  tags?: string[] | null;
+  recurrence?: RecurrenceRule;
+}
+
+/** Input for updating an existing plan (partial update). */
+export interface UpdatePlanInput {
+  id: string;
+  title?: string;
+  description?: string | null;
+  start_time?: string;
+  end_time?: string;
+  all_day?: boolean;
+  type?: PlanType;
+  category?: string | null;
+  color?: string | null;
+  importance?: Importance | null;
+  tags?: string[] | null;
+  recurrence?: RecurrenceRule | null;
+}
+
+/** Query parameters for listing plans. */
+export interface PlanQuery {
+  workspace_id: string;
+  start_after?: string;
+  end_before?: string;
+  plan_type?: PlanType;
+  category?: string;
+  importance?: string;
+  include_deleted?: boolean;
+}
+
+/** A plan with its linked entities for the detail view. */
+export interface PlanWithLinks {
+  plan: Plan;
+  linked_tasks: PlanLinkedTask[];
+  linked_notes: PlanLinkedNote[];
+}
+
+/** A task linked to a plan (summary view). */
+export interface PlanLinkedTask {
+  task_id: string;
+  title: string;
+  status: string;
+  priority: string;
+  relation: string;
+}
+
+/** A note linked to a plan (summary view). */
+export interface PlanLinkedNote {
+  note_id: string;
+  title: string | null;
+  date: string | null;
+  relation: string;
+}
+
+/** Aggregated daily plan data for a single day. */
+export interface DailyPlanSummary {
+  date: string;
+  daily_plan: Plan | null;
+  time_blocks: Plan[];
+  events: Plan[];
+  milestones: Plan[];
+  scheduled_tasks: PlanLinkedTask[];
+}
+
+/** A unified agenda item (plan or task). */
+export interface AgendaItem {
+  item_type: "plan" | "task";
+  id: string;
+  title: string;
+  start_time: string | null;
+  end_time: string | null;
+  date: string | null;
+  plan_type: PlanType | null;
+  task_status: string | null;
+  task_priority: string | null;
+  color: string | null;
+  importance: string | null;
+  all_day: boolean | null;
+}
+
+/** Input for spawning a task from a plan. */
+export interface SpawnTaskInput {
+  plan_id: string;
+  title: string;
+  description?: string;
+  priority?: string;
+  due_date?: string;
+  scheduled_date?: string;
+}
+
+/** Input for spawning a note from a plan. */
+export interface SpawnNoteInput {
+  plan_id: string;
+  title?: string;
+  template_body?: string;
+  note_type?: string;
+  folder?: string;
+}
+
+/** Plan type display configuration. */
+export interface PlanTypeConfig {
+  label: string;
+  icon: string;
+  color: string;
+}
+
+/** Plan type display configuration map. */
+export const PLAN_TYPE_CONFIG: Record<PlanType, PlanTypeConfig> = {
+  time_block: { label: "Time Block", icon: "clock",    color: "#3b82f6" },
+  event:      { label: "Event",      icon: "calendar", color: "#8b5cf6" },
+  daily_plan: { label: "Daily Plan", icon: "sun",      color: "#10b981" },
+  milestone:  { label: "Milestone",  icon: "diamond",  color: "#f59e0b" },
+};
+
+/** Importance display configuration. */
+export const IMPORTANCE_CONFIG: Record<Importance, { label: string; color: string }> = {
+  low:      { label: "Low",      color: "text-blue-400" },
+  medium:   { label: "Medium",   color: "text-amber-400" },
+  high:     { label: "High",     color: "text-orange-500" },
+  critical: { label: "Critical", color: "text-red-500" },
 };
