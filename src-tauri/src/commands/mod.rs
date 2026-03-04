@@ -1,5 +1,7 @@
 /// Note CRUD and organization commands.
 pub mod notes;
+/// Plan CRUD, calendar queries, spawning, and agenda commands.
+pub mod plans;
 /// Reference (cross-entity link) commands.
 pub mod references;
 /// Full-text search commands.

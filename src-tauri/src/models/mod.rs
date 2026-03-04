@@ -1,5 +1,7 @@
 /// Note entity and related input/query types.
 pub mod note;
+/// Plan entity and related input/query types.
+pub mod plan;
 /// Reference (cross-entity link) entity and related types.
 pub mod reference;
 /// Tag entity.
