@@ -74,6 +74,11 @@ fn validate_title(title: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Returns true for plan types that are point-in-time (no duration).
+fn is_point_in_time(plan_type: &str) -> bool {
+    matches!(plan_type, "milestone" | "deadline" | "reminder")
+}
+
 /// Validates that a plan type is one of the allowed values.
 fn validate_plan_type(plan_type: &str) -> Result<(), AppError> {
     if !VALID_PLAN_TYPES.contains(&plan_type) {
@@ -159,8 +164,8 @@ pub fn create_plan(state: State<'_, AppState>, input: CreatePlanInput) -> Result
 
     let all_day = input.all_day.unwrap_or(false);
 
-    // For milestones, end_time = start_time
-    let end_time = if plan_type == "milestone" {
+    // For point-in-time types (milestone, deadline, reminder), end_time = start_time
+    let end_time = if is_point_in_time(plan_type) {
         input.start_time.clone()
     } else {
         input.end_time.clone()
@@ -277,8 +282,8 @@ pub fn update_plan(state: State<'_, AppState>, input: UpdatePlanInput) -> Result
                 .as_deref()
                 .unwrap_or(&existing.plan_type);
 
-            // For milestones, force end = start
-            let final_end = if effective_type == "milestone" {
+            // For point-in-time types, force end = start
+            let final_end = if is_point_in_time(effective_type) {
                 effective_start
             } else {
                 effective_end
@@ -301,7 +306,7 @@ pub fn update_plan(state: State<'_, AppState>, input: UpdatePlanInput) -> Result
                 params.push(Box::new(desc_opt.clone()));
                 pidx += 1;
             }
-            if input.start_time.is_some() || (effective_type == "milestone" && input.plan_type.is_some()) {
+            if input.start_time.is_some() || (is_point_in_time(effective_type) && input.plan_type.is_some()) {
                 set_clauses.push(format!("start_time = ?{}", pidx));
                 params.push(Box::new(effective_start.to_string()));
                 pidx += 1;
@@ -590,6 +595,11 @@ pub fn get_daily_plan_summary(
             let mut time_blocks = Vec::new();
             let mut events = Vec::new();
             let mut milestones = Vec::new();
+            let mut deadlines = Vec::new();
+            let mut meetings = Vec::new();
+            let mut reviews = Vec::new();
+            let mut habits = Vec::new();
+            let mut reminders = Vec::new();
 
             for plan in plans {
                 match plan.plan_type.as_str() {
@@ -597,6 +607,11 @@ pub fn get_daily_plan_summary(
                     "time_block" => time_blocks.push(plan),
                     "event" => events.push(plan),
                     "milestone" => milestones.push(plan),
+                    "deadline" => deadlines.push(plan),
+                    "meeting" => meetings.push(plan),
+                    "review" => reviews.push(plan),
+                    "habit" => habits.push(plan),
+                    "reminder" => reminders.push(plan),
                     _ => time_blocks.push(plan),
                 }
             }
@@ -684,6 +699,11 @@ pub fn get_daily_plan_summary(
                 time_blocks,
                 events,
                 milestones,
+                deadlines,
+                meetings,
+                reviews,
+                habits,
+                reminders,
                 scheduled_tasks,
             })
         })

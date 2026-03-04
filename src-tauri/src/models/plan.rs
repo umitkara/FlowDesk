@@ -172,6 +172,16 @@ pub struct DailyPlanSummary {
     pub events: Vec<Plan>,
     /// Milestones for this date.
     pub milestones: Vec<Plan>,
+    /// Deadlines for this date.
+    pub deadlines: Vec<Plan>,
+    /// Meetings for this date.
+    pub meetings: Vec<Plan>,
+    /// Review sessions for this date.
+    pub reviews: Vec<Plan>,
+    /// Habit entries for this date.
+    pub habits: Vec<Plan>,
+    /// Reminders for this date.
+    pub reminders: Vec<Plan>,
     /// Tasks scheduled for this date.
     pub scheduled_tasks: Vec<PlanLinkedTask>,
 }
@@ -238,7 +248,17 @@ pub struct SpawnNoteInput {
 }
 
 /// Valid plan types.
-pub const VALID_PLAN_TYPES: &[&str] = &["time_block", "event", "daily_plan", "milestone"];
+pub const VALID_PLAN_TYPES: &[&str] = &[
+    "time_block",
+    "event",
+    "daily_plan",
+    "milestone",
+    "deadline",
+    "meeting",
+    "review",
+    "habit",
+    "reminder",
+];
 
 /// Valid importance levels.
 pub const VALID_IMPORTANCE: &[&str] = &["low", "medium", "high", "critical"];
