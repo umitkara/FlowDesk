@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { useNoteStore } from "../../stores/noteStore";
 import { timeAgo, truncate } from "../../lib/utils";
 import * as ipc from "../../lib/ipc";
@@ -45,7 +46,6 @@ export function TrashView() {
 
   const handleHardDelete = useCallback(
     async (id: string) => {
-      if (!confirm("Permanently delete this note? This cannot be undone.")) return;
       await hardDeleteNote(id);
       await loadTrashed();
     },
@@ -53,12 +53,20 @@ export function TrashView() {
   );
 
   const handleEmptyTrash = useCallback(async () => {
-    if (!confirm(`Permanently delete all ${trashedNotes.length} notes in trash? This cannot be undone.`)) return;
+    const confirmed = await ask(
+      `Permanently delete all ${trashedNotes.length} notes in trash? This cannot be undone.`,
+      { title: "Empty Trash", kind: "warning" },
+    );
+    if (!confirmed) return;
     for (const note of trashedNotes) {
-      await hardDeleteNote(note.id);
+      try {
+        await ipc.hardDeleteNote(note.id);
+      } catch (e) {
+        console.error("Failed to delete note:", e);
+      }
     }
     await loadTrashed();
-  }, [trashedNotes, hardDeleteNote, loadTrashed]);
+  }, [trashedNotes, loadTrashed]);
 
   return (
     <div className="mx-auto max-w-2xl overflow-y-auto px-8 py-6">

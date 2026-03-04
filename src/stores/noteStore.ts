@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { ask } from "@tauri-apps/plugin-dialog";
 import * as ipc from "../lib/ipc";
 import type {
   Note,
@@ -165,12 +166,21 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   deleteNote: async (id) => {
-    await ipc.deleteNote(id);
-    const activeNote = get().activeNote;
-    if (activeNote?.id === id) {
-      set({ activeNote: null });
+    const confirmed = await ask("Delete this note?", {
+      title: "Confirm Delete",
+      kind: "warning",
+    });
+    if (!confirmed) return;
+    try {
+      await ipc.deleteNote(id);
+      const activeNote = get().activeNote;
+      if (activeNote?.id === id) {
+        set({ activeNote: null });
+      }
+      await get().refreshAll();
+    } catch (e) {
+      console.error("Failed to delete note:", e);
     }
-    await get().refreshAll();
   },
 
   restoreNote: async (id) => {
@@ -179,12 +189,21 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   hardDeleteNote: async (id) => {
-    await ipc.hardDeleteNote(id);
-    const activeNote = get().activeNote;
-    if (activeNote?.id === id) {
-      set({ activeNote: null });
+    const confirmed = await ask(
+      "Permanently delete this note? This cannot be undone.",
+      { title: "Confirm Permanent Delete", kind: "warning" },
+    );
+    if (!confirmed) return;
+    try {
+      await ipc.hardDeleteNote(id);
+      const activeNote = get().activeNote;
+      if (activeNote?.id === id) {
+        set({ activeNote: null });
+      }
+      await get().refreshAll();
+    } catch (e) {
+      console.error("Failed to permanently delete note:", e);
     }
-    await get().refreshAll();
   },
 
   openDailyNote: async (date) => {

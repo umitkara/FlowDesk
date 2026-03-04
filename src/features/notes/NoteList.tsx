@@ -142,9 +142,7 @@ function NoteListCard({
       <button
         onClick={(e) => {
           e.stopPropagation();
-          if (confirm("Delete this note?")) {
-            onDelete(note.id);
-          }
+          onDelete(note.id);
         }}
         title="Delete note"
         className={`absolute right-2 top-2 rounded p-0.5 text-gray-400 transition-opacity hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/30 dark:hover:text-red-400 ${

@@ -152,11 +152,7 @@ export function NoteEditor() {
               </svg>
             </button>
             <button
-              onClick={() => {
-                if (confirm("Delete this note?")) {
-                  deleteNote(activeNote.id);
-                }
-              }}
+              onClick={() => deleteNote(activeNote.id)}
               title="Delete note"
               className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
             >
