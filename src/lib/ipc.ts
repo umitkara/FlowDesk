@@ -11,6 +11,16 @@ import type {
   ExportOptions,
   ExportResult,
   Workspace,
+  Task,
+  TaskWithChildren,
+  CreateTaskInput,
+  UpdateTaskInput,
+  TaskFilter,
+  TaskSort,
+  Reference,
+  CreateReferenceInput,
+  ReferenceFilter,
+  Backlink,
 } from "./types";
 
 // --- Notes ---
@@ -109,3 +119,78 @@ export const listWorkspaces = () => invoke<Workspace[]>("list_workspaces");
 /** Gets a workspace by ID. */
 export const getWorkspace = (id: string) =>
   invoke<Workspace>("get_workspace", { id });
+
+// --- Tasks ---
+
+/** Creates a new task. */
+export const createTask = (task: CreateTaskInput) =>
+  invoke<Task>("create_task", { task });
+
+/** Gets a task by ID. */
+export const getTask = (id: string) => invoke<Task>("get_task", { id });
+
+/** Lists tasks with filtering and sorting. */
+export const listTasks = (filter: TaskFilter, sort?: TaskSort) =>
+  invoke<TaskWithChildren[]>("list_tasks", { filter, sort });
+
+/** Updates fields on an existing task. */
+export const updateTask = (id: string, updates: UpdateTaskInput) =>
+  invoke<Task>("update_task", { id, updates });
+
+/** Soft-deletes a task (and its subtasks). */
+export const deleteTask = (id: string) =>
+  invoke<void>("delete_task", { id });
+
+/** Restores a soft-deleted task. */
+export const restoreTask = (id: string) =>
+  invoke<Task>("restore_task", { id });
+
+/** Toggles a task between todo and done. */
+export const toggleTaskStatus = (id: string) =>
+  invoke<Task>("toggle_task_status", { id });
+
+/** Gets the recursive subtask tree for a task. */
+export const getSubtaskTree = (taskId: string) =>
+  invoke<TaskWithChildren[]>("get_subtask_tree", { taskId });
+
+/** Batch status change for multiple tasks. */
+export const bulkUpdateTaskStatus = (taskIds: string[], status: string) =>
+  invoke<Task[]>("bulk_update_task_status", { taskIds, status });
+
+/** Batch tag addition for multiple tasks. */
+export const bulkAddTaskTags = (taskIds: string[], tags: string[]) =>
+  invoke<Task[]>("bulk_add_task_tags", { taskIds, tags });
+
+/** Batch soft-delete multiple tasks. */
+export const bulkDeleteTasks = (taskIds: string[]) =>
+  invoke<void>("bulk_delete_tasks", { taskIds });
+
+/** Gets active sticky tasks for a workspace. */
+export const getStickyTasks = (workspaceId: string) =>
+  invoke<Task[]>("get_sticky_tasks", { workspaceId });
+
+/** Moves a task to a new status (Kanban drag-and-drop). */
+export const moveTaskStatus = (id: string, newStatus: string) =>
+  invoke<Task>("move_task_status", { id, newStatus });
+
+// --- References ---
+
+/** Creates a reference between two entities. */
+export const createReference = (reference: CreateReferenceInput) =>
+  invoke<Reference>("create_reference", { reference });
+
+/** Deletes a reference by ID. */
+export const deleteReference = (id: string) =>
+  invoke<void>("delete_reference", { id });
+
+/** Lists references with filter. */
+export const listReferences = (filter: ReferenceFilter) =>
+  invoke<Reference[]>("list_references", { filter });
+
+/** Gets incoming references (backlinks) for an entity. */
+export const getBacklinks = (targetType: string, targetId: string) =>
+  invoke<Backlink[]>("get_backlinks", { targetType, targetId });
+
+/** Syncs inline references for a note. */
+export const syncNoteReferences = (noteId: string, body: string) =>
+  invoke<Reference[]>("sync_note_references", { noteId, body });
