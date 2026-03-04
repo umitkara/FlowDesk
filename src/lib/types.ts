@@ -356,7 +356,7 @@ export const PRIORITY_CONFIG: Record<TaskPriority, PriorityConfig> = {
 // --- Plan Types ---
 
 /** Valid plan type values. */
-export type PlanType = "time_block" | "event" | "daily_plan" | "milestone";
+export type PlanType = "time_block" | "event" | "daily_plan" | "milestone" | "deadline" | "meeting" | "review" | "habit" | "reminder";
 
 /** Valid importance levels. */
 export type Importance = "low" | "medium" | "high" | "critical";
@@ -455,6 +455,11 @@ export interface DailyPlanSummary {
   time_blocks: Plan[];
   events: Plan[];
   milestones: Plan[];
+  deadlines: Plan[];
+  meetings: Plan[];
+  reviews: Plan[];
+  habits: Plan[];
+  reminders: Plan[];
   scheduled_tasks: PlanLinkedTask[];
 }
 
@@ -506,6 +511,11 @@ export const PLAN_TYPE_CONFIG: Record<PlanType, PlanTypeConfig> = {
   event:      { label: "Event",      icon: "calendar", color: "#8b5cf6" },
   daily_plan: { label: "Daily Plan", icon: "sun",      color: "#10b981" },
   milestone:  { label: "Milestone",  icon: "diamond",  color: "#f59e0b" },
+  deadline:   { label: "Deadline",   icon: "flag",     color: "#ef4444" },
+  meeting:    { label: "Meeting",    icon: "users",    color: "#6366f1" },
+  review:     { label: "Review",     icon: "refresh",  color: "#14b8a6" },
+  habit:      { label: "Habit",      icon: "repeat",   color: "#a855f7" },
+  reminder:   { label: "Reminder",   icon: "bell",     color: "#f97316" },
 };
 
 /** Importance display configuration. */

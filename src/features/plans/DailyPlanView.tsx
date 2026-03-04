@@ -58,10 +58,15 @@ export default function DailyPlanView() {
     setInitialized(true);
   }, [dailyPlanDate, fetchDailySummary, fetchStickyTasks]);
 
-  // Fetch linked tasks for each time block / event
+  // Fetch linked tasks for each duration-based plan
   useEffect(() => {
     if (!dailySummary) return;
-    const planIds = [...dailySummary.time_blocks, ...dailySummary.events].map((p) => p.id);
+    const planIds = [
+      ...dailySummary.time_blocks,
+      ...dailySummary.events,
+      ...dailySummary.meetings,
+      ...dailySummary.reviews,
+    ].map((p) => p.id);
     if (planIds.length === 0) {
       setPlanLinkedTasks({});
       return;
@@ -132,6 +137,51 @@ export default function DailyPlanView() {
     });
   }, [dailyPlanDate, openDialog]);
 
+  const handleAddMeeting = useCallback(() => {
+    openDialog({
+      workspace_id: "",
+      start_time: `${dailyPlanDate}T09:00:00`,
+      end_time: `${dailyPlanDate}T10:00:00`,
+      type: "meeting",
+    });
+  }, [dailyPlanDate, openDialog]);
+
+  const handleAddReview = useCallback(() => {
+    openDialog({
+      workspace_id: "",
+      start_time: `${dailyPlanDate}T17:00:00`,
+      end_time: `${dailyPlanDate}T17:30:00`,
+      type: "review",
+    });
+  }, [dailyPlanDate, openDialog]);
+
+  const handleAddHabit = useCallback(() => {
+    openDialog({
+      workspace_id: "",
+      start_time: `${dailyPlanDate}T07:00:00`,
+      end_time: `${dailyPlanDate}T07:30:00`,
+      type: "habit",
+    });
+  }, [dailyPlanDate, openDialog]);
+
+  const handleAddDeadline = useCallback(() => {
+    openDialog({
+      workspace_id: "",
+      start_time: `${dailyPlanDate}T23:59:00`,
+      end_time: `${dailyPlanDate}T23:59:00`,
+      type: "deadline",
+    });
+  }, [dailyPlanDate, openDialog]);
+
+  const handleAddReminder = useCallback(() => {
+    openDialog({
+      workspace_id: "",
+      start_time: `${dailyPlanDate}T09:00:00`,
+      end_time: `${dailyPlanDate}T09:00:00`,
+      type: "reminder",
+    });
+  }, [dailyPlanDate, openDialog]);
+
   const handleCreateDailyPlan = useCallback(() => {
     openDialog({
       workspace_id: "",
@@ -153,11 +203,21 @@ export default function DailyPlanView() {
   const timeBlocks = dailySummary?.time_blocks ?? [];
   const events = dailySummary?.events ?? [];
   const milestones = dailySummary?.milestones ?? [];
+  const deadlines = dailySummary?.deadlines ?? [];
+  const meetings = dailySummary?.meetings ?? [];
+  const reviews = dailySummary?.reviews ?? [];
+  const habits = dailySummary?.habits ?? [];
+  const reminders = dailySummary?.reminders ?? [];
   const scheduledTasks = dailySummary?.scheduled_tasks ?? [];
   const dailyPlan = dailySummary?.daily_plan;
 
-  // Merge and sort time blocks and events chronologically
-  const chronological = [...timeBlocks, ...events].sort(
+  // Merge and sort duration-based plans chronologically
+  const chronological = [...timeBlocks, ...events, ...meetings, ...reviews].sort(
+    (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+  );
+
+  // Merge point-in-time markers
+  const markers = [...milestones, ...deadlines, ...reminders].sort(
     (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
   );
 
@@ -362,25 +422,61 @@ export default function DailyPlanView() {
           </section>
         )}
 
-        {/* Milestones */}
-        {milestones.length > 0 && (
+        {/* Habits */}
+        {habits.length > 0 && (
           <section>
             <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
-              Milestones ({milestones.length})
+              Habits ({habits.length})
             </div>
             <div className="space-y-1">
-              {milestones.map((m: Plan) => (
+              {habits.map((h: Plan) => (
                 <button
-                  key={m.id}
-                  onClick={() => handlePlanClick(m.id)}
+                  key={h.id}
+                  onClick={() => handlePlanClick(h.id)}
                   className="flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                 >
-                  <span className="text-amber-500 text-[10px]">◆</span>
-                  <span className="truncate text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    {m.title}
+                  <span style={{ color: "#a855f7" }} className="text-[10px]">↻</span>
+                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    {h.title}
+                  </span>
+                  <span className="text-[9px] text-zinc-400">
+                    {formatTime(h.start_time)}
                   </span>
                 </button>
               ))}
+            </div>
+          </section>
+        )}
+
+        {/* Markers: milestones, deadlines, reminders */}
+        {markers.length > 0 && (
+          <section>
+            <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+              Markers ({markers.length})
+            </div>
+            <div className="space-y-1">
+              {markers.map((m: Plan) => {
+                const typeCfg = PLAN_TYPE_CONFIG[m.type as keyof typeof PLAN_TYPE_CONFIG];
+                const markerIcon = m.type === "deadline" ? "⚑" : m.type === "reminder" ? "🔔" : "◆";
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => handlePlanClick(m.id)}
+                    className="flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  >
+                    <span style={{ color: typeCfg?.color }} className="text-[10px]">{markerIcon}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      {m.title}
+                    </span>
+                    <span
+                      className="rounded px-1 py-0.5 text-[9px] font-medium text-white"
+                      style={{ backgroundColor: typeCfg?.color || "#6b7280" }}
+                    >
+                      {typeCfg?.label || m.type}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </section>
         )}
@@ -408,6 +504,36 @@ export default function DailyPlanView() {
               className="rounded border border-zinc-200 px-2.5 py-1 text-[10px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
             >
               + Milestone
+            </button>
+            <button
+              onClick={handleAddMeeting}
+              className="rounded border border-zinc-200 px-2.5 py-1 text-[10px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              + Meeting
+            </button>
+            <button
+              onClick={handleAddReview}
+              className="rounded border border-zinc-200 px-2.5 py-1 text-[10px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              + Review
+            </button>
+            <button
+              onClick={handleAddHabit}
+              className="rounded border border-zinc-200 px-2.5 py-1 text-[10px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              + Habit
+            </button>
+            <button
+              onClick={handleAddDeadline}
+              className="rounded border border-zinc-200 px-2.5 py-1 text-[10px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              + Deadline
+            </button>
+            <button
+              onClick={handleAddReminder}
+              className="rounded border border-zinc-200 px-2.5 py-1 text-[10px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              + Reminder
             </button>
           </div>
         </section>
