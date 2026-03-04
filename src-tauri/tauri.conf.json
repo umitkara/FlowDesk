@@ -24,6 +24,11 @@
     ],
     "security": {
       "csp": null
+    },
+    "trayIcon": {
+      "id": "main-tray",
+      "iconPath": "icons/icon.ico",
+      "tooltip": "FlowDesk"
     }
   },
   "bundle": {

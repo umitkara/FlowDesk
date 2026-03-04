@@ -14,7 +14,9 @@ pub mod utils;
 use db::connection::DbPool;
 use state::AppState;
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use tauri::tray::TrayIconEvent;
 
 /// Backup-related settings loaded from the database.
 struct BackupSettings {
@@ -199,7 +201,87 @@ pub fn run() {
                 data_dir,
             });
 
+            // --- System tray setup ---
+            let show_item = MenuItemBuilder::with_id("show", "Show FlowDesk").build(app)?;
+            let start_item = MenuItemBuilder::with_id("tray_start", "Start Tracking").build(app)?;
+            let pause_item = MenuItemBuilder::with_id("tray_pause", "Pause").build(app)?;
+            let resume_item = MenuItemBuilder::with_id("tray_resume", "Resume").build(app)?;
+            let stop_item = MenuItemBuilder::with_id("tray_stop", "Stop Tracking").build(app)?;
+            let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
+
+            let menu = MenuBuilder::new(app)
+                .item(&show_item)
+                .separator()
+                .item(&start_item)
+                .item(&pause_item)
+                .item(&resume_item)
+                .item(&stop_item)
+                .separator()
+                .item(&quit_item)
+                .build()?;
+
+            if let Some(tray) = app.tray_by_id("main-tray") {
+                tray.set_menu(Some(menu))?;
+                tray.set_tooltip(Some("FlowDesk"))?;
+
+                tray.on_tray_icon_event(|tray_icon, event| {
+                    if let TrayIconEvent::DoubleClick { .. } = event {
+                        if let Some(window) = tray_icon.app_handle().get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.unminimize();
+                            let _ = window.set_focus();
+                        }
+                    }
+                });
+
+                tray.on_menu_event(|app_handle, event| {
+                    match event.id().as_ref() {
+                        "show" => {
+                            if let Some(window) = app_handle.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.unminimize();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "tray_start" | "tray_pause" | "tray_resume" | "tray_stop" => {
+                            // Emit events to the frontend which drives the state machine
+                            if let Some(window) = app_handle.get_webview_window("main") {
+                                let _ = window.emit("tray-tracker-action", event.id().as_ref());
+                            }
+                        }
+                        "quit" => {
+                            app_handle.exit(0);
+                        }
+                        _ => {}
+                    }
+                });
+            }
+
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // Check if the tracker is running — if so, minimize to tray instead of closing.
+                let app = window.app_handle();
+                let should_minimize = app.try_state::<AppState>().is_some_and(|state| {
+                    state.db.with_conn(|conn| {
+                        let status: String = conn
+                            .query_row(
+                                "SELECT status FROM tracker_state WHERE id = 1",
+                                [],
+                                |row| row.get(0),
+                            )
+                            .unwrap_or_else(|_| "idle".to_string());
+                        Ok(status != "idle")
+                    })
+                    .unwrap_or(false)
+                });
+
+                if should_minimize {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             // Notes
@@ -263,6 +345,28 @@ pub fn run() {
             commands::references::list_references,
             commands::references::get_backlinks,
             commands::references::sync_note_references,
+            // Time Entries / Tracker
+            commands::time_entries::tracker_start,
+            commands::time_entries::tracker_pause,
+            commands::time_entries::tracker_resume,
+            commands::time_entries::tracker_stop,
+            commands::time_entries::tracker_get_state,
+            commands::time_entries::tracker_update_notes,
+            commands::time_entries::tracker_add_session_note,
+            commands::time_entries::tracker_save_detail,
+            commands::time_entries::tracker_discard,
+            commands::time_entries::tracker_set_break_mode,
+            commands::time_entries::tracker_snooze_break,
+            commands::time_entries::tracker_recover_session,
+            commands::time_entries::get_time_entry,
+            commands::time_entries::list_time_entries,
+            commands::time_entries::update_time_entry,
+            commands::time_entries::delete_time_entry,
+            commands::time_entries::get_daily_summary,
+            commands::time_entries::get_weekly_summary,
+            commands::time_entries::get_entries_for_task,
+            commands::time_entries::get_entries_for_plan,
+            commands::time_entries::update_tray_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -9,6 +9,7 @@
     "dialog:default",
     "fs:default",
     "notification:default",
-    "window-state:default"
+    "window-state:default",
+    "core:tray:default"
   ]
 }
