@@ -4,6 +4,7 @@ import { searchNotes } from "../../lib/ipc";
 import { useNoteStore } from "../../stores/noteStore";
 import { useUIStore } from "../../stores/uiStore";
 import { useTaskStore } from "../../stores/taskStore";
+import { usePlanStore } from "../../stores/planStore";
 import type { SearchResult } from "../../lib/types";
 import { STATUS_CONFIG } from "../../lib/types";
 import { listWorkspaces } from "../../lib/ipc";
@@ -17,6 +18,7 @@ export function SearchResults() {
   const navigateTo = useUIStore((s) => s.navigateTo);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const openDetail = useTaskStore((s) => s.openDetail);
+  const fetchPlanWithLinks = usePlanStore((s) => s.fetchPlanWithLinks);
 
   const handleSearch = useCallback(async (query: string) => {
     if (!query.trim()) {
@@ -47,13 +49,16 @@ export function SearchResults() {
       if (result.entity_type === "task") {
         setActiveView("tasks");
         openDetail(result.id);
+      } else if (result.entity_type === "plan") {
+        setActiveView("plans");
+        fetchPlanWithLinks(result.id);
       } else {
         await selectNote(result.id);
         navigateTo(result.id);
         setActiveView("notes");
       }
     },
-    [selectNote, navigateTo, setActiveView, openDetail],
+    [selectNote, navigateTo, setActiveView, openDetail, fetchPlanWithLinks],
   );
 
   return (
@@ -85,7 +90,9 @@ export function SearchResults() {
                   className={`rounded px-1 py-0.5 text-[9px] font-medium uppercase ${
                     result.entity_type === "task"
                       ? "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
-                      : "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                      : result.entity_type === "plan"
+                        ? "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400"
+                        : "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                   }`}
                 >
                   {result.entity_type}

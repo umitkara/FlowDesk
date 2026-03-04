@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { NodeViewWrapper } from "@tiptap/react";
 import type { NodeViewProps } from "@tiptap/react";
-import type { Task, TaskStatus } from "../../../lib/types";
-import { STATUS_CONFIG, PRIORITY_CONFIG } from "../../../lib/types";
+import type { Task, Plan, TaskStatus } from "../../../lib/types";
+import { STATUS_CONFIG, PRIORITY_CONFIG, PLAN_TYPE_CONFIG } from "../../../lib/types";
 import * as ipc from "../../../lib/ipc";
 import { useTaskStore } from "../../../stores/taskStore";
+import { usePlanStore } from "../../../stores/planStore";
 import { useUIStore } from "../../../stores/uiStore";
 
 /**
@@ -20,20 +21,23 @@ export function TaskReferenceView({ node }: NodeViewProps) {
   const entityId: string = node.attrs.entityId;
 
   const [task, setTask] = useState<Task | null>(null);
+  const [plan, setPlan] = useState<Plan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const openDetail = useTaskStore((s) => s.openDetail);
+  const fetchPlanWithLinks = usePlanStore((s) => s.fetchPlanWithLinks);
   const setActiveView = useUIStore((s) => s.setActiveView);
 
-  const fetchTask = useCallback(async () => {
-    if (entityType !== "task") {
-      setIsLoading(false);
-      return;
-    }
+  const fetchEntity = useCallback(async () => {
     try {
-      const t = await ipc.getTask(entityId);
-      setTask(t);
+      if (entityType === "task") {
+        const t = await ipc.getTask(entityId);
+        setTask(t);
+      } else if (entityType === "plan") {
+        const p = await ipc.getPlan(entityId);
+        setPlan(p);
+      }
       setError(false);
     } catch {
       setError(true);
@@ -43,8 +47,11 @@ export function TaskReferenceView({ node }: NodeViewProps) {
   }, [entityType, entityId]);
 
   useEffect(() => {
-    fetchTask();
-  }, [fetchTask]);
+    fetchEntity();
+  }, [fetchEntity]);
+
+  // Keep backward-compatible alias
+  const fetchTask = fetchEntity;
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -87,7 +94,7 @@ export function TaskReferenceView({ node }: NodeViewProps) {
   }
 
   // Error / not found state
-  if (error || (entityType === "task" && !task)) {
+  if (error || (entityType === "task" && !task) || (entityType === "plan" && !plan)) {
     return (
       <NodeViewWrapper as="span" className="entity-ref-chip entity-ref-error">
         <span className="entity-ref-text">
@@ -97,7 +104,35 @@ export function TaskReferenceView({ node }: NodeViewProps) {
     );
   }
 
-  // Non-task entity types (note, plan) — render as simple badge
+  // Plan reference chip
+  if (entityType === "plan" && plan) {
+    const typeCfg = PLAN_TYPE_CONFIG[plan.type as keyof typeof PLAN_TYPE_CONFIG];
+    return (
+      <NodeViewWrapper as="span" className="entity-ref-chip entity-ref-plan">
+        <span
+          className="inline-block h-2 w-2 rounded-sm"
+          style={{ backgroundColor: plan.color || typeCfg?.color || "#6b7280" }}
+        />
+        <span
+          role="button"
+          tabIndex={-1}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setActiveView("plans");
+            fetchPlanWithLinks(entityId);
+          }}
+          className="entity-ref-title"
+          title={`${plan.title} — ${typeCfg?.label || plan.type}`}
+        >
+          {plan.title}
+        </span>
+        <span className="entity-ref-badge">{typeCfg?.label || plan.type}</span>
+      </NodeViewWrapper>
+    );
+  }
+
+  // Non-task/plan entity types (note) — render as simple badge
   if (entityType !== "task" || !task) {
     return (
       <NodeViewWrapper as="span" className="entity-ref-chip">

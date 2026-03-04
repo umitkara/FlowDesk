@@ -52,7 +52,15 @@ export function TaskRow({ task, depth = 0, isFocused, onFocus, hasChildren, isCo
   return (
     <tr
       onClick={onFocus}
-      className={`group border-b border-gray-100 text-sm transition-colors hover:bg-gray-50 dark:border-gray-800/50 dark:hover:bg-gray-900/50 ${
+      draggable
+      data-task-id={task.id}
+      data-task-title={task.title}
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", task.id);
+        e.dataTransfer.setData("application/x-task-id", task.id);
+        e.dataTransfer.setData("application/x-task-title", task.title);
+      }}
+      className={`task-draggable group border-b border-gray-100 text-sm transition-colors hover:bg-gray-50 dark:border-gray-800/50 dark:hover:bg-gray-900/50 ${
         isOverdue && !isDone ? "bg-red-50/50 dark:bg-red-950/20" : ""
       } ${isFocused ? "ring-1 ring-inset ring-primary-300 dark:ring-primary-700" : ""}`}
     >

@@ -9,11 +9,15 @@ import { STATUS_CONFIG } from "../../../lib/types";
 
 /** A single suggestion item displayed in the autocomplete dropdown. */
 export interface SuggestionItem {
-  entityType: "task" | "note";
+  entityType: "task" | "note" | "plan";
   id: string;
   title: string;
   status?: string;
   priority?: string;
+  /** Plan type (time_block, event, etc.) — only set for plan items. */
+  planType?: string;
+  /** Start time ISO string — only set for plan items. */
+  startTime?: string;
 }
 
 interface EntitySuggestionListProps {
@@ -21,7 +25,25 @@ interface EntitySuggestionListProps {
   command: (item: SuggestionItem) => void;
 }
 
-/** Autocomplete dropdown for @task / @note references in the editor. */
+/** Formats a plan start time for display in the suggestion dropdown. */
+function formatPlanTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isTomorrow = d.toDateString() === tomorrow.toDateString();
+    const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    if (isToday) return `Today ${time}`;
+    if (isTomorrow) return `Tomorrow ${time}`;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + ` ${time}`;
+  } catch {
+    return "";
+  }
+}
+
+/** Autocomplete dropdown for @task / @note / @plan references in the editor. */
 export const EntitySuggestionList = forwardRef<
   { onKeyDown: (props: { event: KeyboardEvent }) => boolean },
   EntitySuggestionListProps
@@ -55,7 +77,7 @@ export const EntitySuggestionList = forwardRef<
   if (items.length === 0) {
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900">
-        <div className="px-2 py-1 text-xs text-gray-400">No matching tasks</div>
+        <div className="px-2 py-1 text-xs text-gray-400">No results</div>
       </div>
     );
   }
@@ -81,15 +103,22 @@ export const EntitySuggestionList = forwardRef<
               className={`flex-shrink-0 rounded px-1 py-0.5 text-[9px] font-medium uppercase ${
                 item.entityType === "task"
                   ? "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
-                  : "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                  : item.entityType === "plan"
+                    ? "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400"
+                    : "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
               }`}
             >
-              {item.entityType}
+              {item.entityType === "plan" ? (item.planType ?? "plan") : item.entityType}
             </span>
             <span className="flex-1 truncate">{item.title}</span>
             {statusCfg && (
               <span className={`flex-shrink-0 text-[10px] ${statusCfg.color}`}>
                 {statusCfg.label}
+              </span>
+            )}
+            {item.startTime && (
+              <span className="flex-shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
+                {formatPlanTime(item.startTime)}
               </span>
             )}
           </button>
