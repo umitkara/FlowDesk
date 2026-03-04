@@ -1,0 +1,211 @@
+import { create } from "zustand";
+import * as ipc from "../lib/ipc";
+import type {
+  Note,
+  NoteListItem,
+  NoteQuery,
+  FolderNode,
+  CreateNoteInput,
+  UpdateNoteInput,
+} from "../lib/types";
+
+/** State and actions for note management. */
+interface NoteState {
+  /** Listed notes matching current filters. */
+  notes: NoteListItem[];
+  /** The currently selected note with full body content. */
+  activeNote: Note | null;
+  /** Virtual folder tree for the current workspace. */
+  folderTree: FolderNode[];
+  /** Dates that have notes in the currently viewed month. */
+  datesWithNotes: string[];
+  /** Current folder filter (null = show all). */
+  currentFolder: string | null;
+  /** Active query parameters for list filtering. */
+  currentQuery: Partial<NoteQuery>;
+  /** Whether a note list load is in progress. */
+  isLoading: boolean;
+  /** Whether a save operation is in progress. */
+  isSaving: boolean;
+  /** Error message from the last save attempt. */
+  saveError: string | null;
+
+  /** Loads notes matching the given query merged with current filters. */
+  loadNotes: (query?: Partial<NoteQuery>) => Promise<void>;
+  /** Refreshes the virtual folder tree. */
+  loadFolderTree: () => Promise<void>;
+  /** Loads dates with notes for a given month. */
+  loadDatesWithNotes: (year: number, month: number) => Promise<void>;
+  /** Refreshes the note list, folder tree, and calendar dates. */
+  refreshAll: () => Promise<void>;
+  /** Selects and loads the full content of a note by ID. */
+  selectNote: (id: string) => Promise<void>;
+  /** Creates a new note. */
+  createNote: (input: CreateNoteInput) => Promise<Note>;
+  /** Updates an existing note. */
+  updateNote: (id: string, input: UpdateNoteInput) => Promise<void>;
+  /** Soft-deletes a note and refreshes the list. */
+  deleteNote: (id: string) => Promise<void>;
+  /** Restores a soft-deleted note. */
+  restoreNote: (id: string) => Promise<void>;
+  /** Permanently deletes a note from the database. */
+  hardDeleteNote: (id: string) => Promise<void>;
+  /** Opens or creates a daily note for the given date. */
+  openDailyNote: (date: string) => Promise<void>;
+  /** Moves a note to a folder and refreshes. */
+  moveToFolder: (id: string, folder: string) => Promise<void>;
+  /** Sets the active folder filter and reloads notes. */
+  setFolder: (folder: string | null) => void;
+  /** Clears the active note selection. */
+  clearActiveNote: () => void;
+}
+
+/** The workspace ID to use for all operations (Phase 1: single workspace). */
+let cachedWorkspaceId: string | null = null;
+
+/** Resolves the current workspace ID (caches after first call). */
+async function getWorkspaceId(): Promise<string> {
+  if (cachedWorkspaceId) return cachedWorkspaceId;
+  const workspaces = await ipc.listWorkspaces();
+  if (workspaces.length > 0) {
+    cachedWorkspaceId = workspaces[0].id;
+    return cachedWorkspaceId;
+  }
+  throw new Error("No workspace found");
+}
+
+export const useNoteStore = create<NoteState>((set, get) => ({
+  notes: [],
+  activeNote: null,
+  folderTree: [],
+  datesWithNotes: [],
+  currentFolder: null,
+  currentQuery: {},
+  isLoading: false,
+  isSaving: false,
+  saveError: null,
+
+  loadNotes: async (query) => {
+    set({ isLoading: true });
+    try {
+      const wsId = await getWorkspaceId();
+      // When query is provided, it replaces currentQuery (new filter).
+      // When query is omitted, reload with existing currentQuery (refresh).
+      const baseQuery = query !== undefined ? query : get().currentQuery;
+      const merged: NoteQuery = {
+        workspace_id: wsId,
+        ...baseQuery,
+      };
+      if (get().currentFolder) {
+        merged.folder = get().currentFolder ?? undefined;
+      }
+      const notes = await ipc.listNotes(merged);
+      set({ notes, currentQuery: merged, isLoading: false });
+    } catch {
+      set({ isLoading: false });
+    }
+  },
+
+  loadFolderTree: async () => {
+    try {
+      const wsId = await getWorkspaceId();
+      const folderTree = await ipc.getFolderTree(wsId);
+      set({ folderTree });
+    } catch {
+      // silently fail
+    }
+  },
+
+  loadDatesWithNotes: async (year, month) => {
+    try {
+      const wsId = await getWorkspaceId();
+      const dates = await ipc.getDatesWithNotes(wsId, year, month);
+      set({ datesWithNotes: dates });
+    } catch {
+      // silently fail
+    }
+  },
+
+  refreshAll: async () => {
+    const now = new Date();
+    await Promise.all([
+      get().loadNotes(),
+      get().loadFolderTree(),
+      get().loadDatesWithNotes(now.getFullYear(), now.getMonth() + 1),
+    ]);
+  },
+
+  selectNote: async (id) => {
+    try {
+      const note = await ipc.getNote(id);
+      set({ activeNote: note });
+    } catch {
+      set({ activeNote: null });
+    }
+  },
+
+  createNote: async (input) => {
+    const wsId = await getWorkspaceId();
+    const note = await ipc.createNote({ ...input, workspace_id: wsId });
+    set({ activeNote: note });
+    await get().refreshAll();
+    return note;
+  },
+
+  updateNote: async (id, input) => {
+    set({ isSaving: true, saveError: null });
+    try {
+      const updated = await ipc.updateNote(id, input);
+      set({ activeNote: updated, isSaving: false });
+      // Refresh list — await to ensure UI stays in sync
+      await get().loadNotes();
+    } catch (e) {
+      set({ isSaving: false, saveError: String(e) });
+    }
+  },
+
+  deleteNote: async (id) => {
+    await ipc.deleteNote(id);
+    const activeNote = get().activeNote;
+    if (activeNote?.id === id) {
+      set({ activeNote: null });
+    }
+    await get().refreshAll();
+  },
+
+  restoreNote: async (id) => {
+    await ipc.restoreNote(id);
+    await get().refreshAll();
+  },
+
+  hardDeleteNote: async (id) => {
+    await ipc.hardDeleteNote(id);
+    const activeNote = get().activeNote;
+    if (activeNote?.id === id) {
+      set({ activeNote: null });
+    }
+    await get().refreshAll();
+  },
+
+  openDailyNote: async (date) => {
+    const wsId = await getWorkspaceId();
+    let note = await ipc.getDailyNote(wsId, date);
+    if (!note) {
+      note = await ipc.createDailyNote(wsId, date);
+      await get().refreshAll();
+    }
+    set({ activeNote: note });
+  },
+
+  moveToFolder: async (id, folder) => {
+    await ipc.moveNoteToFolder(id, folder);
+    await get().refreshAll();
+  },
+
+  setFolder: (folder) => {
+    set({ currentFolder: folder, currentQuery: {} });
+    get().loadNotes();
+  },
+
+  clearActiveNote: () => set({ activeNote: null }),
+}));
