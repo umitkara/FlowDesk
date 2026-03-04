@@ -119,6 +119,7 @@ export function Sidebar() {
         </div>
         <button
           onClick={() => {
+            setFilter({});
             setViewMode("list");
             setActiveView("tasks");
           }}
@@ -133,6 +134,7 @@ export function Sidebar() {
         </button>
         <button
           onClick={() => {
+            setFilter({});
             setViewMode("board");
             setActiveView("tasks");
           }}
