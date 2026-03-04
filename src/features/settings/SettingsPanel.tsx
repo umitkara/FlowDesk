@@ -117,6 +117,16 @@ export function SettingsPanel() {
           />
         </SettingRow>
       </SettingsSection>
+
+      {/* About link */}
+      <div className="mb-6">
+        <button
+          onClick={() => setActiveView("about")}
+          className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+        >
+          About FlowDesk
+        </button>
+      </div>
     </div>
   );
 }

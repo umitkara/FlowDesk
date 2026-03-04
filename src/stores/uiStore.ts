@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /** Active view identifier. */
-export type ActiveView = "notes" | "search" | "settings" | "daily" | "trash" | "tasks";
+export type ActiveView = "notes" | "search" | "settings" | "daily" | "trash" | "tasks" | "about";
 
 /** Active sidebar section identifier. */
 export type SidebarSection = "folders" | "calendar" | "search";

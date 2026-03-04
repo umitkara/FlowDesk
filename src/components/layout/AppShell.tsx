@@ -12,6 +12,7 @@ import { QuickSwitcher } from "../../features/notes/QuickSwitcher";
 import { SearchResults } from "../../features/search/SearchResults";
 import { SettingsPanel } from "../../features/settings/SettingsPanel";
 import { TrashView } from "../../features/notes/TrashView";
+import { AboutPanel } from "../../features/about/AboutPanel";
 import { TaskList } from "../../features/tasks/TaskList";
 import { TaskBoard } from "../../features/tasks/TaskBoard";
 import { TaskDetail } from "../../features/tasks/TaskDetail";
@@ -148,6 +149,7 @@ export function AppShell() {
             {activeView === "search" && <SearchResults />}
             {activeView === "settings" && <SettingsPanel />}
             {activeView === "trash" && <TrashView />}
+            {activeView === "about" && <AboutPanel />}
             {activeView === "tasks" && viewMode === "list" && <TaskList />}
             {activeView === "tasks" && viewMode === "board" && <TaskBoard />}
           </div>
