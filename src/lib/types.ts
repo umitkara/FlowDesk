@@ -525,3 +525,154 @@ export const IMPORTANCE_CONFIG: Record<Importance, { label: string; color: strin
   high:     { label: "High",     color: "text-orange-500" },
   critical: { label: "Critical", color: "text-red-500" },
 };
+
+// --- Time Tracker Types ---
+
+/** A pause interval within a tracking session. */
+export interface Pause {
+  paused_at: string;
+  resumed_at: string | null;
+}
+
+/** A timestamped note taken during an active tracking session. */
+export interface SessionNote {
+  elapsed_mins: number;
+  wall_time: string;
+  text: string;
+  ref_type?: string;
+  ref_id?: string;
+}
+
+/** A recorded time tracking session. */
+export interface TimeEntry {
+  id: string;
+  workspace_id: string;
+  start_time: string;
+  end_time: string | null;
+  pauses: Pause[];
+  active_mins: number | null;
+  notes: string;
+  category: string | null;
+  tags: string[];
+  session_notes: SessionNote[];
+  linked_plan_id: string | null;
+  linked_task_id: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+/** Tracker status values. */
+export type TrackerStatus = "idle" | "running" | "paused";
+
+/** Break reminder modes. */
+export type BreakMode = "none" | "pomodoro" | "custom";
+
+/** Pomodoro break configuration. */
+export interface PomodoroConfig {
+  work_mins: number;
+  short_break_mins: number;
+  long_break_mins: number;
+  cycles_before_long: number;
+}
+
+/** Custom break configuration. */
+export interface CustomBreakConfig {
+  interval_mins: number;
+}
+
+/** Combined break configuration for all modes. */
+export interface BreakConfig {
+  pomodoro: PomodoroConfig;
+  custom: CustomBreakConfig;
+  sound_enabled: boolean;
+  snooze_mins: number;
+}
+
+/** Persisted tracker state for crash recovery and frontend sync. */
+export interface TrackerState {
+  status: TrackerStatus;
+  time_entry_id: string | null;
+  started_at: string | null;
+  paused_at: string | null;
+  pauses: Pause[];
+  notes: string;
+  session_notes: SessionNote[];
+  linked_plan_id: string | null;
+  linked_task_id: string | null;
+  category: string | null;
+  tags: string[];
+  break_mode: BreakMode;
+  break_config: BreakConfig;
+  pomodoro_cycle: number;
+  active_mins?: number | null;
+  end_time?: string | null;
+  updated_at: string;
+}
+
+/** Input parameters for starting a tracking session. */
+export interface StartTrackerInput {
+  workspace_id: string;
+  linked_plan_id?: string;
+  linked_task_id?: string;
+  category?: string;
+  tags?: string[];
+  break_mode?: BreakMode;
+}
+
+/** Input parameters for saving a completed session's details. */
+export interface SaveDetailInput {
+  time_entry_id: string;
+  notes?: string;
+  category?: string;
+  tags?: string[];
+  linked_plan_id?: string;
+  linked_task_id?: string;
+  create_task?: CreateTaskFromSession;
+  create_note?: CreateNoteFromSession;
+}
+
+/** Parameters for creating a task from a tracking session. */
+export interface CreateTaskFromSession {
+  title: string;
+  description?: string;
+}
+
+/** Parameters for creating a note from a tracking session. */
+export interface CreateNoteFromSession {
+  title: string;
+  folder?: string;
+}
+
+/** A daily time summary. */
+export interface DailySummary {
+  date: string;
+  total_mins: number;
+  entry_count: number;
+  by_category: CategoryTime[];
+  by_tag: TagTime[];
+}
+
+/** A weekly time summary. */
+export interface WeeklySummary {
+  week_start: string;
+  week_end: string;
+  total_mins: number;
+  daily_breakdown: DailySummary[];
+  by_category: CategoryTime[];
+  by_tag: TagTime[];
+}
+
+/** Time totals for a single category. */
+export interface CategoryTime {
+  category: string | null;
+  total_mins: number;
+  entry_count: number;
+}
+
+/** Time totals for a single tag. */
+export interface TagTime {
+  tag: string;
+  total_mins: number;
+  entry_count: number;
+}

@@ -32,6 +32,14 @@ import type {
   AgendaItem,
   SpawnTaskInput,
   SpawnNoteInput,
+  TrackerState,
+  SessionNote,
+  TimeEntry,
+  BreakConfig,
+  DailySummary,
+  WeeklySummary,
+  CreateTaskFromSession,
+  CreateNoteFromSession,
 } from "./types";
 
 // --- Notes ---
@@ -258,3 +266,121 @@ export const searchPlans = (workspaceId: string, query: string) =>
 /** Gets a unified agenda of plans and tasks in date range. */
 export const getAgenda = (workspaceId: string, startDate: string, endDate: string) =>
   invoke<AgendaItem[]>("get_agenda", { workspaceId, startDate, endDate });
+
+// --- Time Tracker ---
+
+/** Starts a new tracking session. */
+export const trackerStart = (params: {
+  workspaceId: string;
+  linkedPlanId?: string;
+  linkedTaskId?: string;
+  category?: string;
+  tags?: string[];
+  breakMode?: string;
+}) => invoke<TrackerState>("tracker_start", params);
+
+/** Pauses the active tracking session. */
+export const trackerPause = () => invoke<TrackerState>("tracker_pause");
+
+/** Resumes a paused tracking session. */
+export const trackerResume = () => invoke<TrackerState>("tracker_resume");
+
+/** Stops the active tracking session. */
+export const trackerStop = () => invoke<TrackerState>("tracker_stop");
+
+/** Gets the current tracker state. */
+export const trackerGetState = () => invoke<TrackerState>("tracker_get_state");
+
+/** Updates the running notes on an active session. */
+export const trackerUpdateNotes = (notes: string) =>
+  invoke<void>("tracker_update_notes", { notes });
+
+/** Adds a timestamped session note. */
+export const trackerAddSessionNote = (
+  text: string,
+  refType?: string,
+  refId?: string,
+) => invoke<SessionNote>("tracker_add_session_note", { text, refType, refId });
+
+/** Saves the detail form for a completed session. */
+export const trackerSaveDetail = (params: {
+  timeEntryId: string;
+  notes?: string;
+  category?: string;
+  tags?: string[];
+  linkedPlanId?: string;
+  linkedTaskId?: string;
+  createTask?: CreateTaskFromSession;
+  createNote?: CreateNoteFromSession;
+}) => invoke<TimeEntry>("tracker_save_detail", params);
+
+/** Discards a time entry and resets the tracker to idle. */
+export const trackerDiscard = (timeEntryId: string) =>
+  invoke<void>("tracker_discard", { timeEntryId });
+
+/** Updates the break reminder mode and configuration. */
+export const trackerSetBreakMode = (mode: string, config?: BreakConfig) =>
+  invoke<void>("tracker_set_break_mode", { mode, config });
+
+/** Snoozes the next break reminder. */
+export const trackerSnoozeBreak = () =>
+  invoke<void>("tracker_snooze_break");
+
+/** Recovers an interrupted tracking session. */
+export const trackerRecoverSession = (action: "resume" | "stop") =>
+  invoke<TrackerState>("tracker_recover_session", { action });
+
+// --- Time Entry CRUD ---
+
+/** Gets a time entry by ID. */
+export const getTimeEntry = (id: string) =>
+  invoke<TimeEntry>("get_time_entry", { id });
+
+/** Lists time entries with filters. */
+export const listTimeEntries = (params: {
+  workspaceId: string;
+  startDate?: string;
+  endDate?: string;
+  category?: string;
+  tag?: string;
+  linkedTaskId?: string;
+  linkedPlanId?: string;
+  limit?: number;
+  offset?: number;
+}) => invoke<TimeEntry[]>("list_time_entries", params);
+
+/** Updates a saved time entry. */
+export const updateTimeEntry = (params: {
+  id: string;
+  notes?: string;
+  category?: string | null;
+  tags?: string[];
+  linkedPlanId?: string | null;
+  linkedTaskId?: string | null;
+}) => invoke<TimeEntry>("update_time_entry", params);
+
+/** Soft-deletes a time entry. */
+export const deleteTimeEntry = (id: string) =>
+  invoke<void>("delete_time_entry", { id });
+
+// --- Time Reports ---
+
+/** Gets a daily time summary. */
+export const getDailySummary = (workspaceId: string, date: string) =>
+  invoke<DailySummary>("get_daily_summary", { workspaceId, date });
+
+/** Gets a weekly time summary. */
+export const getWeeklySummary = (workspaceId: string, weekStart: string) =>
+  invoke<WeeklySummary>("get_weekly_summary", { workspaceId, weekStart });
+
+/** Gets time entries for a specific task. */
+export const getEntriesForTask = (taskId: string) =>
+  invoke<TimeEntry[]>("get_entries_for_task", { taskId });
+
+/** Gets time entries for a specific plan. */
+export const getEntriesForPlan = (planId: string) =>
+  invoke<TimeEntry[]>("get_entries_for_plan", { planId });
+
+/** Updates the system tray tooltip with current tracker status and elapsed time. */
+export const updateTrayStatus = (status: string, elapsed: string) =>
+  invoke<void>("update_tray_status", { status, elapsed });
