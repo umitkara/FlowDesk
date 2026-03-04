@@ -10,6 +10,7 @@ import CharacterCount from "@tiptap/extension-character-count";
 import { useNoteStore } from "../../stores/noteStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useUIStore } from "../../stores/uiStore";
+import { useTrackerStore } from "../../stores/trackerStore";
 import { useDebounce } from "../../hooks/useDebounce";
 import { FrontMatterPanel } from "./FrontMatterPanel";
 import { formatDate } from "../../lib/utils";
@@ -27,6 +28,9 @@ export function NoteEditor() {
   const deleteNote = useNoteStore((s) => s.deleteNote);
   const detailPanelOpen = useUIStore((s) => s.detailPanelOpen);
   const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel);
+  const trackerStatus = useTrackerStore((s) => s.status);
+  const trackerElapsed = useTrackerStore((s) => s.elapsedSeconds);
+  const addSessionNote = useTrackerStore((s) => s.addSessionNote);
 
   const delayMs = Math.max(200, Math.min(5000, parseInt(debounceMs, 10) || 1000));
 
@@ -86,17 +90,30 @@ export function NoteEditor() {
     }
   }, [editor, activeNote, updateNote]);
 
-  // Ctrl+S force save
+  // Insert a timestamped marker into the editor and log a session note on the backend.
+  const insertTimestamp = useCallback(() => {
+    if (!editor || trackerStatus === "idle") return;
+    const mins = Math.round(trackerElapsed / 60);
+    const marker = `\u23F1 +${mins}min `;
+    editor.chain().focus().insertContent(marker).run();
+    addSessionNote(`Timestamp inserted in note: +${mins}min`).catch(() => {});
+  }, [editor, trackerStatus, trackerElapsed, addSessionNote]);
+
+  // Ctrl+S force save, Ctrl+Shift+T insert timestamp
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s" && !e.shiftKey) {
         e.preventDefault();
         handleForceSave();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "T") {
+        e.preventDefault();
+        insertTimestamp();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleForceSave]);
+  }, [handleForceSave, insertTimestamp]);
 
   if (!activeNote) return null;
 
@@ -267,6 +284,25 @@ export function NoteEditor() {
             >
               --
             </ToolbarButton>
+
+            {/* Timestamp button — only visible when tracker is running */}
+            {trackerStatus !== "idle" && (
+              <>
+                <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
+                <ToolbarButton
+                  active={false}
+                  onClick={insertTimestamp}
+                  title="Insert Timestamp (Ctrl+Shift+T)"
+                >
+                  <span className="flex items-center gap-0.5">
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" strokeWidth={2} />
+                      <path strokeLinecap="round" strokeWidth={2} d="M12 6v6l4 2" />
+                    </svg>
+                  </span>
+                </ToolbarButton>
+              </>
+            )}
           </div>
         )}
 

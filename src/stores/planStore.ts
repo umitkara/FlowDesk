@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import * as ipc from "../lib/ipc";
+import { logActivity } from "../lib/activityLog";
 import type {
   Plan,
   CreatePlanInput,
@@ -135,6 +136,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
 
   createPlan: async (input) => {
     const plan = await ipc.createPlan(input);
+    logActivity(`Created plan: ${plan.title}`, "plan", plan.id);
     set((s) => ({ plans: [...s.plans, plan] }));
     return plan;
   },
@@ -152,7 +154,9 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   },
 
   deletePlan: async (id) => {
+    const title = get().plans.find((p) => p.id === id)?.title ?? "Untitled";
     await ipc.deletePlan(id);
+    logActivity(`Deleted plan: ${title}`, "plan", id);
     set((s) => ({
       plans: s.plans.filter((p) => p.id !== id),
       selectedPlan: s.selectedPlan?.plan.id === id ? null : s.selectedPlan,
@@ -184,6 +188,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   spawnTask: async (input) => {
     try {
       const linked = await ipc.spawnTaskFromPlan(input);
+      logActivity(`Spawned task from plan: ${input.title}`, "task", linked.task_id);
       // Refresh plan links
       const { selectedPlan } = get();
       if (selectedPlan) {
@@ -202,6 +207,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   spawnNote: async (input) => {
     try {
       const linked = await ipc.spawnNoteFromPlan(input);
+      logActivity(`Spawned note from plan: ${input.title}`, "note", linked.note_id);
       const { selectedPlan } = get();
       if (selectedPlan) {
         set({

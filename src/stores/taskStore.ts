@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { ask } from "@tauri-apps/plugin-dialog";
 import * as ipc from "../lib/ipc";
+import { logActivity } from "../lib/activityLog";
 import type {
   Task,
   TaskWithChildren,
@@ -152,6 +153,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   createTask: async (input) => {
     const wsId = await getWorkspaceId();
     const task = await ipc.createTask({ ...input, workspace_id: wsId });
+    logActivity(`Created task: ${task.title}`, "task", task.id);
     await get().fetchTasks();
     return task;
   },
@@ -167,12 +169,17 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   deleteTask: async (id) => {
+    const title =
+      get().selectedTask?.id === id
+        ? get().selectedTask!.title
+        : get().tasks.find((t) => t.id === id)?.title ?? "Untitled";
     const confirmed = await ask("Delete this task and all its subtasks?", {
       title: "Confirm Delete",
       kind: "warning",
     });
     if (!confirmed) return;
     await ipc.deleteTask(id);
+    logActivity(`Deleted task: ${title}`, "task", id);
     if (get().selectedTask?.id === id) {
       set({ selectedTask: null, isDetailOpen: false });
     }
@@ -188,6 +195,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   toggleTaskStatus: async (id) => {
     const task = await ipc.toggleTaskStatus(id);
+    const verb = task.status === "done" ? "Completed" : "Reopened";
+    logActivity(`${verb} task: ${task.title}`, "task", task.id);
     if (get().selectedTask?.id === id) {
       set({ selectedTask: task });
     }
@@ -197,6 +206,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   moveTaskStatus: async (id, newStatus) => {
     const task = await ipc.moveTaskStatus(id, newStatus);
+    logActivity(`Moved task to ${newStatus}: ${task.title}`, "task", task.id);
     if (get().selectedTask?.id === id) {
       set({ selectedTask: task });
     }

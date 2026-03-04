@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { ask } from "@tauri-apps/plugin-dialog";
 import * as ipc from "../lib/ipc";
+import { logActivity } from "../lib/activityLog";
 import type {
   Note,
   NoteListItem,
@@ -149,6 +150,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     const wsId = await getWorkspaceId();
     const note = await ipc.createNote({ ...input, workspace_id: wsId });
     set({ activeNote: note });
+    logActivity(`Created note: ${note.title}`, "note", note.id);
     await get().refreshAll();
     return note;
   },
@@ -166,6 +168,10 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   deleteNote: async (id) => {
+    const title =
+      get().activeNote?.id === id
+        ? get().activeNote!.title
+        : get().notes.find((n) => n.id === id)?.title ?? "Untitled";
     const confirmed = await ask("Delete this note?", {
       title: "Confirm Delete",
       kind: "warning",
@@ -173,6 +179,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     if (!confirmed) return;
     try {
       await ipc.deleteNote(id);
+      logActivity(`Deleted note: ${title}`, "note", id);
       const activeNote = get().activeNote;
       if (activeNote?.id === id) {
         set({ activeNote: null });
@@ -211,6 +218,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     let note = await ipc.getDailyNote(wsId, date);
     if (!note) {
       note = await ipc.createDailyNote(wsId, date);
+      logActivity(`Created daily note: ${date}`, "note", note.id);
       await get().refreshAll();
     }
     set({ activeNote: note });

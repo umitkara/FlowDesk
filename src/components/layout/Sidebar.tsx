@@ -222,6 +222,24 @@ export function Sidebar() {
         </button>
       </div>
 
+      {/* Time Tracker section */}
+      <div className="space-y-0.5 border-b border-gray-200 px-2 py-2 dark:border-gray-800">
+        <div className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Time Tracker
+        </div>
+        <button
+          onClick={() => setActiveView("time-reports")}
+          className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
+            activeView === "time-reports" ? activeClass : inactiveClass
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Time Reports
+        </button>
+      </div>
+
       {/* Folder tree */}
       <div className="flex-1 overflow-y-auto px-2 py-2">
         <div className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">

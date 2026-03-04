@@ -1,6 +1,7 @@
 import { useUIStore } from "../../stores/uiStore";
+import { TrackerWidget } from "../../features/tracker/TrackerWidget";
 
-/** Top navigation bar with sidebar toggle and search trigger. */
+/** Top navigation bar with sidebar toggle, tracker widget, and search trigger. */
 export function TopBar() {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -21,6 +22,11 @@ export function TopBar() {
         <span className="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
           FlowDesk
         </span>
+      </div>
+
+      {/* Center: Tracker Widget (always visible) */}
+      <div className="flex flex-1 justify-center">
+        <TrackerWidget />
       </div>
 
       <div className="flex items-center gap-1">

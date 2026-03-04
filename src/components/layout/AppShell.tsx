@@ -21,7 +21,11 @@ import CalendarView from "../../features/plans/CalendarView";
 import DailyPlanView from "../../features/plans/DailyPlanView";
 import PlanDetail from "../../features/plans/PlanDetail";
 import PlanDialog from "../../features/plans/PlanDialog";
+import { TimeReports } from "../../features/tracker/TimeReports";
+import { TrackerDetailForm } from "../../features/tracker/TrackerDetailForm";
+import { TrackerRecoveryDialog } from "../../features/tracker/TrackerRecoveryDialog";
 import { usePlanStore } from "../../stores/planStore";
+import { useTrackerStore } from "../../stores/trackerStore";
 import { todayISO } from "../../lib/utils";
 
 /** Root layout container with sidebar, main content, and status bar. */
@@ -43,6 +47,13 @@ export function AppShell() {
   const openQuickAdd = useTaskStore((s) => s.openQuickAdd);
   const fetchTasks = useTaskStore((s) => s.fetchTasks);
   const isPlanDetailOpen = usePlanStore((s) => s.isDetailOpen);
+
+  const trackerStatus = useTrackerStore((s) => s.status);
+  const trackerStart = useTrackerStore((s) => s.start);
+  const trackerPause = useTrackerStore((s) => s.pause);
+  const trackerResume = useTrackerStore((s) => s.resume);
+  const trackerStop = useTrackerStore((s) => s.stop);
+  const openSessionNoteInput = useTrackerStore((s) => s.openSessionNoteInput);
 
   useEffect(() => {
     if (activeView === "tasks") {
@@ -92,7 +103,43 @@ export function AppShell() {
         key: "t",
         ctrl: true,
         shift: true,
-        handler: () => openQuickAdd(),
+        handler: () => {
+          // When tracker is active, Ctrl+Shift+T is handled by the editor for timestamp insertion
+          if (trackerStatus === "idle") openQuickAdd();
+        },
+      },
+      {
+        key: "s",
+        ctrl: true,
+        shift: true,
+        handler: () => {
+          if (trackerStatus === "idle") trackerStart();
+        },
+      },
+      {
+        key: "p",
+        ctrl: true,
+        shift: true,
+        handler: () => {
+          if (trackerStatus === "running") trackerPause();
+          else if (trackerStatus === "paused") trackerResume();
+        },
+      },
+      {
+        key: "x",
+        ctrl: true,
+        shift: true,
+        handler: () => {
+          if (trackerStatus === "running" || trackerStatus === "paused") trackerStop();
+        },
+      },
+      {
+        key: "n",
+        ctrl: true,
+        shift: true,
+        handler: () => {
+          if (trackerStatus !== "idle") openSessionNoteInput();
+        },
       },
     ],
     [
@@ -103,6 +150,12 @@ export function AppShell() {
       handleBack,
       handleForward,
       openQuickAdd,
+      trackerStatus,
+      trackerStart,
+      trackerPause,
+      trackerResume,
+      trackerStop,
+      openSessionNoteInput,
     ],
   );
 
@@ -160,6 +213,7 @@ export function AppShell() {
             {activeView === "tasks" && viewMode === "board" && <TaskBoard />}
             {activeView === "plans" && <CalendarView />}
             {activeView === "daily-plan" && <DailyPlanView />}
+            {activeView === "time-reports" && <TimeReports />}
           </div>
 
           {/* Task detail panel */}
@@ -175,6 +229,8 @@ export function AppShell() {
       {quickSwitcherOpen && <QuickSwitcher />}
       <TaskQuickAdd />
       <PlanDialog />
+      <TrackerDetailForm />
+      <TrackerRecoveryDialog />
     </div>
   );
 }
