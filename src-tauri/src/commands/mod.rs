@@ -12,5 +12,7 @@ pub mod export;
 pub mod settings;
 /// Task CRUD, filtering, bulk operations, and kanban commands.
 pub mod tasks;
+/// Time entry CRUD, tracker state machine, reports, and recovery commands.
+pub mod time_entries;
 /// Workspace listing commands.
 pub mod workspaces;

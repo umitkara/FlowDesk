@@ -8,5 +8,7 @@ pub mod reference;
 pub mod tag;
 /// Task entity and related input/query/filter types.
 pub mod task;
+/// Time entry, tracker state, and report types.
+pub mod time_entry;
 /// Workspace entity.
 pub mod workspace;
