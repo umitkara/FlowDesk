@@ -70,11 +70,19 @@ pub const VALID_ENTITY_TYPES: &[&str] = &["note", "task", "plan", "time_entry"];
 /// Valid target-only types (includes external targets).
 pub const VALID_TARGET_TYPES: &[&str] = &["note", "task", "plan", "time_entry", "url", "file"];
 
-/// Valid relation types for Phase 2.
+/// Valid relation types.
 pub const VALID_RELATIONS: &[&str] = &[
     "references",
     "blocks",
     "blocked_by",
     "subtask_of",
     "related_to",
+    "spawned",
+    "spawned_from",
+    "implements",
+    "daily_note_for",
+    "scheduled_in",
+    "documents",
+    "continues",
+    "time_logged",
 ];

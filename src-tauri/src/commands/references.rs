@@ -403,6 +403,24 @@ fn get_source_info(
                 Err(_) => ("Unknown".to_string(), None),
             }
         }
+        "plan" => {
+            let result = conn.query_row(
+                "SELECT title, description FROM plans WHERE id = ?1",
+                [source_id],
+                |row| {
+                    let title: String = row.get(0)?;
+                    let desc: Option<String> = row.get(1)?;
+                    Ok((title, desc))
+                },
+            );
+            match result {
+                Ok((title, desc)) => {
+                    let snippet = desc.as_deref().and_then(|d| extract_snippet(d, target_id, conn));
+                    (title, snippet)
+                }
+                Err(_) => ("Unknown".to_string(), None),
+            }
+        }
         _ => ("Unknown".to_string(), None),
     }
 }
@@ -496,6 +514,19 @@ pub fn sync_note_references(
                         if let Some(ref tid) = create_ref.target_id {
                             conn.query_row(
                                 "SELECT COUNT(*) FROM notes WHERE id = ?1 AND deleted_at IS NULL",
+                                [tid],
+                                |row| row.get::<_, i64>(0),
+                            )
+                            .unwrap_or(0)
+                                > 0
+                        } else {
+                            false
+                        }
+                    }
+                    "plan" => {
+                        if let Some(ref tid) = create_ref.target_id {
+                            conn.query_row(
+                                "SELECT COUNT(*) FROM plans WHERE id = ?1 AND deleted_at IS NULL",
                                 [tid],
                                 |row| row.get::<_, i64>(0),
                             )

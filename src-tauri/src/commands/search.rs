@@ -80,6 +80,8 @@ pub fn search_notes(
         || entity_types.is_some_and(|types| types.iter().any(|t| t == "note"));
     let search_tasks = entity_types.is_none()
         || entity_types.is_some_and(|types| types.iter().any(|t| t == "task"));
+    let search_plans = entity_types.is_none()
+        || entity_types.is_some_and(|types| types.iter().any(|t| t == "plan"));
 
     state
         .db
@@ -165,6 +167,46 @@ pub fn search_notes(
                     r.snippet = resolve_entity_refs(&r.snippet, conn);
                     r
                 }));
+            }
+
+            // Search plans
+            if search_plans {
+                let mut stmt = conn.prepare(
+                    "SELECT p.id, p.title,
+                            snippet(plans_fts, 1, '<mark>', '</mark>', '...', 32) as snippet,
+                            rank, p.type, p.start_time, p.updated_at
+                     FROM plans_fts
+                     JOIN plans p ON plans_fts.rowid = p.rowid
+                     WHERE plans_fts MATCH ?1 AND p.workspace_id = ?2 AND p.deleted_at IS NULL
+                     ORDER BY rank
+                     LIMIT ?3 OFFSET ?4",
+                )?;
+
+                let plan_results = stmt
+                    .query_map(
+                        rusqlite::params![sanitized, query.workspace_id, limit, offset],
+                        |row| {
+                            let plan_type: String = row.get(4)?;
+                            let start_time: String = row.get(5)?;
+                            Ok(SearchResult {
+                                entity_type: "plan".to_string(),
+                                id: row.get(0)?,
+                                title: row.get(1)?,
+                                snippet: row.get(2)?,
+                                rank: row.get(3)?,
+                                note_type: None,
+                                folder: None,
+                                updated_at: row.get(6)?,
+                                metadata: serde_json::json!({
+                                    "plan_type": plan_type,
+                                    "start_time": start_time,
+                                }),
+                            })
+                        },
+                    )?
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                results.extend(plan_results);
             }
 
             // Sort combined results by rank (lower is better for FTS5)
