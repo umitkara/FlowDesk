@@ -326,6 +326,8 @@ export function TaskDetail() {
               Sticky
             </label>
             <button
+              role="switch"
+              aria-checked={selectedTask.is_sticky}
               onClick={() => handleUpdate({ is_sticky: !selectedTask.is_sticky })}
               className={`relative h-5 w-9 rounded-full transition-colors ${
                 selectedTask.is_sticky

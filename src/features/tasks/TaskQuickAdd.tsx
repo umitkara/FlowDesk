@@ -18,6 +18,7 @@ export function TaskQuickAdd() {
   const [category, setCategory] = useState("");
   const [tags, setTags] = useState("");
   const [parentTaskId, setParentTaskId] = useState("");
+  const [isSticky, setIsSticky] = useState(false);
   const [parentTaskOptions, setParentTaskOptions] = useState<{ id: string; title: string }[]>([]);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -30,6 +31,7 @@ export function TaskQuickAdd() {
       setTags("");
       setTitle("");
       setParentTaskId("");
+      setIsSticky(false);
       setTimeout(() => titleRef.current?.focus(), 50);
       // Load parent task options
       ipc.listWorkspaces().then(async (ws) => {
@@ -51,6 +53,7 @@ export function TaskQuickAdd() {
     setCategory("");
     setTags("");
     setParentTaskId("");
+    setIsSticky(false);
   };
 
   const handleCreate = async (keepOpen: boolean, openDetailAfter: boolean) => {
@@ -72,6 +75,7 @@ export function TaskQuickAdd() {
               .filter(Boolean)
           : undefined,
         parent_task_id: parentTaskId || undefined,
+        is_sticky: isSticky || undefined,
       });
 
       if (openDetailAfter) {
@@ -239,6 +243,28 @@ export function TaskQuickAdd() {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Sticky */}
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
+              Sticky
+            </label>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isSticky}
+              onClick={() => setIsSticky((v) => !v)}
+              className={`relative h-5 w-9 rounded-full transition-colors ${
+                isSticky ? "bg-primary-600" : "bg-gray-300 dark:bg-gray-600"
+              }`}
+            >
+              <span
+                className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                  isSticky ? "translate-x-4" : ""
+                }`}
+              />
+            </button>
           </div>
         </div>
 

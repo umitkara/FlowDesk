@@ -69,6 +69,15 @@ export function TaskFilters() {
     }
   };
 
+  const handleStickyToggle = () => {
+    if (filter.is_sticky) {
+      const { is_sticky: _, ...rest } = filter;
+      setFilter(rest);
+    } else {
+      setFilter({ ...filter, is_sticky: true });
+    }
+  };
+
   const clearFilters = () => setFilter({});
 
   const hasFilters =
@@ -143,6 +152,18 @@ export function TaskFilters() {
         onChange={handleDueBeforeChange}
         className="w-28 rounded-md border border-gray-200 bg-white px-1.5 py-1 text-xs dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
       />
+
+      <button
+        onClick={handleStickyToggle}
+        title="Sticky tasks only"
+        className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+          filter.is_sticky
+            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+            : "text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+        }`}
+      >
+        📌 Sticky
+      </button>
 
       {hasFilters && (
         <button
