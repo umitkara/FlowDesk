@@ -375,6 +375,23 @@ pub fn run() {
             commands::time_entries::get_entries_for_task,
             commands::time_entries::get_entries_for_plan,
             commands::time_entries::update_tray_status,
+            // Activity Log
+            commands::activity::list_activity,
+            commands::activity::get_entity_activity,
+            // Saved Filters
+            commands::filters::create_saved_filter,
+            commands::filters::get_saved_filter,
+            commands::filters::update_saved_filter,
+            commands::filters::delete_saved_filter,
+            commands::filters::list_saved_filters,
+            commands::filters::reorder_saved_filters,
+            // Discovery (Graph, Groups, Search, Comparisons)
+            commands::discovery::faceted_search,
+            commands::discovery::get_graph_data,
+            commands::discovery::get_grouped_view,
+            commands::discovery::get_planned_vs_actual,
+            commands::discovery::get_planned_vs_actual_range,
+            commands::discovery::get_backlinks_with_context,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
