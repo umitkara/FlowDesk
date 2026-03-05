@@ -1136,3 +1136,210 @@ export interface AutoDailyNoteConfig {
   enabled: boolean;
   template: string;
 }
+
+// --- Phase 8: Polish & Power Features ---
+
+/** A snapshot of a note's content at a point in time. */
+export interface NoteVersion {
+  id: string;
+  note_id: string;
+  workspace_id: string;
+  title: string | null;
+  body: string;
+  body_hash: string;
+  version_number: number;
+  created_at: string;
+}
+
+/** Lightweight version info for timeline display. */
+export interface NoteVersionSummary {
+  id: string;
+  version_number: number;
+  title: string | null;
+  body_hash: string;
+  created_at: string;
+  body_size: number;
+}
+
+/** A computed diff between two versions. */
+export interface VersionDiff {
+  from_version_id: string;
+  to_version_id: string;
+  hunks: DiffHunk[];
+  stats: DiffStats;
+}
+
+/** Diff statistics. */
+export interface DiffStats {
+  additions: number;
+  deletions: number;
+  unchanged: number;
+}
+
+/** A contiguous region of changes. */
+export interface DiffHunk {
+  lines: DiffLine[];
+}
+
+/** A single diff line. */
+export interface DiffLine {
+  kind: "Added" | "Removed" | "Unchanged";
+  content: string;
+}
+
+/** Storage stats for version history. */
+export interface VersionStorageStats {
+  total_versions: number;
+  total_size_bytes: number;
+  notes_with_versions: number;
+  largest_notes: NoteVersionSizeEntry[];
+}
+
+/** Per-note version size info. */
+export interface NoteVersionSizeEntry {
+  note_id: string;
+  title: string | null;
+  version_count: number;
+  total_size_bytes: number;
+}
+
+/** Result of a prune operation. */
+export interface PruneResult {
+  pruned_count: number;
+  freed_bytes: number;
+}
+
+/** Configuration for version history. */
+export interface VersionHistoryConfig {
+  enabled: boolean;
+  max_versions_per_note: number;
+  auto_prune: boolean;
+  snapshot_debounce_secs: number;
+}
+
+/** Result of an import operation. */
+export interface ImportResult {
+  imported_count: number;
+  skipped_count: number;
+  errors: ImportError[];
+  warnings: ImportWarning[];
+}
+
+/** An import error. */
+export interface ImportError {
+  file_path: string;
+  message: string;
+}
+
+/** An import warning. */
+export interface ImportWarning {
+  file_path: string;
+  message: string;
+}
+
+/** Options for markdown folder import. */
+export interface MarkdownImportOptions {
+  source_dir: string;
+  workspace_id: string;
+  target_folder?: string;
+  preserve_folder_structure: boolean;
+  overwrite_existing: boolean;
+}
+
+/** Options for Obsidian vault import. */
+export interface ObsidianImportOptions {
+  vault_path: string;
+  workspace_id: string;
+  target_folder?: string;
+  convert_wikilinks: boolean;
+  import_tags: boolean;
+}
+
+/** Options for CSV task import. */
+export interface CsvImportOptions {
+  file_path: string;
+  workspace_id: string;
+  delimiter?: string;
+  has_header: boolean;
+  field_mapping: CsvFieldMapping;
+}
+
+/** CSV column to task field mapping. */
+export interface CsvFieldMapping {
+  title: number;
+  description?: number;
+  status?: number;
+  priority?: number;
+  due_date?: number;
+  category?: number;
+  tags?: number;
+}
+
+/** CSV file preview. */
+export interface CsvPreview {
+  headers: string[];
+  rows: string[][];
+  total_rows: number;
+}
+
+/** Enhanced export result. */
+export interface EnhancedExportResult {
+  exported_count: number;
+  output_path: string;
+  format: string;
+  errors: string[];
+}
+
+/** JSON export options. */
+export interface JsonExportOptions {
+  workspace_id: string;
+  output_path: string;
+  include_notes: boolean;
+  include_tasks: boolean;
+  include_plans: boolean;
+  include_time_entries: boolean;
+  pretty_print: boolean;
+}
+
+/** CSV export options. */
+export interface CsvExportOptions {
+  workspace_id: string;
+  output_path: string;
+  include_done: boolean;
+  include_cancelled: boolean;
+  delimiter?: string;
+}
+
+/** Markdown export options. */
+export interface MarkdownExportOptions {
+  workspace_id: string;
+  output_dir: string;
+  note_ids?: string[];
+  folder?: string;
+  include_front_matter: boolean;
+  flatten_folders: boolean;
+}
+
+/** Undo/redo state. */
+export interface UndoRedoState {
+  can_undo: boolean;
+  can_redo: boolean;
+  undo_description: string | null;
+  redo_description: string | null;
+}
+
+/** Theme settings. */
+export interface ThemeSettings {
+  mode: "system" | "light" | "dark";
+  accent_color: string;
+}
+
+/** A command palette command. */
+export interface Command {
+  id: string;
+  title: string;
+  category: string;
+  shortcut?: string;
+  handler: () => void;
+  keywords?: string[];
+}

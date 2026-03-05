@@ -23,6 +23,18 @@ export default {
           light: "var(--workspace-accent-light)",
           dark: "var(--workspace-accent-dark)",
         },
+        surface: {
+          primary: "var(--theme-bg-primary)",
+          secondary: "var(--theme-bg-secondary)",
+          tertiary: "var(--theme-bg-tertiary)",
+        },
+        content: {
+          primary: "var(--theme-text-primary)",
+          secondary: "var(--theme-text-secondary)",
+        },
+        border: {
+          DEFAULT: "var(--theme-border)",
+        },
       },
       fontFamily: {
         sans: [

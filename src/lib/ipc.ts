@@ -70,6 +70,23 @@ import type {
   CreateReminderInput,
   UpdateReminderInput,
   Suggestion,
+  NoteVersion,
+  NoteVersionSummary,
+  VersionDiff,
+  VersionStorageStats,
+  PruneResult,
+  VersionHistoryConfig,
+  ImportResult,
+  MarkdownImportOptions,
+  ObsidianImportOptions,
+  CsvImportOptions,
+  CsvPreview,
+  EnhancedExportResult,
+  JsonExportOptions,
+  CsvExportOptions,
+  MarkdownExportOptions,
+  UndoRedoState,
+  ThemeSettings,
 } from "./types";
 
 // --- Notes ---
@@ -128,9 +145,9 @@ export const getNoteCount = (workspaceId: string) =>
 
 // --- Search ---
 
-/** Performs a full-text search across notes. */
-export const searchNotes = (query: SearchQuery) =>
-  invoke<SearchResult[]>("search_notes", { query });
+/** Performs a full-text search across notes, tasks, and plans. */
+export const searchEntities = (query: SearchQuery) =>
+  invoke<SearchResult[]>("search_entities", { query });
 
 // --- Export ---
 
@@ -668,3 +685,119 @@ export const suggestOnTrackerStop = (
   notes: string,
   stoppedAt: string,
 ) => invoke<Suggestion[]>("suggest_on_tracker_stop", { workspaceId, tags, notes, stoppedAt });
+
+// --- Version History ---
+
+/** Creates a version snapshot of a note. */
+export const createVersion = (noteId: string, workspaceId: string, title: string | null, body: string) =>
+  invoke<NoteVersion | null>("create_version", { noteId, workspaceId, title, body });
+
+/** Lists version summaries for a note. */
+export const listVersions = (noteId: string) =>
+  invoke<NoteVersionSummary[]>("list_versions", { noteId });
+
+/** Gets a full version by ID. */
+export const getVersion = (versionId: string) =>
+  invoke<NoteVersion>("get_version", { versionId });
+
+/** Restores a note to a specific version. */
+export const restoreVersion = (versionId: string) =>
+  invoke<NoteVersion>("restore_version", { versionId });
+
+/** Deletes a specific version. */
+export const deleteVersion = (versionId: string) =>
+  invoke<void>("delete_version", { versionId });
+
+/** Prunes old versions for a note. */
+export const pruneVersions = (noteId: string, maxKeep?: number) =>
+  invoke<PruneResult>("prune_versions", { noteId, maxKeep });
+
+/** Gets storage statistics for version history. */
+export const getVersionStorageStats = (workspaceId: string) =>
+  invoke<VersionStorageStats>("get_version_storage_stats", { workspaceId });
+
+/** Computes a diff between two versions. */
+export const diffVersions = (fromVersionId: string, toVersionId: string) =>
+  invoke<VersionDiff>("diff_versions", { fromVersionId, toVersionId });
+
+// --- Import ---
+
+/** Imports a folder of markdown files as notes. */
+export const importMarkdownFolder = (options: MarkdownImportOptions) =>
+  invoke<ImportResult>("import_markdown_folder", { options });
+
+/** Imports an Obsidian vault. */
+export const importObsidianVault = (options: ObsidianImportOptions) =>
+  invoke<ImportResult>("import_obsidian_vault", { options });
+
+/** Imports tasks from a CSV file. */
+export const importCsvTasks = (options: CsvImportOptions) =>
+  invoke<ImportResult>("import_csv_tasks", { options });
+
+/** Previews a CSV file for field mapping. */
+export const previewCsv = (filePath: string, delimiter?: string) =>
+  invoke<CsvPreview>("preview_csv", { filePath, delimiter });
+
+// --- Enhanced Export ---
+
+/** Exports workspace data as JSON. */
+export const exportWorkspaceJson = (options: JsonExportOptions) =>
+  invoke<EnhancedExportResult>("export_workspace_json", { options });
+
+/** Exports tasks as CSV. */
+export const exportTasksCsv = (options: CsvExportOptions) =>
+  invoke<EnhancedExportResult>("export_tasks_csv", { options });
+
+/** Enhanced markdown export. */
+export const exportNotesMarkdown = (options: MarkdownExportOptions) =>
+  invoke<EnhancedExportResult>("export_notes_markdown", { options });
+
+/** Exports a single note as markdown string. */
+export const exportSingleNoteMarkdown = (id: string) =>
+  invoke<string>("export_single_note_markdown", { id });
+
+// --- Undo/Redo ---
+
+/** Undoes the most recent operation. */
+export const undoOperation = () =>
+  invoke<UndoRedoState>("undo_operation");
+
+/** Redoes the most recently undone operation. */
+export const redoOperation = () =>
+  invoke<UndoRedoState>("redo_operation");
+
+/** Gets the current undo/redo state. */
+export const getUndoRedoState = () =>
+  invoke<UndoRedoState>("get_undo_redo_state");
+
+// --- Extended Settings ---
+
+/** Gets customized keyboard shortcuts. */
+export const getKeyboardShortcuts = () =>
+  invoke<Record<string, string>>("get_keyboard_shortcuts");
+
+/** Updates keyboard shortcuts. */
+export const updateKeyboardShortcuts = (shortcuts: Record<string, string>) =>
+  invoke<void>("update_keyboard_shortcuts", { shortcuts });
+
+/** Gets theme settings. */
+export const getTheme = () =>
+  invoke<ThemeSettings>("get_theme");
+
+/** Updates theme settings. */
+export const updateTheme = (theme: ThemeSettings) =>
+  invoke<void>("update_theme", { theme });
+
+/** Gets version history configuration. */
+export const getVersionHistoryConfig = () =>
+  invoke<VersionHistoryConfig>("get_version_history_config");
+
+/** Updates version history configuration. */
+export const updateVersionHistoryConfig = (config: VersionHistoryConfig) =>
+  invoke<void>("update_version_history_config", { config });
+
+// --- Global Hotkey ---
+
+/** Updates the global hotkey binding. */
+export const updateGlobalHotkey = (hotkey: string) =>
+  invoke<void>("update_global_hotkey", { hotkey });
