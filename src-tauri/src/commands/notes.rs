@@ -1,6 +1,7 @@
 use crate::models::note::{
     CreateNoteInput, FolderNode, Note, NoteListItem, NoteQuery, UpdateNoteInput,
 };
+use crate::services::activity::log_activity;
 use crate::state::AppState;
 use crate::utils::errors::AppError;
 use crate::utils::text::resolve_entity_refs;
@@ -204,13 +205,20 @@ pub fn create_note(
             }))?;
     }
 
-    state.db.with_conn(|conn| {
+    let note = state.db.with_conn(|conn| {
         read_note(conn, &id).map_err(|e| match e {
             AppError::Database(db_err) => db_err,
             _ => rusqlite::Error::InvalidQuery,
         })
     })
-    .map_err(AppError::Database)
+    .map_err(AppError::Database)?;
+
+    // Best-effort activity logging
+    let _ = state.db.with_conn(|conn| {
+        log_activity(conn, &input.workspace_id, "note", &id, note.title.as_deref(), "created", None)
+    });
+
+    Ok(note)
 }
 
 /// Retrieves a single note by ID (excludes soft-deleted).
@@ -354,18 +362,34 @@ pub fn update_note(
         Ok(())
     })?;
 
-    state.db.with_conn(|conn| {
+    let note = state.db.with_conn(|conn| {
         read_note(conn, &id).map_err(|e| match e {
             AppError::Database(db_err) => db_err,
             _ => rusqlite::Error::InvalidQuery,
         })
     })
-    .map_err(AppError::Database)
+    .map_err(AppError::Database)?;
+
+    // Best-effort activity logging
+    let _ = state.db.with_conn(|conn| {
+        log_activity(conn, &note.workspace_id, "note", &id, note.title.as_deref(), "updated", None)
+    });
+
+    Ok(note)
 }
 
 /// Soft-deletes a note by setting its `deleted_at` timestamp.
 #[tauri::command]
 pub fn delete_note(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
+    // Capture metadata before deletion for activity logging
+    let meta: Option<(String, Option<String>)> = state.db.with_conn(|conn| {
+        conn.query_row(
+            "SELECT workspace_id, title FROM notes WHERE id = ?1",
+            [&id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).ok().map_or(Ok(None), |v| Ok(Some(v)))
+    })?;
+
     let now = now_iso();
     let affected = state.db.with_conn(|conn| {
         conn.execute(
@@ -380,6 +404,14 @@ pub fn delete_note(state: State<'_, AppState>, id: String) -> Result<(), AppErro
             id,
         });
     }
+
+    // Best-effort activity logging
+    if let Some((workspace_id, title)) = meta {
+        let _ = state.db.with_conn(|conn| {
+            log_activity(conn, &workspace_id, "note", &id, title.as_deref(), "deleted", None)
+        });
+    }
+
     Ok(())
 }
 
@@ -400,12 +432,35 @@ pub fn restore_note(state: State<'_, AppState>, id: String) -> Result<(), AppErr
             id,
         });
     }
+
+    // Best-effort activity logging
+    let _ = state.db.with_conn(|conn| {
+        let meta: Option<(String, Option<String>)> = conn.query_row(
+            "SELECT workspace_id, title FROM notes WHERE id = ?1",
+            [&id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).ok();
+        if let Some((wid, title)) = meta {
+            log_activity(conn, &wid, "note", &id, title.as_deref(), "restored", None)?;
+        }
+        Ok(())
+    });
+
     Ok(())
 }
 
 /// Permanently deletes a note and its tag associations from the database.
 #[tauri::command]
 pub fn hard_delete_note(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
+    // Capture metadata before hard deletion for activity logging
+    let meta: Option<(String, Option<String>)> = state.db.with_conn(|conn| {
+        conn.query_row(
+            "SELECT workspace_id, title FROM notes WHERE id = ?1",
+            [&id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).ok().map_or(Ok(None), |v| Ok(Some(v)))
+    })?;
+
     let affected = state.db.with_conn(|conn| {
         conn.execute("DELETE FROM note_tags WHERE note_id = ?1", [&id])?;
         conn.execute("DELETE FROM notes WHERE id = ?1", [&id])
@@ -417,6 +472,14 @@ pub fn hard_delete_note(state: State<'_, AppState>, id: String) -> Result<(), Ap
             id,
         });
     }
+
+    // Best-effort activity logging
+    if let Some((workspace_id, title)) = meta {
+        let _ = state.db.with_conn(|conn| {
+            log_activity(conn, &workspace_id, "note", &id, title.as_deref(), "hard_deleted", None)
+        });
+    }
+
     Ok(())
 }
 
@@ -781,6 +844,21 @@ pub fn move_note_to_folder(
             id,
         });
     }
+
+    // Best-effort activity logging
+    let _ = state.db.with_conn(|conn| {
+        let meta: Option<(String, Option<String>)> = conn.query_row(
+            "SELECT workspace_id, title FROM notes WHERE id = ?1",
+            [&id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).ok();
+        if let Some((wid, title)) = meta {
+            let details = serde_json::json!({"field": "folder", "new": folder});
+            log_activity(conn, &wid, "note", &id, title.as_deref(), "updated", Some(details))?;
+        }
+        Ok(())
+    });
+
     Ok(())
 }
 

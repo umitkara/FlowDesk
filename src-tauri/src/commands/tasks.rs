@@ -2,6 +2,7 @@ use crate::models::task::{
     CreateTask, Task, TaskFilter, TaskSort, TaskWithChildren, UpdateTask, VALID_PRIORITIES,
     VALID_STATUSES,
 };
+use crate::services::activity::log_activity;
 use crate::services::references::{get_task_depth, would_create_cycle};
 use crate::state::AppState;
 use crate::utils::errors::AppError;
@@ -238,6 +239,12 @@ pub fn create_task(state: State<'_, AppState>, task: CreateTask) -> Result<Task,
         })
     })
     .map_err(AppError::Database)
+    .inspect(|t| {
+        // Best-effort activity logging
+        let _ = state.db.with_conn(|conn| {
+            log_activity(conn, &t.workspace_id, "task", &t.id, Some(&t.title), "created", None)
+        });
+    })
 }
 
 /// Gets a single task by ID. Returns 404 if not found or soft-deleted.
@@ -701,13 +708,19 @@ pub fn update_task(
             AppError::Database(e)
         }
     })
+    .inspect(|t| {
+        // Best-effort activity logging
+        let _ = state.db.with_conn(|conn| {
+            log_activity(conn, &t.workspace_id, "task", &t.id, Some(&t.title), "updated", None)
+        });
+    })
 }
 
 /// Soft-deletes a task. Also soft-deletes all subtasks recursively.
 #[tauri::command]
 pub fn delete_task(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let now = now_iso();
-    state
+    let task_meta = state
         .db
         .with_conn(|conn| {
             // Verify task exists
@@ -722,6 +735,8 @@ pub fn delete_task(state: State<'_, AppState>, id: String) -> Result<(), AppErro
                 return Err(rusqlite::Error::QueryReturnedNoRows);
             }
 
+            let meta = (existing.workspace_id.clone(), existing.title.clone());
+
             // Recursively soft-delete subtasks
             soft_delete_recursive(conn, &id, &now)?;
 
@@ -731,18 +746,25 @@ pub fn delete_task(state: State<'_, AppState>, id: String) -> Result<(), AppErro
                 [&id],
             )?;
 
-            Ok(())
+            Ok(meta)
         })
         .map_err(|e| {
             if matches!(e, rusqlite::Error::QueryReturnedNoRows) {
                 AppError::NotFound {
                     entity: "Task".to_string(),
-                    id,
+                    id: id.clone(),
                 }
             } else {
                 AppError::Database(e)
             }
-        })
+        })?;
+
+    // Best-effort activity logging
+    let _ = state.db.with_conn(|conn| {
+        log_activity(conn, &task_meta.0, "task", &id, Some(&task_meta.1), "deleted", None)
+    });
+
+    Ok(())
 }
 
 /// Recursively soft-deletes a task and all its subtasks.
@@ -793,7 +815,7 @@ pub fn restore_task(state: State<'_, AppState>, id: String) -> Result<Task, AppE
         });
     }
 
-    state
+    let task = state
         .db
         .with_conn(|conn| {
             read_task(conn, &id).map_err(|e| match e {
@@ -801,7 +823,14 @@ pub fn restore_task(state: State<'_, AppState>, id: String) -> Result<Task, AppE
                 _ => rusqlite::Error::InvalidQuery,
             })
         })
-        .map_err(AppError::Database)
+        .map_err(AppError::Database)?;
+
+    // Best-effort activity logging
+    let _ = state.db.with_conn(|conn| {
+        log_activity(conn, &task.workspace_id, "task", &id, Some(&task.title), "restored", None)
+    });
+
+    Ok(task)
 }
 
 /// Toggles a task's status between todo and done.
@@ -811,22 +840,25 @@ pub fn restore_task(state: State<'_, AppState>, id: String) -> Result<Task, AppE
 #[tauri::command]
 pub fn toggle_task_status(state: State<'_, AppState>, id: String) -> Result<Task, AppError> {
     let now = now_iso();
+    let id_log = id.clone();
 
-    state
+    let (old_status, task) = state
         .db
         .with_conn(|conn| {
-            let task = read_task(conn, &id).map_err(|e| match e {
+            let existing = read_task(conn, &id).map_err(|e| match e {
                 AppError::Database(db_err) => db_err,
                 other => rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::other(
                     other.to_string(),
                 ))),
             })?;
 
-            if task.deleted_at.is_some() {
+            if existing.deleted_at.is_some() {
                 return Err(rusqlite::Error::QueryReturnedNoRows);
             }
 
-            if task.status == "done" {
+            let old_status = existing.status.clone();
+
+            if existing.status == "done" {
                 conn.execute(
                     "UPDATE tasks SET status = 'todo', completed_at = NULL, updated_at = ?1 WHERE id = ?2",
                     rusqlite::params![now, id],
@@ -838,10 +870,11 @@ pub fn toggle_task_status(state: State<'_, AppState>, id: String) -> Result<Task
                 )?;
             }
 
-            read_task(conn, &id).map_err(|e| match e {
+            let updated = read_task(conn, &id).map_err(|e| match e {
                 AppError::Database(db_err) => db_err,
                 _ => rusqlite::Error::InvalidQuery,
-            })
+            })?;
+            Ok((old_status, updated))
         })
         .map_err(|e| {
             if matches!(e, rusqlite::Error::QueryReturnedNoRows) {
@@ -852,7 +885,16 @@ pub fn toggle_task_status(state: State<'_, AppState>, id: String) -> Result<Task
             } else {
                 AppError::Database(e)
             }
-        })
+        })?;
+
+    // Best-effort activity logging
+    let action = if task.status == "done" { "completed" } else { "status_changed" };
+    let details = serde_json::json!({"field": "status", "old": old_status, "new": task.status});
+    let _ = state.db.with_conn(|conn| {
+        log_activity(conn, &task.workspace_id, "task", &id_log, Some(&task.title), action, Some(details))
+    });
+
+    Ok(task)
 }
 
 /// Gets the full subtask tree for a given task (recursive).
@@ -957,6 +999,14 @@ pub fn bulk_update_task_status(
             Ok(results)
         })
         .map_err(AppError::Database)
+        .inspect(|tasks| {
+            for task in tasks {
+                let details = serde_json::json!({"field": "status", "new": status});
+                let _ = state.db.with_conn(|conn| {
+                    log_activity(conn, &task.workspace_id, "task", &task.id, Some(&task.title), "status_changed", Some(details))
+                });
+            }
+        })
 }
 
 /// Bulk update: add tags to multiple tasks at once. Merges new tags with existing (no duplicates).
@@ -1017,6 +1067,14 @@ pub fn bulk_add_task_tags(
             Ok(results)
         })
         .map_err(AppError::Database)
+        .inspect(|tasks| {
+            for task in tasks {
+                let details = serde_json::json!({"field": "tags", "added": tags});
+                let _ = state.db.with_conn(|conn| {
+                    log_activity(conn, &task.workspace_id, "task", &task.id, Some(&task.title), "updated", Some(details))
+                });
+            }
+        })
 }
 
 /// Bulk soft-delete multiple tasks.
@@ -1028,6 +1086,17 @@ pub fn bulk_delete_tasks(
     if task_ids.is_empty() {
         return Ok(());
     }
+
+    // Capture metadata before deletion for activity logging
+    let metas: Vec<(String, String, String)> = task_ids.iter().filter_map(|tid| {
+        state.db.with_conn(|conn| {
+            conn.query_row(
+                "SELECT id, workspace_id, title FROM tasks WHERE id = ?1",
+                [tid],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
+            ).ok().map_or(Ok(None), |v| Ok(Some(v)))
+        }).ok().flatten()
+    }).collect();
 
     let now = now_iso();
 
@@ -1042,7 +1111,16 @@ pub fn bulk_delete_tasks(
 
             tx.commit()
         })
-        .map_err(AppError::Database)
+        .map_err(AppError::Database)?;
+
+    // Best-effort activity logging
+    for (tid, wid, title) in &metas {
+        let _ = state.db.with_conn(|conn| {
+            log_activity(conn, wid, "task", tid, Some(title.as_str()), "deleted", None)
+        });
+    }
+
+    Ok(())
 }
 
 /// Gets sticky tasks for a workspace (tasks with is_sticky=1 that are not done/cancelled/deleted).
@@ -1092,20 +1170,23 @@ pub fn move_task_status(
 ) -> Result<Task, AppError> {
     validate_status(&new_status)?;
     let now = now_iso();
+    let id_log = id.clone();
 
-    state
+    let (old_status, task) = state
         .db
         .with_conn(|conn| {
-            let task = read_task(conn, &id).map_err(|e| match e {
+            let existing = read_task(conn, &id).map_err(|e| match e {
                 AppError::Database(db_err) => db_err,
                 other => rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::other(
                     other.to_string(),
                 ))),
             })?;
 
-            if task.deleted_at.is_some() {
+            if existing.deleted_at.is_some() {
                 return Err(rusqlite::Error::QueryReturnedNoRows);
             }
+
+            let old_status = existing.status.clone();
 
             // Handle completed_at side effects
             let completed_at = if new_status == "done" || new_status == "cancelled" {
@@ -1119,10 +1200,11 @@ pub fn move_task_status(
                 rusqlite::params![new_status, completed_at, now, id],
             )?;
 
-            read_task(conn, &id).map_err(|e| match e {
+            let updated = read_task(conn, &id).map_err(|e| match e {
                 AppError::Database(db_err) => db_err,
                 _ => rusqlite::Error::InvalidQuery,
-            })
+            })?;
+            Ok((old_status, updated))
         })
         .map_err(|e| {
             if matches!(e, rusqlite::Error::QueryReturnedNoRows) {
@@ -1133,7 +1215,16 @@ pub fn move_task_status(
             } else {
                 AppError::Database(e)
             }
-        })
+        })?;
+
+    // Best-effort activity logging
+    let action = if task.status == "done" { "completed" } else { "status_changed" };
+    let details = serde_json::json!({"field": "status", "old": old_status, "new": task.status});
+    let _ = state.db.with_conn(|conn| {
+        log_activity(conn, &task.workspace_id, "task", &id_log, Some(&task.title), action, Some(details))
+    });
+
+    Ok(task)
 }
 
 /// Sanitizes a search query for FTS5 by escaping special characters.

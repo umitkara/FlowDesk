@@ -3,6 +3,7 @@ use crate::models::plan::{
     PlanWithLinks, SpawnNoteInput, SpawnTaskInput, UpdatePlanInput, VALID_IMPORTANCE,
     VALID_PLAN_TYPES,
 };
+use crate::services::activity::log_activity;
 use crate::state::AppState;
 use crate::utils::errors::AppError;
 use crate::utils::{id::generate_id, time::now_iso};
@@ -215,6 +216,12 @@ pub fn create_plan(state: State<'_, AppState>, input: CreatePlanInput) -> Result
             read_plan(conn, &id).map_err(to_sql_err)
         })
         .map_err(AppError::Database)
+        .inspect(|p| {
+            // Best-effort activity logging
+            let _ = state.db.with_conn(|conn| {
+                log_activity(conn, &p.workspace_id, "plan", &p.id, Some(&p.title), "created", None)
+            });
+        })
 }
 
 /// Gets a single plan by ID. Returns 404 if not found or soft-deleted.
@@ -390,13 +397,19 @@ pub fn update_plan(state: State<'_, AppState>, input: UpdatePlanInput) -> Result
                 AppError::Database(e)
             }
         })
+        .inspect(|p| {
+            // Best-effort activity logging
+            let _ = state.db.with_conn(|conn| {
+                log_activity(conn, &p.workspace_id, "plan", &p.id, Some(&p.title), "updated", None)
+            });
+        })
 }
 
 /// Soft-deletes a plan by setting `deleted_at`.
 #[tauri::command]
 pub fn delete_plan(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let now = now_iso();
-    state
+    let meta = state
         .db
         .with_conn(|conn| {
             let existing = read_plan(conn, &id).map_err(to_sql_err)?;
@@ -405,23 +418,32 @@ pub fn delete_plan(state: State<'_, AppState>, id: String) -> Result<(), AppErro
                 return Err(rusqlite::Error::QueryReturnedNoRows);
             }
 
+            let meta = (existing.workspace_id.clone(), existing.title.clone());
+
             conn.execute(
                 "UPDATE plans SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
                 rusqlite::params![now, id],
             )?;
 
-            Ok(())
+            Ok(meta)
         })
         .map_err(|e| {
             if matches!(e, rusqlite::Error::QueryReturnedNoRows) {
                 AppError::NotFound {
                     entity: "Plan".to_string(),
-                    id,
+                    id: id.clone(),
                 }
             } else {
                 AppError::Database(e)
             }
-        })
+        })?;
+
+    // Best-effort activity logging
+    let _ = state.db.with_conn(|conn| {
+        log_activity(conn, &meta.0, "plan", &id, Some(&meta.1), "deleted", None)
+    });
+
+    Ok(())
 }
 
 /// Lists plans matching the given query parameters.
@@ -806,6 +828,7 @@ pub fn spawn_task_from_plan(
     state: State<'_, AppState>,
     input: SpawnTaskInput,
 ) -> Result<PlanLinkedTask, AppError> {
+    let plan_id_for_log = input.plan_id.clone();
     state
         .db
         .with_conn(|conn| {
@@ -860,13 +883,13 @@ pub fn spawn_task_from_plan(
                 rusqlite::params![ref2_id, task_id, input.plan_id, now],
             )?;
 
-            Ok(PlanLinkedTask {
+            Ok((plan.workspace_id.clone(), PlanLinkedTask {
                 task_id,
                 title: input.title,
                 status: "todo".to_string(),
                 priority: priority.to_string(),
                 relation: "spawned".to_string(),
-            })
+            }))
         })
         .map_err(|e| {
             if matches!(e, rusqlite::Error::QueryReturnedNoRows) {
@@ -878,6 +901,13 @@ pub fn spawn_task_from_plan(
                 AppError::Database(e)
             }
         })
+        .inspect(|(wid, linked)| {
+            let details = serde_json::json!({"plan_id": plan_id_for_log, "spawned": "task"});
+            let _ = state.db.with_conn(|conn| {
+                log_activity(conn, wid, "task", &linked.task_id, Some(&linked.title), "created", Some(details))
+            });
+        })
+        .map(|(_, linked)| linked)
 }
 
 /// Spawns a note from a plan, creating bidirectional references.
@@ -889,6 +919,7 @@ pub fn spawn_note_from_plan(
     state: State<'_, AppState>,
     input: SpawnNoteInput,
 ) -> Result<PlanLinkedNote, AppError> {
+    let plan_id_for_log = input.plan_id.clone();
     state
         .db
         .with_conn(|conn| {
@@ -951,12 +982,12 @@ pub fn spawn_note_from_plan(
                 rusqlite::params![ref2_id, note_id, input.plan_id, note_relation, now],
             )?;
 
-            Ok(PlanLinkedNote {
+            Ok((plan.workspace_id.clone(), PlanLinkedNote {
                 note_id,
                 title: Some(title),
                 date: Some(date),
                 relation: "spawned".to_string(),
-            })
+            }))
         })
         .map_err(|e| {
             if matches!(e, rusqlite::Error::QueryReturnedNoRows) {
@@ -968,6 +999,13 @@ pub fn spawn_note_from_plan(
                 AppError::Database(e)
             }
         })
+        .inspect(|(wid, linked)| {
+            let details = serde_json::json!({"plan_id": plan_id_for_log, "spawned": "note"});
+            let _ = state.db.with_conn(|conn| {
+                log_activity(conn, wid, "note", &linked.note_id, linked.title.as_deref(), "created", Some(details))
+            });
+        })
+        .map(|(_, linked)| linked)
 }
 
 /// Links an existing task to a plan with a specified relation.
@@ -980,6 +1018,9 @@ pub fn link_task_to_plan(
     task_id: String,
     relation: String,
 ) -> Result<(), AppError> {
+    let plan_id_log = plan_id.clone();
+    let task_id_log = task_id.clone();
+    let relation_log = relation.clone();
     state
         .db
         .with_conn(|conn| {
@@ -1014,7 +1055,7 @@ pub fn link_task_to_plan(
                 )?;
 
             if existing {
-                return Ok(()); // Idempotent
+                return Ok(plan.workspace_id.clone()); // Idempotent
             }
 
             let ref_id = generate_id();
@@ -1033,7 +1074,7 @@ pub fn link_task_to_plan(
                 rusqlite::params![ref_id_reverse, plan_id, task_id, relation, now],
             )?;
 
-            Ok(())
+            Ok(plan.workspace_id.clone())
         })
         .map_err(|e| {
             if matches!(e, rusqlite::Error::QueryReturnedNoRows) {
@@ -1045,6 +1086,13 @@ pub fn link_task_to_plan(
                 AppError::Database(e)
             }
         })
+        .inspect(|wid| {
+            let details = serde_json::json!({"plan_id": plan_id_log, "task_id": task_id_log, "relation": relation_log});
+            let _ = state.db.with_conn(|conn| {
+                log_activity(conn, wid, "plan", &plan_id_log, None, "linked", Some(details))
+            });
+        })
+        .map(|_| ())
 }
 
 /// Removes all references between a task and a plan.
@@ -1054,6 +1102,18 @@ pub fn unlink_task_from_plan(
     plan_id: String,
     task_id: String,
 ) -> Result<(), AppError> {
+    let plan_id_log = plan_id.clone();
+    let task_id_log = task_id.clone();
+
+    // Capture workspace_id before deletion
+    let workspace_id: Option<String> = state.db.with_conn(|conn| {
+        conn.query_row(
+            "SELECT workspace_id FROM plans WHERE id = ?1",
+            [&plan_id_log],
+            |row| row.get(0),
+        ).ok().map_or(Ok(None), |v| Ok(Some(v)))
+    }).ok().flatten();
+
     state
         .db
         .with_conn(|conn| {
@@ -1075,7 +1135,17 @@ pub fn unlink_task_from_plan(
 
             Ok(())
         })
-        .map_err(AppError::Database)
+        .map_err(AppError::Database)?;
+
+    // Best-effort activity logging
+    if let Some(wid) = workspace_id {
+        let details = serde_json::json!({"plan_id": plan_id_log, "task_id": task_id_log});
+        let _ = state.db.with_conn(|conn| {
+            log_activity(conn, &wid, "plan", &plan_id_log, None, "unlinked", Some(details))
+        });
+    }
+
+    Ok(())
 }
 
 /// Searches plans using FTS5 full-text search.
