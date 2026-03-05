@@ -1,6 +1,8 @@
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useUIStore } from "../../stores/uiStore";
 import { ReminderSettings } from "./ReminderSettings";
+import { ThemeSettings } from "./ThemeSettings";
+import { KeyboardShortcuts } from "./KeyboardShortcuts";
 
 /** Settings panel with grouped configuration options. */
 export function SettingsPanel() {
@@ -62,17 +64,9 @@ export function SettingsPanel() {
 
       {/* Appearance section */}
       <SettingsSection title="Appearance">
-        <SettingRow label="Theme" description="Application color theme">
-          <select
-            value={settings.theme ?? "system"}
-            onChange={(e) => setSetting("theme", e.target.value)}
-            className="rounded border border-gray-200 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800"
-          >
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </SettingRow>
+        <div className="px-4 py-3">
+          <ThemeSettings />
+        </div>
         <SettingRow label="Sidebar Width" description="Default width in pixels">
           <input
             type="number"
@@ -83,6 +77,13 @@ export function SettingsPanel() {
             className="w-20 rounded border border-gray-200 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800"
           />
         </SettingRow>
+      </SettingsSection>
+
+      {/* Keyboard Shortcuts */}
+      <SettingsSection title="Keyboard Shortcuts">
+        <div className="p-3">
+          <KeyboardShortcuts />
+        </div>
       </SettingsSection>
 
       {/* Backup section */}
@@ -152,6 +153,18 @@ export function SettingsPanel() {
 
       {/* Reminders & Automation */}
       <ReminderSettings />
+
+      {/* Data section */}
+      <SettingsSection title="Data">
+        <div className="px-4 py-3">
+          <button
+            onClick={() => setActiveView("import-wizard")}
+            className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+          >
+            Import Data...
+          </button>
+        </div>
+      </SettingsSection>
 
       {/* About link */}
       <div className="mb-6">

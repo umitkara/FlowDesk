@@ -5,7 +5,7 @@ import { TrackerWidget } from "../../features/tracker/TrackerWidget";
 export function TopBar() {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const toggleQuickSwitcher = useUIStore((s) => s.toggleQuickSwitcher);
+  const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
 
   return (
     <div className="flex h-11 flex-shrink-0 items-center justify-between border-b border-gray-200 bg-white px-3 dark:border-gray-800 dark:bg-gray-950" data-tauri-drag-region>
@@ -31,16 +31,16 @@ export function TopBar() {
 
       <div className="flex items-center gap-1">
         <button
-          onClick={toggleQuickSwitcher}
+          onClick={toggleCommandPalette}
           className="flex items-center gap-1.5 rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-200"
-          title="Quick switcher (Ctrl+P)"
+          title="Command palette (Ctrl+K)"
         >
           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <span>Search...</span>
           <kbd className="rounded bg-gray-100 px-1 py-0.5 font-mono text-[10px] dark:bg-gray-800">
-            Ctrl+P
+            Ctrl+K
           </kbd>
         </button>
 

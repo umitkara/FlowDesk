@@ -8,6 +8,7 @@ import { useUIStore } from "./stores/uiStore";
 import { useTaskStore } from "./stores/taskStore";
 import { useTrackerStore } from "./stores/trackerStore";
 import { useReminderStore } from "./stores/reminderStore";
+import { useTheme } from "./hooks/useTheme";
 import type { Reminder } from "./lib/types";
 import * as ipc from "./lib/ipc";
 
@@ -48,26 +49,8 @@ function App() {
     fetchStickyTasks();
   }, [activeWorkspaceId, loadNotes, loadFolderTree, fetchStickyTasks]);
 
-  // Apply theme setting to the document
-  const theme = useSettingsStore((s) => s.settings.theme ?? "system");
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else if (theme === "light") {
-      root.classList.remove("dark");
-    } else {
-      // system
-      const mq = window.matchMedia("(prefers-color-scheme: dark)");
-      const apply = () => {
-        if (mq.matches) root.classList.add("dark");
-        else root.classList.remove("dark");
-      };
-      apply();
-      mq.addEventListener("change", apply);
-      return () => mq.removeEventListener("change", apply);
-    }
-  }, [theme]);
+  // Apply theme via hook (replaces inline theme effect)
+  useTheme();
 
   // Load reminder defaults
   const loadReminderDefaults = useReminderStore((s) => s.loadDefaults);
@@ -83,6 +66,15 @@ function App() {
     });
     return () => { unlisten.then((fn) => fn()); };
   }, [addFiredReminder]);
+
+  // Listen for global hotkey quick-capture activation
+  const toggleQuickCapture = useUIStore((s) => s.toggleQuickCapture);
+  useEffect(() => {
+    const unlisten = listen("quick-capture:activate", () => {
+      toggleQuickCapture();
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [toggleQuickCapture]);
 
   // Listen for system tray tracker actions
   const trackerStart = useTrackerStore((s) => s.start);

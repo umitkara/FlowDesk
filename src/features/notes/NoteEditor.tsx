@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -12,7 +12,9 @@ import { useSettingsStore } from "../../stores/settingsStore";
 import { useUIStore } from "../../stores/uiStore";
 import { useTrackerStore } from "../../stores/trackerStore";
 import { useDebounce } from "../../hooks/useDebounce";
+import { useVersionHistory } from "../../hooks/useVersionHistory";
 import { FrontMatterPanel } from "./FrontMatterPanel";
+import { VersionHistory } from "./VersionHistory";
 import { formatDate } from "../../lib/utils";
 import { TaskReferenceExtension, preprocessEntityRefs } from "./extensions/TaskReferenceExtension";
 import { syncNoteReferences } from "../../lib/ipc";
@@ -21,6 +23,7 @@ import { syncNoteReferences } from "../../lib/ipc";
 export function NoteEditor() {
   const activeNote = useNoteStore((s) => s.activeNote);
   const updateNote = useNoteStore((s) => s.updateNote);
+  const selectNote = useNoteStore((s) => s.selectNote);
   const fontSize = useSettingsStore((s) => s.settings.font_size ?? "14");
   const debounceMs = useSettingsStore(
     (s) => s.settings.auto_save_debounce_ms ?? "1000",
@@ -32,6 +35,9 @@ export function NoteEditor() {
   const trackerElapsed = useTrackerStore((s) => s.elapsedSeconds);
   const addSessionNote = useTrackerStore((s) => s.addSessionNote);
 
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+  const { scheduleSnapshot } = useVersionHistory(activeNote?.id ?? "");
+
   const delayMs = Math.max(200, Math.min(5000, parseInt(debounceMs, 10) || 1000));
 
   const debouncedSave = useDebounce((body: string) => {
@@ -39,6 +45,8 @@ export function NoteEditor() {
       updateNote(activeNote.id, { body });
       // Sync inline @task[id] references after save
       syncNoteReferences(activeNote.id, body).catch(() => {});
+      // Schedule a version snapshot (5s debounce)
+      scheduleSnapshot(activeNote.workspace_id, activeNote.title, body, 5);
     }
   }, delayMs);
 
@@ -303,6 +311,20 @@ export function NoteEditor() {
                 </ToolbarButton>
               </>
             )}
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Version History button */}
+            <ToolbarButton
+              active={versionHistoryOpen}
+              onClick={() => setVersionHistoryOpen(!versionHistoryOpen)}
+              title="Version History"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </ToolbarButton>
           </div>
         )}
 
@@ -320,6 +342,21 @@ export function NoteEditor() {
         <div className="flex h-full w-72 flex-shrink-0 flex-col border-l border-gray-200 dark:border-gray-800">
           <FrontMatterPanel />
         </div>
+      )}
+
+      {/* Version history panel */}
+      {versionHistoryOpen && activeNote && (
+        <VersionHistory
+          noteId={activeNote.id}
+          onClose={() => setVersionHistoryOpen(false)}
+          onRestore={() => {
+            setVersionHistoryOpen(false);
+            // Re-read note to refresh editor content
+            if (activeNote) {
+              selectNote(activeNote.id);
+            }
+          }}
+        />
       )}
     </div>
   );

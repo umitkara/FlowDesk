@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /** Active view identifier. */
-export type ActiveView = "notes" | "search" | "settings" | "daily" | "trash" | "tasks" | "about" | "plans" | "daily-plan" | "time-reports" | "dashboard" | "workspace-settings" | "faceted-search" | "graph" | "timeline" | "grouped" | "planned-vs-actual" | "templates";
+export type ActiveView = "notes" | "settings" | "daily" | "trash" | "tasks" | "about" | "plans" | "daily-plan" | "time-reports" | "dashboard" | "workspace-settings" | "faceted-search" | "graph" | "timeline" | "grouped" | "planned-vs-actual" | "templates" | "import-wizard" | "version-history";
 
 /** Active sidebar section identifier. */
 export type SidebarSection = "folders" | "calendar" | "search";
@@ -24,6 +24,10 @@ interface UIState {
   historyIndex: number;
   /** Whether the quick switcher overlay is shown. */
   quickSwitcherOpen: boolean;
+  /** Whether the command palette is open. */
+  commandPaletteOpen: boolean;
+  /** Whether the quick capture widget is open. */
+  quickCaptureOpen: boolean;
 
   /** Toggles sidebar visibility. */
   toggleSidebar: () => void;
@@ -41,6 +45,10 @@ interface UIState {
   toggleDetailPanel: () => void;
   /** Toggles the quick switcher overlay. */
   toggleQuickSwitcher: () => void;
+  /** Toggles the command palette. */
+  toggleCommandPalette: () => void;
+  /** Toggles the quick capture widget. */
+  toggleQuickCapture: () => void;
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
@@ -52,6 +60,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   navigationHistory: [],
   historyIndex: -1,
   quickSwitcherOpen: false,
+  commandPaletteOpen: false,
+  quickCaptureOpen: false,
 
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
 
@@ -95,4 +105,10 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   toggleQuickSwitcher: () =>
     set((s) => ({ quickSwitcherOpen: !s.quickSwitcherOpen })),
+
+  toggleCommandPalette: () =>
+    set((s) => ({ commandPaletteOpen: !s.commandPaletteOpen })),
+
+  toggleQuickCapture: () =>
+    set((s) => ({ quickCaptureOpen: !s.quickCaptureOpen })),
 }));

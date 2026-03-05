@@ -6,10 +6,10 @@ import { useUIStore } from "../../stores/uiStore";
 import { useNoteStore } from "../../stores/noteStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboard";
+import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
 import { NoteEditor } from "../../features/notes/NoteEditor";
 import { NoteList } from "../../features/notes/NoteList";
-import { QuickSwitcher } from "../../features/notes/QuickSwitcher";
-import { SearchResults } from "../../features/search/SearchResults";
+
 import { SettingsPanel } from "../../features/settings/SettingsPanel";
 import { TrashView } from "../../features/notes/TrashView";
 import { AboutPanel } from "../../features/about/AboutPanel";
@@ -32,6 +32,9 @@ import TimelineView from "../../features/discovery/TimelineView";
 import GroupedView from "../../features/discovery/GroupedView";
 import PlannedVsActual from "../../features/discovery/PlannedVsActual";
 import { TemplateManager } from "../../features/notes/TemplateManager";
+import { ImportWizard } from "../../features/import/ImportWizard";
+import { CommandPalette } from "../../features/command-palette/CommandPalette";
+import { QuickCapture } from "../../features/capture/QuickCapture";
 import { usePlanStore } from "../../stores/planStore";
 import { useTrackerStore } from "../../stores/trackerStore";
 import { todayISO } from "../../lib/utils";
@@ -42,8 +45,9 @@ export function AppShell() {
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
-  const toggleQuickSwitcher = useUIStore((s) => s.toggleQuickSwitcher);
-  const quickSwitcherOpen = useUIStore((s) => s.quickSwitcherOpen);
+  const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
+  const toggleQuickCapture = useUIStore((s) => s.toggleQuickCapture);
+  const registerCommands = useCommandPaletteStore((s) => s.registerCommands);
   const goBack = useUIStore((s) => s.goBack);
   const goForward = useUIStore((s) => s.goForward);
   const activeNote = useNoteStore((s) => s.activeNote);
@@ -91,12 +95,12 @@ export function AppShell() {
   const shortcuts = useMemo(
     () => [
       { key: "n", ctrl: true, handler: handleNewNote },
-      { key: "p", ctrl: true, handler: toggleQuickSwitcher },
+      { key: "p", ctrl: true, handler: () => toggleCommandPalette() },
       {
         key: "f",
         ctrl: true,
         shift: true,
-        handler: () => setActiveView("search"),
+        handler: () => toggleCommandPalette(),
       },
       {
         key: "d",
@@ -107,6 +111,13 @@ export function AppShell() {
       { key: "ArrowLeft", alt: true, handler: handleBack },
       { key: "ArrowRight", alt: true, handler: handleForward },
       { key: ",", ctrl: true, handler: () => setActiveView("settings") },
+      { key: "k", ctrl: true, handler: () => toggleCommandPalette() },
+      {
+        key: " ",
+        ctrl: true,
+        shift: true,
+        handler: () => toggleQuickCapture(),
+      },
       {
         key: "t",
         ctrl: true,
@@ -152,7 +163,8 @@ export function AppShell() {
     ],
     [
       handleNewNote,
-      toggleQuickSwitcher,
+      toggleCommandPalette,
+      toggleQuickCapture,
       setActiveView,
       openDailyNote,
       handleBack,
@@ -168,6 +180,35 @@ export function AppShell() {
   );
 
   useKeyboardShortcuts(shortcuts);
+
+  // Register commands for the command palette
+  useEffect(() => {
+    registerCommands([
+      // Navigation
+      { id: "nav:notes", title: "Go to Notes", category: "Navigation", shortcut: "Ctrl+P", handler: () => setActiveView("notes"), keywords: ["notes", "view"] },
+      { id: "nav:tasks", title: "Go to Tasks", category: "Navigation", handler: () => setActiveView("tasks"), keywords: ["tasks", "todo"] },
+      { id: "nav:plans", title: "Go to Calendar", category: "Navigation", handler: () => setActiveView("plans"), keywords: ["plans", "calendar"] },
+      { id: "nav:daily-plan", title: "Go to Daily Plan", category: "Navigation", handler: () => setActiveView("daily-plan"), keywords: ["daily", "plan", "today"] },
+      { id: "nav:dashboard", title: "Go to Dashboard", category: "Navigation", handler: () => setActiveView("dashboard"), keywords: ["dashboard", "home"] },
+      { id: "nav:time-reports", title: "Go to Time Reports", category: "Navigation", handler: () => setActiveView("time-reports"), keywords: ["time", "reports", "tracker"] },
+      { id: "nav:templates", title: "Go to Templates", category: "Navigation", handler: () => setActiveView("templates"), keywords: ["templates"] },
+      { id: "nav:settings", title: "Open Settings", category: "Navigation", shortcut: "Ctrl+,", handler: () => setActiveView("settings"), keywords: ["settings", "preferences", "config"] },
+      { id: "nav:trash", title: "Go to Trash", category: "Navigation", handler: () => setActiveView("trash"), keywords: ["trash", "deleted"] },
+      // Discovery
+      { id: "nav:search", title: "Global Search", category: "Discovery", shortcut: "Ctrl+Shift+F", handler: () => toggleCommandPalette(), keywords: ["search", "find"] },
+      { id: "nav:faceted", title: "Advanced Search", category: "Discovery", handler: () => setActiveView("faceted-search"), keywords: ["faceted", "filter", "advanced"] },
+      { id: "nav:graph", title: "Knowledge Graph", category: "Discovery", handler: () => setActiveView("graph"), keywords: ["graph", "links", "connections"] },
+      { id: "nav:timeline", title: "Timeline", category: "Discovery", handler: () => setActiveView("timeline"), keywords: ["timeline", "history"] },
+      { id: "nav:grouped", title: "Grouped View", category: "Discovery", handler: () => setActiveView("grouped"), keywords: ["grouped", "categories"] },
+      { id: "nav:planned-vs-actual", title: "Plan vs Actual", category: "Discovery", handler: () => setActiveView("planned-vs-actual"), keywords: ["planned", "actual", "compare"] },
+      // Actions
+      { id: "action:new-note", title: "New Note", category: "Actions", shortcut: "Ctrl+N", handler: handleNewNote, keywords: ["create", "new", "note"] },
+      { id: "action:daily-note", title: "Open Today's Note", category: "Actions", shortcut: "Ctrl+Shift+D", handler: () => openDailyNote(todayISO()), keywords: ["today", "daily", "journal"] },
+      { id: "action:quick-capture", title: "Quick Capture", category: "Actions", shortcut: "Ctrl+Shift+Space", handler: () => toggleQuickCapture(), keywords: ["capture", "quick", "inbox"] },
+      { id: "action:new-task", title: "New Task", category: "Actions", shortcut: "Ctrl+Shift+T", handler: () => openQuickAdd(), keywords: ["create", "new", "task", "todo"] },
+      { id: "action:import", title: "Import Data", category: "Actions", handler: () => setActiveView("import-wizard"), keywords: ["import", "csv", "markdown", "obsidian"] },
+    ]);
+  }, [registerCommands, setActiveView, handleNewNote, openDailyNote, toggleQuickCapture, openQuickAdd]);
 
   return (
     <div className="flex h-full flex-col bg-white dark:bg-gray-950">
@@ -213,7 +254,7 @@ export function AppShell() {
                 </div>
               </div>
             )}
-            {activeView === "search" && <SearchResults />}
+
             {activeView === "settings" && <SettingsPanel />}
             {activeView === "trash" && <TrashView />}
             {activeView === "about" && <AboutPanel />}
@@ -230,6 +271,7 @@ export function AppShell() {
             {activeView === "grouped" && <GroupedView />}
             {activeView === "planned-vs-actual" && <PlannedVsActual />}
             {activeView === "templates" && <TemplateManager />}
+            {activeView === "import-wizard" && <ImportWizard />}
           </div>
 
           {/* Task detail panel */}
@@ -242,7 +284,8 @@ export function AppShell() {
 
       <StatusBar />
 
-      {quickSwitcherOpen && <QuickSwitcher />}
+      <CommandPalette />
+      <QuickCapture />
       <TaskQuickAdd />
       <PlanDialog />
       <TrackerDetailForm />
