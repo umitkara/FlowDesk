@@ -1,3 +1,5 @@
+/// Advanced view types: filters, activity, graph, faceted search, grouped views, planned vs actual.
+pub mod discovery;
 /// Note entity and related input/query types.
 pub mod note;
 /// Plan entity and related input/query types.
