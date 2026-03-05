@@ -71,6 +71,11 @@ pub fn run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
             "011_rebuild_fts",
             include_str!("../../migrations/011_rebuild_fts.sql"),
         ),
+        (
+            12,
+            "012_recurrence_templates",
+            include_str!("../../migrations/012_recurrence_templates.sql"),
+        ),
     ];
 
     for (version, name, sql) in migrations {
