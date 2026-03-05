@@ -51,6 +51,16 @@ pub fn run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
             "007_time_entries",
             include_str!("../../migrations/007_time_entries.sql"),
         ),
+        (
+            8,
+            "008_workspaces_enhanced",
+            include_str!("../../migrations/008_workspaces_enhanced.sql"),
+        ),
+        (
+            9,
+            "009_cross_workspace_refs",
+            include_str!("../../migrations/009_cross_workspace_refs.sql"),
+        ),
     ];
 
     for (version, name, sql) in migrations {

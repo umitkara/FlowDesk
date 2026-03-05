@@ -311,6 +311,14 @@ pub fn run() {
             // Workspaces
             commands::workspaces::list_workspaces,
             commands::workspaces::get_workspace,
+            commands::workspaces::create_workspace,
+            commands::workspaces::update_workspace,
+            commands::workspaces::delete_workspace,
+            commands::workspaces::reorder_workspaces,
+            commands::workspaces::update_workspace_config,
+            commands::workspaces::get_workspace_badge,
+            commands::workspaces::resolve_cross_workspace_ref,
+            commands::workspaces::get_dashboard_data,
             // Tasks
             commands::tasks::create_task,
             commands::tasks::get_task,

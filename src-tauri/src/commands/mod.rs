@@ -14,5 +14,5 @@ pub mod settings;
 pub mod tasks;
 /// Time entry CRUD, tracker state machine, reports, and recovery commands.
 pub mod time_entries;
-/// Workspace listing commands.
+/// Workspace CRUD, config, dashboard, and cross-workspace reference commands.
 pub mod workspaces;
