@@ -18,6 +18,11 @@ export default {
           900: "#1e3a8a",
           950: "#172554",
         },
+        accent: {
+          DEFAULT: "var(--workspace-accent)",
+          light: "var(--workspace-accent-light)",
+          dark: "var(--workspace-accent-dark)",
+        },
       },
       fontFamily: {
         sans: [

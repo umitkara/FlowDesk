@@ -3,6 +3,12 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --workspace-accent: #3b82f6;
+    --workspace-accent-light: #3b82f620;
+    --workspace-accent-dark: #2563eb;
+  }
+
   html,
   body,
   #root {
