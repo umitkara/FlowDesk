@@ -11,6 +11,12 @@ import type {
   ExportOptions,
   ExportResult,
   Workspace,
+  WorkspaceSummary,
+  WorkspaceConfig,
+  WorkspaceBadge,
+  CreateWorkspaceInput,
+  UpdateWorkspaceInput,
+  DashboardData,
   Task,
   TaskWithChildren,
   CreateTaskInput,
@@ -132,12 +138,55 @@ export const setManySettings = (settings: Record<string, string>) =>
 
 // --- Workspaces ---
 
-/** Returns all workspaces. */
-export const listWorkspaces = () => invoke<Workspace[]>("list_workspaces");
+/** Returns all active workspaces with note/task counts. */
+export const listWorkspaces = () =>
+  invoke<WorkspaceSummary[]>("list_workspaces");
 
-/** Gets a workspace by ID. */
+/** Gets a workspace by ID with full config. */
 export const getWorkspace = (id: string) =>
   invoke<Workspace>("get_workspace", { id });
+
+/** Creates a new workspace. */
+export const createWorkspace = (input: CreateWorkspaceInput) =>
+  invoke<Workspace>("create_workspace", { input });
+
+/** Updates workspace metadata and/or config. */
+export const updateWorkspace = (input: UpdateWorkspaceInput) =>
+  invoke<Workspace>("update_workspace", { input });
+
+/** Soft-deletes a workspace and all its entities. */
+export const deleteWorkspace = (id: string) =>
+  invoke<void>("delete_workspace", { id });
+
+/** Reorders workspaces by updating sort_order. */
+export const reorderWorkspaces = (workspaceIds: string[]) =>
+  invoke<void>("reorder_workspaces", { input: { workspace_ids: workspaceIds } });
+
+/** Updates only the config JSON for a workspace. */
+export const updateWorkspaceConfig = (
+  workspaceId: string,
+  config: WorkspaceConfig,
+) => invoke<WorkspaceConfig>("update_workspace_config", { workspaceId, config });
+
+/** Gets workspace badge info for cross-workspace reference display. */
+export const getWorkspaceBadge = (workspaceId: string) =>
+  invoke<WorkspaceBadge>("get_workspace_badge", { workspaceId });
+
+/** Resolves a cross-workspace reference. Returns badge if cross-workspace. */
+export const resolveCrossWorkspaceRef = (
+  entityId: string,
+  entityType: string,
+  activeWorkspaceId: string,
+) =>
+  invoke<WorkspaceBadge | null>("resolve_cross_workspace_ref", {
+    entityId,
+    entityType,
+    activeWorkspaceId,
+  });
+
+/** Gets dashboard data for a workspace. */
+export const getDashboardData = (workspaceId: string, widgets: string[]) =>
+  invoke<DashboardData>("get_dashboard_data", { workspaceId, widgets });
 
 // --- Tasks ---
 

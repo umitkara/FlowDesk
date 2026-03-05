@@ -128,6 +128,16 @@ export interface ExportResult {
   errors: string[];
 }
 
+/** Per-workspace configuration stored in the config JSON column. */
+export interface WorkspaceConfig {
+  categories: string[];
+  note_types: string[];
+  task_categories: string[];
+  default_note_template: string | null;
+  accent_color: string;
+  dashboard_widgets: string[];
+}
+
 /** A workspace context (e.g. "Personal", "Work"). */
 export interface Workspace {
   id: string;
@@ -136,10 +146,100 @@ export interface Workspace {
   icon: string | null;
   color: string | null;
   export_path: string | null;
+  attachment_path: string | null;
   sort_order: number;
-  config: Record<string, unknown> | null;
+  config: WorkspaceConfig;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
+}
+
+/** Lightweight workspace info for the workspace switcher list. */
+export interface WorkspaceSummary {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string | null;
+  color: string | null;
+  sort_order: number;
+  note_count: number;
+  task_count: number;
+}
+
+/** Minimal workspace info for cross-workspace reference badges. */
+export interface WorkspaceBadge {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string | null;
+  color: string | null;
+}
+
+/** Input for creating a new workspace. */
+export interface CreateWorkspaceInput {
+  name: string;
+  icon?: string | null;
+  color?: string | null;
+  export_path?: string | null;
+  config?: WorkspaceConfig;
+}
+
+/** Input for updating an existing workspace. */
+export interface UpdateWorkspaceInput {
+  id: string;
+  name?: string;
+  icon?: string;
+  color?: string;
+  export_path?: string;
+  attachment_path?: string;
+  sort_order?: number;
+  config?: WorkspaceConfig;
+}
+
+/** A plan item for the dashboard. */
+export interface DashboardPlan {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  plan_type: string;
+  color: string | null;
+}
+
+/** A task item for the dashboard. */
+export interface DashboardTask {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  due_date: string | null;
+  color: string | null;
+}
+
+/** A note item for the dashboard. */
+export interface DashboardNote {
+  id: string;
+  title: string | null;
+  note_type: string | null;
+  folder: string | null;
+  updated_at: string;
+}
+
+/** Time tracked today summary. */
+export interface TimeSummary {
+  total_mins: number;
+  active_mins: number;
+  entry_count: number;
+}
+
+/** Aggregated dashboard data for a workspace. */
+export interface DashboardData {
+  today_plan: DashboardPlan[];
+  pending_tasks: DashboardTask[];
+  recent_notes: DashboardNote[];
+  time_today: TimeSummary;
+  sticky_tasks: DashboardTask[];
+  upcoming_deadlines: DashboardTask[];
 }
 
 /** A workspace-scoped tag. */
