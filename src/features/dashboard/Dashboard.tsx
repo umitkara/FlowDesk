@@ -1,8 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { useDashboardStore } from "../../stores/dashboardStore";
 import { useUIStore } from "../../stores/uiStore";
+import { useNoteStore } from "../../stores/noteStore";
+import { useTaskStore } from "../../stores/taskStore";
 import { formatMinutes } from "../../stores/trackerStore";
+import { DashboardEditor } from "./DashboardEditor";
 import type {
+  DashboardData,
   DashboardPlan,
   DashboardTask,
   DashboardNote,
@@ -16,11 +21,17 @@ export function Dashboard() {
   const loadDashboard = useWorkspaceStore((s) => s.loadDashboard);
   const setActiveView = useUIStore((s) => s.setActiveView);
 
+  const isEditing = useDashboardStore((s) => s.isEditing);
+  const loadLayout = useDashboardStore((s) => s.loadLayout);
+  const startEditing = useDashboardStore((s) => s.startEditing);
+  const widgets = useDashboardStore((s) => s.widgets);
+
   useEffect(() => {
     if (activeWorkspace) {
       loadDashboard();
+      loadLayout();
     }
-  }, [activeWorkspace?.id, loadDashboard]);
+  }, [activeWorkspace?.id, loadDashboard, loadLayout]);
 
   if (!activeWorkspace) {
     return (
@@ -30,11 +41,16 @@ export function Dashboard() {
     );
   }
 
+  if (isEditing) {
+    return <DashboardEditor />;
+  }
+
   if (!dashboardData) {
     return <DashboardSkeleton name={activeWorkspace.name} icon={activeWorkspace.icon} />;
   }
 
-  const widgets = activeWorkspace.config.dashboard_widgets;
+  // Use ordered widgets from the store (synced from config)
+  const widgetOrder = widgets.length > 0 ? widgets : activeWorkspace.config.dashboard_widgets;
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -52,43 +68,77 @@ export function Dashboard() {
               Welcome to your workspace dashboard.
             </p>
           </div>
-          <button
-            onClick={() => setActiveView("workspace-settings")}
-            className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-            title="Workspace settings"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            Settings
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={startEditing}
+              className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+              title="Customize dashboard layout"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z" />
+              </svg>
+              Edit Layout
+            </button>
+            <button
+              onClick={() => setActiveView("workspace-settings")}
+              className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+              title="Workspace settings"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Settings
+            </button>
+          </div>
         </div>
 
         {/* Widget Grid */}
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-          {widgets.includes("today_plan") && (
-            <TodayPlanWidget plans={dashboardData.today_plan} />
-          )}
-          {widgets.includes("pending_tasks") && (
-            <PendingTasksWidget tasks={dashboardData.pending_tasks} />
-          )}
-          {widgets.includes("recent_notes") && (
-            <RecentNotesWidget notes={dashboardData.recent_notes} />
-          )}
-          {widgets.includes("time_today") && (
-            <TimeTodayWidget summary={dashboardData.time_today} />
-          )}
-          {widgets.includes("sticky_tasks") && (
-            <StickyTasksWidget tasks={dashboardData.sticky_tasks} />
-          )}
-          {widgets.includes("upcoming_deadlines") && (
-            <UpcomingDeadlinesWidget tasks={dashboardData.upcoming_deadlines} />
-          )}
+          {widgetOrder.map((type) => (
+            <WidgetRenderer key={type} type={type} data={dashboardData} />
+          ))}
         </div>
+
+        {widgetOrder.length === 0 && (
+          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 py-16 dark:border-gray-700">
+            <p className="mb-3 text-sm text-gray-400 dark:text-gray-500">
+              No widgets on this dashboard.
+            </p>
+            <button
+              onClick={startEditing}
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-white"
+              style={{ backgroundColor: "var(--workspace-accent)" }}
+            >
+              Add Widgets
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+/** Routes a widget type string to the correct widget component. */
+function WidgetRenderer({ type, data }: { type: string; data: DashboardData }) {
+  switch (type) {
+    case "today_plan":
+      return <TodayPlanWidget plans={data.today_plan} />;
+    case "pending_tasks":
+      return <PendingTasksWidget tasks={data.pending_tasks} />;
+    case "recent_notes":
+      return <RecentNotesWidget notes={data.recent_notes} />;
+    case "time_today":
+      return <TimeTodayWidget summary={data.time_today} />;
+    case "sticky_tasks":
+      return <StickyTasksWidget tasks={data.sticky_tasks} />;
+    case "upcoming_deadlines":
+      return <UpcomingDeadlinesWidget tasks={data.upcoming_deadlines} />;
+    case "quick_capture":
+      return <QuickCaptureWidget />;
+    default:
+      return null;
+  }
 }
 
 /** Loading skeleton for the dashboard. */
@@ -373,6 +423,99 @@ function UpcomingDeadlinesWidget({ tasks }: { tasks: DashboardTask[] }) {
           ))}
         </ul>
       )}
+    </DashboardCard>
+  );
+}
+
+/** Quick capture widget — create a note or task with one keystroke. */
+function QuickCaptureWidget() {
+  const [text, setText] = useState("");
+  const [mode, setMode] = useState<"note" | "task">("task");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const createNote = useNoteStore((s) => s.createNote);
+  const createTask = useTaskStore((s) => s.createTask);
+  const loadDashboard = useWorkspaceStore((s) => s.loadDashboard);
+
+  const handleSubmit = useCallback(async () => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setIsSubmitting(true);
+    try {
+      if (mode === "task") {
+        // workspace_id is auto-filled by the store
+        await createTask({ workspace_id: "", title: trimmed });
+      } else {
+        await createNote({ workspace_id: "", title: trimmed, note_type: "note" });
+      }
+      setText("");
+      loadDashboard();
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [text, mode, createNote, createTask, loadDashboard]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    },
+    [handleSubmit],
+  );
+
+  return (
+    <DashboardCard title="Quick Capture">
+      <div className="space-y-2">
+        {/* Mode toggle */}
+        <div className="flex gap-1 rounded-md bg-gray-100 p-0.5 dark:bg-gray-700/60">
+          <button
+            onClick={() => setMode("task")}
+            className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+              mode === "task"
+                ? "bg-white text-gray-700 shadow-sm dark:bg-gray-600 dark:text-gray-200"
+                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+            }`}
+          >
+            Task
+          </button>
+          <button
+            onClick={() => setMode("note")}
+            className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+              mode === "note"
+                ? "bg-white text-gray-700 shadow-sm dark:bg-gray-600 dark:text-gray-200"
+                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+            }`}
+          >
+            Note
+          </button>
+        </div>
+
+        {/* Input */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={mode === "task" ? "New task..." : "New note title..."}
+            className="flex-1 rounded-md border border-gray-200 bg-transparent px-3 py-1.5 text-sm text-gray-700 placeholder-gray-400 outline-none focus:border-gray-300 dark:border-gray-600 dark:text-gray-300 dark:placeholder-gray-500 dark:focus:border-gray-500"
+            disabled={isSubmitting}
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={!text.trim() || isSubmitting}
+            className="rounded-md px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+            style={{ backgroundColor: "var(--workspace-accent)" }}
+          >
+            {isSubmitting ? "..." : "Add"}
+          </button>
+        </div>
+
+        <p className="text-[10px] text-gray-400 dark:text-gray-500">
+          Press Enter to add
+        </p>
+      </div>
     </DashboardCard>
   );
 }
