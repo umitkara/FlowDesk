@@ -85,6 +85,14 @@ const STATUSES = ["inbox", "todo", "in_progress", "done", "cancelled"];
 const PRIORITIES = ["urgent", "high", "medium", "low", "none"];
 const IMPORTANCES = ["critical", "high", "medium", "low"];
 
+const SORT_OPTIONS: { value: string; label: string }[] = [
+  { value: "updated_at:desc", label: "Recently updated" },
+  { value: "updated_at:asc", label: "Oldest updated" },
+  { value: "title:asc", label: "Title A\u2013Z" },
+  { value: "title:desc", label: "Title Z\u2013A" },
+  { value: "rank:asc", label: "Relevance" },
+];
+
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
@@ -112,6 +120,8 @@ export function FacetedSearch() {
   const fetchPlanWithLinks = usePlanStore((s) => s.fetchPlanWithLinks);
 
   const [savedDropdownOpen, setSavedDropdownOpen] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveFilterName, setSaveFilterName] = useState("");
   const [queryValue, setQueryValue] = useState(filter.query ?? "");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -187,10 +197,12 @@ export function FacetedSearch() {
 
   // Save current filter
   const handleSaveFilter = useCallback(() => {
-    const name = window.prompt("Save filter as:");
-    if (!name?.trim()) return;
-    saveCurrentFilter(name.trim());
-  }, [saveCurrentFilter]);
+    const name = saveFilterName.trim();
+    if (!name) return;
+    saveCurrentFilter(name);
+    setSaveFilterName("");
+    setSaveDialogOpen(false);
+  }, [saveCurrentFilter, saveFilterName]);
 
   // Collect active chips
   const chips: { key: string; value: string; label: string }[] = [];
@@ -277,6 +289,22 @@ export function FacetedSearch() {
           onToggle={(v) => toggleArrayFilter("importance", v)}
         />
 
+        {/* Sort */}
+        <select
+          value={`${filter.sort_by ?? "updated_at"}:${filter.sort_order ?? "desc"}`}
+          onChange={(e) => {
+            const [sort_by, dir] = e.target.value.split(":");
+            setFilter({ sort_by, sort_order: dir as "asc" | "desc" });
+          }}
+          className="flex-shrink-0 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+
         {/* Date range */}
         <input
           type="date"
@@ -295,14 +323,44 @@ export function FacetedSearch() {
         />
 
         {/* Save filter */}
-        <button
-          onClick={handleSaveFilter}
-          disabled={!hasFilters}
-          title="Save current filter"
-          className="flex-shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-        >
-          Save Filter
-        </button>
+        {saveDialogOpen ? (
+          <div className="flex flex-shrink-0 items-center gap-1">
+            <input
+              type="text"
+              value={saveFilterName}
+              onChange={(e) => setSaveFilterName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSaveFilter();
+                if (e.key === "Escape") { setSaveDialogOpen(false); setSaveFilterName(""); }
+              }}
+              placeholder="Filter name..."
+              autoFocus
+              className="w-28 rounded-md border border-blue-300 bg-white px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-400 dark:border-blue-700 dark:bg-gray-900 dark:text-gray-200"
+            />
+            <button
+              onClick={handleSaveFilter}
+              disabled={!saveFilterName.trim()}
+              className="rounded-md bg-blue-500 px-2 py-1 text-xs font-medium text-white hover:bg-blue-600 disabled:opacity-40"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => { setSaveDialogOpen(false); setSaveFilterName(""); }}
+              className="px-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              &times;
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setSaveDialogOpen(true)}
+            disabled={!hasFilters}
+            title="Save current filter"
+            className="flex-shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+          >
+            Save
+          </button>
+        )}
 
         {/* Saved filters dropdown */}
         <div className="relative">
@@ -444,7 +502,6 @@ export function FacetedSearch() {
               <ResultRow
                 key={`${result.entity_type}-${result.id}`}
                 result={result}
-                query={filter.query}
                 onClick={() => handleSelectResult(result)}
               />
             ))}
@@ -606,14 +663,12 @@ function FacetSection({
 
 function ResultRow({
   result,
-  query,
   onClick,
 }: {
   result: FacetedSearchResult;
-  query?: string;
   onClick: () => void;
 }) {
-  const snippet = highlightSnippet(result.snippet, query);
+  const snippet = result.snippet ? sanitizeSnippet(result.snippet) : null;
 
   return (
     <button
@@ -659,7 +714,7 @@ function ResultRow({
 
       {snippet && (
         <p
-          className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400"
+          className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400 [&_mark]:rounded [&_mark]:bg-yellow-200 [&_mark]:px-0.5 dark:[&_mark]:bg-yellow-700/60"
           dangerouslySetInnerHTML={{ __html: snippet }}
         />
       )}
@@ -763,19 +818,15 @@ function SavedFiltersDropdown({
 /*  Utility helpers                                                    */
 /* ------------------------------------------------------------------ */
 
-function highlightSnippet(snippet: string | null, query?: string): string | null {
-  if (!snippet) return null;
-  if (!query?.trim()) return snippet;
-  // Escape regex special chars in query, then wrap matches in <mark>
-  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  try {
-    return snippet.replace(
-      new RegExp(`(${escaped})`, "gi"),
-      '<mark class="bg-yellow-200 dark:bg-yellow-700/60 rounded px-0.5">$1</mark>',
-    );
-  } catch {
-    return snippet;
-  }
+/** Strips all HTML except <mark> tags to prevent XSS from stored content. */
+function sanitizeSnippet(snippet: string): string {
+  // Replace allowed <mark> and </mark> with placeholders, strip all other tags, then restore
+  return snippet
+    .replace(/<mark>/gi, "\x00MARK_OPEN\x00")
+    .replace(/<\/mark>/gi, "\x00MARK_CLOSE\x00")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\x00MARK_OPEN\x00/g, "<mark>")
+    .replace(/\x00MARK_CLOSE\x00/g, "</mark>");
 }
 
 function priorityColor(priority: string): string {

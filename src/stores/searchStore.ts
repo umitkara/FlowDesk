@@ -54,8 +54,8 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         facets: response.facets,
         totalCount: response.total_count,
       });
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Faceted search failed:", err);
     } finally {
       set({ isSearching: false });
     }

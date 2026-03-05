@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useActivityStore } from "../../stores/activityStore";
 import { useNoteStore } from "../../stores/noteStore";
 import { useTaskStore } from "../../stores/taskStore";
@@ -173,8 +173,8 @@ export default function TimelineView() {
   const setActiveView = useUIStore((s) => s.setActiveView);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const activePresetRef = useRef<DatePreset>("week");
-  const activeFilterRef = useRef<EntityTypeFilter>("all");
+  const [activePreset, setActivePreset] = useState<DatePreset>("week");
+  const [activeFilter, setActiveFilter] = useState<EntityTypeFilter>("all");
 
   // Load initial data
   useEffect(() => {
@@ -183,33 +183,37 @@ export default function TimelineView() {
     });
   }, [loadActivity]);
 
-  /** Reloads entries with the current preset and filter. */
-  const reload = useCallback(() => {
-    const query: Record<string, unknown> = {
-      date_from: getPresetDateFrom(activePresetRef.current),
-    };
-    if (activeFilterRef.current !== "all") {
-      query.entity_type = activeFilterRef.current;
-    }
-    loadActivity(query);
-  }, [loadActivity]);
+  /** Reloads entries with the given preset and filter. */
+  const reload = useCallback(
+    (preset: DatePreset, filter: EntityTypeFilter) => {
+      const query: Record<string, unknown> = {
+        date_from: getPresetDateFrom(preset),
+      };
+      if (filter !== "all") {
+        query.entity_type = filter;
+      }
+      loadActivity(query);
+    },
+    [loadActivity],
+  );
 
   /** Handles a date preset button click. */
   const handlePreset = useCallback(
     (preset: DatePreset) => {
-      activePresetRef.current = preset;
-      reload();
+      setActivePreset(preset);
+      reload(preset, activeFilter);
     },
-    [reload],
+    [reload, activeFilter],
   );
 
   /** Handles an entity type filter change. */
   const handleFilterChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
-      activeFilterRef.current = e.target.value as EntityTypeFilter;
-      reload();
+      const filter = e.target.value as EntityTypeFilter;
+      setActiveFilter(filter);
+      reload(activePreset, filter);
     },
-    [reload],
+    [reload, activePreset],
   );
 
   /** Infinite scroll handler. */
@@ -268,7 +272,7 @@ export default function TimelineView() {
                 key={preset}
                 onClick={() => handlePreset(preset)}
                 className={`px-3 py-1.5 text-xs font-medium transition-colors first:rounded-l-md last:rounded-r-md ${
-                  activePresetRef.current === preset
+                  activePreset === preset
                     ? "bg-blue-500 text-white dark:bg-blue-600"
                     : "bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-750"
                 }`}
@@ -285,7 +289,7 @@ export default function TimelineView() {
           {/* Entity type filter */}
           <select
             onChange={handleFilterChange}
-            defaultValue="all"
+            value={activeFilter}
             className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
           >
             {ENTITY_TYPES.map((type) => (

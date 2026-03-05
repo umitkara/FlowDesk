@@ -4,22 +4,23 @@ import type { GroupedViewResult, GroupEntry, FacetedSearchResult } from "../../l
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useNoteStore } from "../../stores/noteStore";
 import { useTaskStore } from "../../stores/taskStore";
+import { usePlanStore } from "../../stores/planStore";
 import { useUIStore } from "../../stores/uiStore";
 
 /** Group-by field options per entity type. */
 const GROUP_BY_OPTIONS: Record<string, { value: string; label: string }[]> = {
-  notes: [
+  note: [
     { value: "category", label: "Category" },
     { value: "note_type", label: "Note Type" },
     { value: "importance", label: "Importance" },
     { value: "folder", label: "Folder" },
   ],
-  tasks: [
+  task: [
     { value: "status", label: "Status" },
     { value: "priority", label: "Priority" },
     { value: "category", label: "Category" },
   ],
-  plans: [
+  plan: [
     { value: "type", label: "Type" },
     { value: "category", label: "Category" },
     { value: "importance", label: "Importance" },
@@ -28,9 +29,9 @@ const GROUP_BY_OPTIONS: Record<string, { value: string; label: string }[]> = {
 
 /** Entity type selector options. */
 const ENTITY_TYPES = [
-  { value: "notes", label: "Notes" },
-  { value: "tasks", label: "Tasks" },
-  { value: "plans", label: "Plans" },
+  { value: "note", label: "Notes" },
+  { value: "task", label: "Tasks" },
+  { value: "plan", label: "Plans" },
 ];
 
 /** Returns a relative time string like "2h ago". */
@@ -52,8 +53,9 @@ export default function GroupedView() {
   const navigateTo = useUIStore((s) => s.navigateTo);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const openDetail = useTaskStore((s) => s.openDetail);
+  const fetchPlanWithLinks = usePlanStore((s) => s.fetchPlanWithLinks);
 
-  const [entityType, setEntityType] = useState("notes");
+  const [entityType, setEntityType] = useState("note");
   const [groupBy, setGroupBy] = useState("category");
   const [result, setResult] = useState<GroupedViewResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -112,10 +114,11 @@ export default function GroupedView() {
         openDetail(item.id);
         setActiveView("tasks");
       } else if (item.entity_type === "plan") {
+        await fetchPlanWithLinks(item.id);
         setActiveView("plans");
       }
     },
-    [selectNote, navigateTo, setActiveView, openDetail],
+    [selectNote, navigateTo, setActiveView, openDetail, fetchPlanWithLinks],
   );
 
   const groupByOptions = GROUP_BY_OPTIONS[entityType] ?? [];
