@@ -348,13 +348,63 @@ export interface TaskSort {
   direction: "asc" | "desc";
 }
 
-/** Recurrence rule for repeating tasks (structural only in Phase 2). */
+/** Recurrence pattern values. */
+export type RecurrencePattern = "daily" | "weekly" | "monthly" | "yearly" | "custom";
+
+/** A full recurrence rule stored in the `recurrence_rules` table. */
 export interface RecurrenceRule {
-  pattern: "daily" | "weekly" | "monthly" | "yearly" | "custom";
+  id: string;
+  workspace_id: string;
+  entity_type: "task" | "plan";
+  parent_entity_id: string;
+  pattern: RecurrencePattern;
   interval: number;
+  days_of_week: number[] | null;
+  day_of_month: number | null;
+  month_of_year: number | null;
+  end_date: string | null;
+  end_after_count: number | null;
+  occurrences_created: number;
+  next_occurrence_date: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Input for creating a recurrence rule. */
+export interface CreateRecurrenceRuleInput {
+  workspace_id: string;
+  entity_type: "task" | "plan";
+  parent_entity_id: string;
+  pattern: RecurrencePattern;
+  interval?: number;
   days_of_week?: number[];
+  day_of_month?: number;
+  month_of_year?: number;
   end_date?: string;
   end_after_count?: number;
+}
+
+/** Input for updating a recurrence rule. */
+export interface UpdateRecurrenceRuleInput {
+  pattern?: RecurrencePattern;
+  interval?: number;
+  days_of_week?: number[] | null;
+  day_of_month?: number | null;
+  month_of_year?: number | null;
+  end_date?: string | null;
+  end_after_count?: number | null;
+  is_active?: boolean;
+}
+
+/** Summary of an entity occurrence in a recurrence chain. */
+export interface EntitySummary {
+  id: string;
+  entity_type: string;
+  title: string;
+  occurrence_index: number | null;
+  date: string | null;
+  status: string | null;
 }
 
 // --- Reference Types ---
@@ -987,4 +1037,102 @@ export interface BacklinkWithContext {
   relation: string;
   context_snippet: string;
   source_updated_at: string;
+}
+
+// --- Phase 7: Recurrence, Templates & Automation ---
+
+/** Reminder offset type values. */
+export type ReminderOffsetType = "at_time" | "15min_before" | "1hr_before" | "1day_before" | "custom";
+
+/** A reminder for a task or plan. */
+export interface Reminder {
+  id: string;
+  workspace_id: string;
+  entity_type: "task" | "plan";
+  entity_id: string;
+  remind_at: string;
+  offset_type: ReminderOffsetType;
+  offset_mins: number | null;
+  is_fired: boolean;
+  is_dismissed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Global reminder default settings. */
+export interface ReminderDefaults {
+  task_due: string[];
+  plan_start: string[];
+  enabled: boolean;
+}
+
+/** Input for creating a reminder. */
+export interface CreateReminderInput {
+  workspace_id: string;
+  entity_type: "task" | "plan";
+  entity_id: string;
+  offset_type: ReminderOffsetType;
+  offset_mins?: number;
+  reference_time: string;
+}
+
+/** Input for updating a reminder. */
+export interface UpdateReminderInput {
+  offset_type?: string;
+  offset_mins?: number | null;
+  reference_time?: string;
+}
+
+/** A note template loaded from disk. */
+export interface NoteTemplate {
+  file_name: string;
+  name: string;
+  description: string;
+  version: number;
+  defaults: Record<string, unknown>;
+  variables: TemplateVariable[];
+  body: string;
+}
+
+/** A variable definition within a note template. */
+export interface TemplateVariable {
+  name: string;
+  label: string;
+  var_type: "text" | "select" | "date" | "number" | "boolean";
+  default: unknown | null;
+  options: string[] | null;
+}
+
+/** Input for creating a template. */
+export interface CreateTemplateInput {
+  file_name: string;
+  name: string;
+  description: string;
+  defaults: Record<string, unknown>;
+  variables: TemplateVariable[];
+  body: string;
+}
+
+/** Input for updating a template. */
+export interface UpdateTemplateInput {
+  name?: string;
+  description?: string;
+  defaults?: Record<string, unknown>;
+  variables?: TemplateVariable[];
+  body?: string;
+}
+
+/** An auto-suggestion when the time tracker stops. */
+export interface Suggestion {
+  entity_type: "task" | "plan";
+  entity_id: string;
+  title: string;
+  score: number;
+  reason: string;
+}
+
+/** Auto-daily-note configuration. */
+export interface AutoDailyNoteConfig {
+  enabled: boolean;
+  template: string;
 }

@@ -132,6 +132,12 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     const plan = await ipc.createPlan(input);
     logActivity(`Created plan: ${plan.title}`, "plan", plan.id);
     set((s) => ({ plans: [...s.plans, plan] }));
+    // Best-effort refresh of daily summary if the daily plan view has been used
+    const { dailySummary, dailyPlanDate } = get();
+    if (dailySummary) {
+      const wsId = getWorkspaceId();
+      ipc.getDailyPlanSummary(wsId, dailyPlanDate).then((s) => set({ dailySummary: s })).catch(() => {});
+    }
     return plan;
   },
 
@@ -144,6 +150,12 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           ? { ...s.selectedPlan, plan: updated }
           : s.selectedPlan,
     }));
+    // Best-effort refresh of daily summary if the daily plan view has been used
+    const { dailySummary, dailyPlanDate } = get();
+    if (dailySummary) {
+      const wsId = getWorkspaceId();
+      ipc.getDailyPlanSummary(wsId, dailyPlanDate).then((s) => set({ dailySummary: s })).catch(() => {});
+    }
     return updated;
   },
 
@@ -156,6 +168,12 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       selectedPlan: s.selectedPlan?.plan.id === id ? null : s.selectedPlan,
       isDetailOpen: s.selectedPlan?.plan.id === id ? false : s.isDetailOpen,
     }));
+    // Best-effort refresh of daily summary if the daily plan view has been used
+    const { dailySummary, dailyPlanDate } = get();
+    if (dailySummary) {
+      const wsId = getWorkspaceId();
+      ipc.getDailyPlanSummary(wsId, dailyPlanDate).then((s) => set({ dailySummary: s })).catch(() => {});
+    }
   },
 
   fetchDailySummary: async (date) => {

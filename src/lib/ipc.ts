@@ -58,6 +58,18 @@ import type {
   GroupedViewResult,
   PlannedVsActualData,
   BacklinkWithContext,
+  RecurrenceRule,
+  CreateRecurrenceRuleInput,
+  UpdateRecurrenceRuleInput,
+  EntitySummary,
+  NoteTemplate,
+  CreateTemplateInput,
+  UpdateTemplateInput,
+  Reminder,
+  ReminderDefaults,
+  CreateReminderInput,
+  UpdateReminderInput,
+  Suggestion,
 } from "./types";
 
 // --- Notes ---
@@ -515,3 +527,144 @@ export const getPlannedVsActualRange = (workspaceId: string, dateFrom: string, d
 /** Gets backlinks with surrounding context snippets. */
 export const getBacklinksWithContext = (entityType: string, entityId: string) =>
   invoke<BacklinkWithContext[]>("get_backlinks_with_context", { entityType, entityId });
+
+// --- Recurrence ---
+
+/** Creates a new recurrence rule. */
+export const createRecurrenceRule = (input: CreateRecurrenceRuleInput) =>
+  invoke<RecurrenceRule>("create_recurrence_rule", { input });
+
+/** Gets a recurrence rule by ID. */
+export const getRecurrenceRule = (ruleId: string) =>
+  invoke<RecurrenceRule>("get_recurrence_rule", { ruleId });
+
+/** Gets the recurrence rule for a specific entity. */
+export const getRecurrenceRuleForEntity = (entityType: string, entityId: string) =>
+  invoke<RecurrenceRule | null>("get_recurrence_rule_for_entity", { entityType, entityId });
+
+/** Updates a recurrence rule. */
+export const updateRecurrenceRule = (ruleId: string, update: UpdateRecurrenceRuleInput) =>
+  invoke<RecurrenceRule>("update_recurrence_rule", { ruleId, update });
+
+/** Deletes a recurrence rule. */
+export const deleteRecurrenceRule = (ruleId: string) =>
+  invoke<void>("delete_recurrence_rule", { ruleId });
+
+/** Skips the next occurrence without generating it. */
+export const skipNextOccurrence = (ruleId: string) =>
+  invoke<RecurrenceRule>("skip_next_occurrence", { ruleId });
+
+/** Postpones the next occurrence to a specific date. */
+export const postponeNextOccurrence = (ruleId: string, newDate: string) =>
+  invoke<RecurrenceRule>("postpone_next_occurrence", { ruleId, newDate });
+
+/** Detaches a single occurrence from its recurrence rule. */
+export const detachOccurrence = (entityType: string, entityId: string) =>
+  invoke<void>("detach_occurrence", { entityType, entityId });
+
+/** Updates the rule for all future occurrences. */
+export const editFutureOccurrences = (ruleId: string, update: UpdateRecurrenceRuleInput) =>
+  invoke<void>("edit_future_occurrences", { ruleId, update });
+
+/** Soft-deletes all occurrences after a given index. */
+export const deleteFutureOccurrences = (ruleId: string, afterIndex: number) =>
+  invoke<void>("delete_future_occurrences", { ruleId, afterIndex });
+
+/** Lists occurrences of a rule within a date range. */
+export const getOccurrences = (ruleId: string, fromDate: string, toDate: string) =>
+  invoke<EntitySummary[]>("get_occurrences", { ruleId, fromDate, toDate });
+
+/** Generates any pending plan occurrences up to a date. */
+export const generatePendingOccurrences = (workspaceId: string, upToDate: string) =>
+  invoke<string[]>("generate_pending_occurrences", { workspaceId, upToDate });
+
+// --- Templates ---
+
+/** Lists all available note templates. */
+export const listTemplates = () =>
+  invoke<NoteTemplate[]>("list_templates");
+
+/** Loads a single template by file name. */
+export const loadTemplate = (fileName: string) =>
+  invoke<NoteTemplate>("load_template", { fileName });
+
+/** Creates a new template file. */
+export const createTemplate = (input: CreateTemplateInput) =>
+  invoke<string>("create_template", { input });
+
+/** Updates an existing template. */
+export const updateTemplate = (fileName: string, update: UpdateTemplateInput) =>
+  invoke<void>("update_template", { fileName, update });
+
+/** Deletes a template file. */
+export const deleteTemplate = (fileName: string) =>
+  invoke<void>("delete_template", { fileName });
+
+/** Applies a template with variable substitution. */
+export const applyTemplate = (
+  fileName: string,
+  variables: Record<string, string>,
+  workspaceId: string,
+  date?: string,
+) => invoke<[string, Record<string, unknown>]>("apply_template", { fileName, variables, workspaceId, date });
+
+/** Creates a note from a template in one step. */
+export const createNoteFromTemplate = (
+  workspaceId: string,
+  templateName: string,
+  variables: Record<string, string>,
+  date?: string,
+) => invoke<Note>("create_note_from_template", { workspaceId, templateName, variables, date });
+
+/** Ensures built-in templates exist on disk. */
+export const ensureDefaultTemplates = () =>
+  invoke<void>("ensure_default_templates");
+
+// --- Reminders ---
+
+/** Gets global reminder default settings. */
+export const getReminderDefaults = () =>
+  invoke<ReminderDefaults>("get_reminder_defaults");
+
+/** Updates global reminder default settings. */
+export const updateReminderDefaults = (defaults: ReminderDefaults) =>
+  invoke<void>("update_reminder_defaults", { defaults });
+
+/** Creates a custom reminder. */
+export const createReminder = (input: CreateReminderInput) =>
+  invoke<Reminder>("create_reminder", { input });
+
+/** Gets all reminders for an entity. */
+export const getRemindersForEntity = (entityType: string, entityId: string) =>
+  invoke<Reminder[]>("get_reminders_for_entity", { entityType, entityId });
+
+/** Updates a reminder. */
+export const updateReminder = (reminderId: string, update: UpdateReminderInput) =>
+  invoke<Reminder>("update_reminder", { reminderId, update });
+
+/** Deletes a reminder. */
+export const deleteReminder = (reminderId: string) =>
+  invoke<void>("delete_reminder", { reminderId });
+
+/** Dismisses a fired reminder. */
+export const dismissReminder = (reminderId: string) =>
+  invoke<void>("dismiss_reminder", { reminderId });
+
+/** Replaces unfired reminders for an entity with new offsets. */
+export const syncEntityReminders = (
+  entityType: string,
+  entityId: string,
+  referenceTime: string,
+  workspaceId: string,
+  offsets: string[],
+) => invoke<Reminder[]>("sync_entity_reminders", { entityType, entityId, referenceTime, workspaceId, offsets });
+
+// --- Suggestions ---
+
+/** Gets auto-suggestions when the time tracker stops. */
+export const suggestOnTrackerStop = (
+  workspaceId: string,
+  tags: string[],
+  notes: string,
+  stoppedAt: string,
+) => invoke<Suggestion[]>("suggest_on_tracker_stop", { workspaceId, tags, notes, stoppedAt });

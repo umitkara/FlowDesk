@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /** Active view identifier. */
-export type ActiveView = "notes" | "search" | "settings" | "daily" | "trash" | "tasks" | "about" | "plans" | "daily-plan" | "time-reports" | "dashboard" | "workspace-settings" | "faceted-search" | "graph" | "timeline" | "grouped" | "planned-vs-actual";
+export type ActiveView = "notes" | "search" | "settings" | "daily" | "trash" | "tasks" | "about" | "plans" | "daily-plan" | "time-reports" | "dashboard" | "workspace-settings" | "faceted-search" | "graph" | "timeline" | "grouped" | "planned-vs-actual" | "templates";
 
 /** Active sidebar section identifier. */
 export type SidebarSection = "folders" | "calendar" | "search";
