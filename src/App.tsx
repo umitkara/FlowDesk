@@ -2,26 +2,49 @@ import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { AppShell } from "./components/layout/AppShell";
 import { useSettingsStore } from "./stores/settingsStore";
+import { useWorkspaceStore } from "./stores/workspaceStore";
 import { useNoteStore } from "./stores/noteStore";
 import { useUIStore } from "./stores/uiStore";
 import { useTaskStore } from "./stores/taskStore";
 import { useTrackerStore } from "./stores/trackerStore";
+import * as ipc from "./lib/ipc";
 
-/** Root application component. Loads settings and initial data on mount. */
+/** Root application component. Loads settings, workspaces, and initial data on mount. */
 function App() {
   const loadSettings = useSettingsStore((s) => s.loadSettings);
+  const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
+  const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
   const loadNotes = useNoteStore((s) => s.loadNotes);
   const loadFolderTree = useNoteStore((s) => s.loadFolderTree);
   const fetchStickyTasks = useTaskStore((s) => s.fetchStickyTasks);
   const fetchTrackerState = useTrackerStore((s) => s.fetchState);
 
+  // Initial load: settings + workspaces
   useEffect(() => {
     loadSettings();
+    fetchTrackerState();
+
+    // Load workspaces, then restore or pick the first workspace
+    loadWorkspaces().then(async () => {
+      const ws = useWorkspaceStore.getState().workspaces;
+      if (ws.length === 0) return;
+
+      // Try to restore last active workspace from settings
+      const lastId = await ipc.getSetting("last_workspace_id").catch(() => null);
+      const target = lastId && ws.some((w) => w.id === lastId) ? lastId : ws[0].id;
+      await setActiveWorkspace(target);
+    });
+  }, [loadSettings, loadWorkspaces, setActiveWorkspace, fetchTrackerState]);
+
+  // When the active workspace changes, reload all entity stores
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
     loadNotes();
     loadFolderTree();
     fetchStickyTasks();
-    fetchTrackerState();
-  }, [loadSettings, loadNotes, loadFolderTree, fetchStickyTasks, fetchTrackerState]);
+  }, [activeWorkspaceId, loadNotes, loadFolderTree, fetchStickyTasks]);
 
   // Apply theme setting to the document
   const theme = useSettingsStore((s) => s.settings.theme ?? "system");
@@ -72,6 +95,15 @@ function App() {
       if (!isNaN(w) && w >= 180 && w <= 400) setSidebarWidth(w);
     }
   }, [sidebarWidthSetting, setSidebarWidth]);
+
+  // Don't render until a workspace is active
+  if (!activeWorkspaceId && workspaces.length > 0) {
+    return (
+      <div className="flex h-full items-center justify-center bg-white dark:bg-gray-950">
+        <div className="text-sm text-gray-400">Loading workspace...</div>
+      </div>
+    );
+  }
 
   return <AppShell />;
 }

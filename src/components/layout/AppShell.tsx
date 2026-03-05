@@ -24,6 +24,8 @@ import PlanDialog from "../../features/plans/PlanDialog";
 import { TimeReports } from "../../features/tracker/TimeReports";
 import { TrackerDetailForm } from "../../features/tracker/TrackerDetailForm";
 import { TrackerRecoveryDialog } from "../../features/tracker/TrackerRecoveryDialog";
+import { Dashboard } from "../../features/dashboard/Dashboard";
+import { WorkspaceSettings } from "../../features/workspaces/WorkspaceSettings";
 import { usePlanStore } from "../../stores/planStore";
 import { useTrackerStore } from "../../stores/trackerStore";
 import { todayISO } from "../../lib/utils";
@@ -214,6 +216,8 @@ export function AppShell() {
             {activeView === "plans" && <CalendarView />}
             {activeView === "daily-plan" && <DailyPlanView />}
             {activeView === "time-reports" && <TimeReports />}
+            {activeView === "dashboard" && <Dashboard />}
+            {activeView === "workspace-settings" && <WorkspaceSettings />}
           </div>
 
           {/* Task detail panel */}
