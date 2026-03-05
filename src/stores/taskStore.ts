@@ -95,18 +95,13 @@ interface TaskState {
   closeQuickAdd: () => void;
 }
 
-/** Cached workspace ID (Phase 1: single workspace). */
-let cachedWorkspaceId: string | null = null;
+import { useWorkspaceStore } from "./workspaceStore";
 
-/** Resolves the current workspace ID. */
-async function getWorkspaceId(): Promise<string> {
-  if (cachedWorkspaceId) return cachedWorkspaceId;
-  const workspaces = await ipc.listWorkspaces();
-  if (workspaces.length > 0) {
-    cachedWorkspaceId = workspaces[0].id;
-    return cachedWorkspaceId;
-  }
-  throw new Error("No workspace found");
+/** Reads the active workspace ID synchronously from the workspace store. */
+function getWorkspaceId(): string {
+  const id = useWorkspaceStore.getState().activeWorkspaceId;
+  if (!id) throw new Error("No active workspace");
+  return id;
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -128,7 +123,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   fetchTasks: async () => {
     set({ isLoading: true, error: null });
     try {
-      const wsId = await getWorkspaceId();
+      const wsId = getWorkspaceId();
       const filter: TaskFilter = {
         workspace_id: wsId,
         ...get().filter,
@@ -142,7 +137,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   fetchStickyTasks: async () => {
     try {
-      const wsId = await getWorkspaceId();
+      const wsId = getWorkspaceId();
       const stickyTasks = await ipc.getStickyTasks(wsId);
       set({ stickyTasks });
     } catch {
@@ -151,7 +146,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   createTask: async (input) => {
-    const wsId = await getWorkspaceId();
+    const wsId = getWorkspaceId();
     const task = await ipc.createTask({ ...input, workspace_id: wsId });
     logActivity(`Created task: ${task.title}`, "task", task.id);
     await get().fetchTasks();

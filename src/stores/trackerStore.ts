@@ -10,6 +10,7 @@ import type {
   CreateNoteFromSession,
 } from "../lib/types";
 import * as ipc from "../lib/ipc";
+import { useWorkspaceStore } from "./workspaceStore";
 
 // ---------------------------------------------------------------------------
 // Elapsed time calculation (client-side, updated every second)
@@ -231,8 +232,9 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
   start: async (params) => {
     try {
       set({ isLoading: true, error: null });
+      const wsId = useWorkspaceStore.getState().activeWorkspaceId ?? "";
       const result = await ipc.trackerStart({
-        workspaceId: "",
+        workspaceId: wsId,
         linkedPlanId: params?.linkedPlanId,
         linkedTaskId: params?.linkedTaskId,
         category: params?.category,

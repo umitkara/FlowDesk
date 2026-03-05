@@ -62,18 +62,13 @@ interface NoteState {
   clearActiveNote: () => void;
 }
 
-/** The workspace ID to use for all operations (Phase 1: single workspace). */
-let cachedWorkspaceId: string | null = null;
+import { useWorkspaceStore } from "./workspaceStore";
 
-/** Resolves the current workspace ID (caches after first call). */
-async function getWorkspaceId(): Promise<string> {
-  if (cachedWorkspaceId) return cachedWorkspaceId;
-  const workspaces = await ipc.listWorkspaces();
-  if (workspaces.length > 0) {
-    cachedWorkspaceId = workspaces[0].id;
-    return cachedWorkspaceId;
-  }
-  throw new Error("No workspace found");
+/** Reads the active workspace ID synchronously from the workspace store. */
+function getWorkspaceId(): string {
+  const id = useWorkspaceStore.getState().activeWorkspaceId;
+  if (!id) throw new Error("No active workspace");
+  return id;
 }
 
 export const useNoteStore = create<NoteState>((set, get) => ({
@@ -90,7 +85,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   loadNotes: async (query) => {
     set({ isLoading: true });
     try {
-      const wsId = await getWorkspaceId();
+      const wsId = getWorkspaceId();
       // When query is provided, it replaces currentQuery (new filter).
       // When query is omitted, reload with existing currentQuery (refresh).
       const baseQuery = query !== undefined ? query : get().currentQuery;
@@ -110,7 +105,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
   loadFolderTree: async () => {
     try {
-      const wsId = await getWorkspaceId();
+      const wsId = getWorkspaceId();
       const folderTree = await ipc.getFolderTree(wsId);
       set({ folderTree });
     } catch {
@@ -120,7 +115,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
   loadDatesWithNotes: async (year, month) => {
     try {
-      const wsId = await getWorkspaceId();
+      const wsId = getWorkspaceId();
       const dates = await ipc.getDatesWithNotes(wsId, year, month);
       set({ datesWithNotes: dates });
     } catch {
@@ -147,7 +142,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   createNote: async (input) => {
-    const wsId = await getWorkspaceId();
+    const wsId = getWorkspaceId();
     const note = await ipc.createNote({ ...input, workspace_id: wsId });
     set({ activeNote: note });
     logActivity(`Created note: ${note.title}`, "note", note.id);
@@ -214,7 +209,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   openDailyNote: async (date) => {
-    const wsId = await getWorkspaceId();
+    const wsId = getWorkspaceId();
     let note = await ipc.getDailyNote(wsId, date);
     if (!note) {
       note = await ipc.createDailyNote(wsId, date);

@@ -12,19 +12,13 @@ import type {
   SpawnTaskInput,
   SpawnNoteInput,
 } from "../lib/types";
+import { useWorkspaceStore } from "./workspaceStore";
 
-/** Cached workspace ID for the plan store. */
-let cachedWorkspaceId: string | null = null;
-
-/** Returns the first available workspace ID. */
-async function getWorkspaceId(): Promise<string> {
-  if (cachedWorkspaceId) return cachedWorkspaceId;
-  const workspaces = await ipc.listWorkspaces();
-  if (workspaces.length > 0) {
-    cachedWorkspaceId = workspaces[0].id;
-    return cachedWorkspaceId;
-  }
-  throw new Error("No workspace found");
+/** Reads the active workspace ID synchronously from the workspace store. */
+function getWorkspaceId(): string {
+  const id = useWorkspaceStore.getState().activeWorkspaceId;
+  if (!id) throw new Error("No active workspace");
+  return id;
 }
 
 /** Calendar view type. */
@@ -167,7 +161,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   fetchDailySummary: async (date) => {
     set({ loading: true, error: null });
     try {
-      const wsId = await getWorkspaceId();
+      const wsId = getWorkspaceId();
       const summary = await ipc.getDailyPlanSummary(wsId, date);
       set({ dailySummary: summary, loading: false });
     } catch (e) {
@@ -177,7 +171,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
 
   fetchAgenda: async (startDate, endDate) => {
     try {
-      const wsId = await getWorkspaceId();
+      const wsId = getWorkspaceId();
       const items = await ipc.getAgenda(wsId, startDate, endDate);
       set({ agendaItems: items });
     } catch (e) {
