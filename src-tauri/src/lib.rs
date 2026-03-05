@@ -17,6 +17,7 @@ use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::TrayIconEvent;
+use tauri_plugin_notification::NotificationExt;
 
 /// Backup-related settings loaded from the database.
 struct BackupSettings {
@@ -142,10 +143,65 @@ fn ensure_directories(data_dir: &str) {
     }
 }
 
+/// Starts a background thread that checks for pending reminders every 30 seconds.
+///
+/// When a reminder is due, it fires a system notification and emits a
+/// `reminder-fired` event to the frontend for in-app display.
+fn start_reminder_scheduler(app_handle: tauri::AppHandle, db: Arc<DbPool>) {
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(30));
+
+            let now = utils::time::now_iso();
+            let result = db.with_conn(|conn| {
+                let reminders = commands::reminders::get_pending_reminders(conn, &now)?;
+                let mut fired = Vec::new();
+
+                for reminder in &reminders {
+                    let title = commands::reminders::get_entity_title(
+                        conn,
+                        &reminder.entity_type,
+                        &reminder.entity_id,
+                    );
+
+                    fired.push((reminder.clone(), title));
+
+                    commands::reminders::mark_fired(conn, &reminder.id)?;
+                }
+
+                Ok(fired)
+            });
+
+            if let Ok(fired_reminders) = result {
+                for (reminder, title) in fired_reminders {
+                    // Emit event to frontend
+                    let _ = app_handle.emit("reminder-fired", &reminder);
+
+                    // Fire system notification
+                    let notif_title = format!("Reminder: {}", title);
+                    let notif_body = if reminder.entity_type == "task" {
+                        format!("Task due: {}", title)
+                    } else {
+                        format!("Plan starting: {}", title)
+                    };
+
+                    let _ = app_handle
+                        .notification()
+                        .builder()
+                        .title(&notif_title)
+                        .body(&notif_body)
+                        .show();
+                }
+            }
+        }
+    });
+}
+
 /// Configures and runs the Tauri application.
 ///
 /// Sets up the database, runs migrations, seeds default data, starts the
-/// backup scheduler, and registers all IPC command handlers.
+/// backup scheduler, starts the reminder scheduler, and registers all IPC
+/// command handlers.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -196,10 +252,18 @@ pub fn run() {
                 );
             }
 
+            // Ensure built-in templates exist
+            let _ = services::templates::ensure_defaults(&data_dir);
+
+            let db_pool_arc = Arc::new(db_pool);
+
             app.manage(AppState {
-                db: Arc::new(db_pool),
+                db: Arc::clone(&db_pool_arc),
                 data_dir,
             });
+
+            // Start background reminder scheduler
+            start_reminder_scheduler(app.handle().clone(), Arc::clone(&db_pool_arc));
 
             // --- System tray setup ---
             let show_item = MenuItemBuilder::with_id("show", "Show FlowDesk").build(app)?;
@@ -392,6 +456,38 @@ pub fn run() {
             commands::discovery::get_planned_vs_actual,
             commands::discovery::get_planned_vs_actual_range,
             commands::discovery::get_backlinks_with_context,
+            // Recurrence
+            commands::recurrence::create_recurrence_rule,
+            commands::recurrence::get_recurrence_rule,
+            commands::recurrence::get_recurrence_rule_for_entity,
+            commands::recurrence::update_recurrence_rule,
+            commands::recurrence::delete_recurrence_rule,
+            commands::recurrence::skip_next_occurrence,
+            commands::recurrence::postpone_next_occurrence,
+            commands::recurrence::detach_occurrence,
+            commands::recurrence::edit_future_occurrences,
+            commands::recurrence::delete_future_occurrences,
+            commands::recurrence::get_occurrences,
+            commands::recurrence::generate_pending_occurrences,
+            // Templates & Suggestions
+            commands::templates::list_templates,
+            commands::templates::load_template,
+            commands::templates::create_template,
+            commands::templates::update_template,
+            commands::templates::delete_template,
+            commands::templates::apply_template,
+            commands::templates::create_note_from_template,
+            commands::templates::ensure_default_templates,
+            commands::templates::suggest_on_tracker_stop,
+            // Reminders
+            commands::reminders::get_reminder_defaults,
+            commands::reminders::update_reminder_defaults,
+            commands::reminders::create_reminder,
+            commands::reminders::get_reminders_for_entity,
+            commands::reminders::update_reminder,
+            commands::reminders::delete_reminder,
+            commands::reminders::dismiss_reminder,
+            commands::reminders::sync_entity_reminders,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

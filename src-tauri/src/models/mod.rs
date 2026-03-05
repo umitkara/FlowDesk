@@ -4,12 +4,18 @@ pub mod discovery;
 pub mod note;
 /// Plan entity and related input/query types.
 pub mod plan;
+/// Recurrence rule entity and related types.
+pub mod recurrence;
 /// Reference (cross-entity link) entity and related types.
 pub mod reference;
+/// Reminder entity and related types.
+pub mod reminder;
 /// Tag entity.
 pub mod tag;
 /// Task entity and related input/query/filter types.
 pub mod task;
+/// Note template and suggestion types.
+pub mod template;
 /// Time entry, tracker state, and report types.
 pub mod time_entry;
 /// Workspace entity.

@@ -213,6 +213,11 @@ pub fn create_plan(state: State<'_, AppState>, input: CreatePlanInput) -> Result
                 ],
             )?;
 
+            // Auto-create default reminders for the plan's start time
+            let _ = crate::commands::reminders::create_default_reminders(
+                conn, "plan", &id, &input.start_time, &input.workspace_id,
+            );
+
             read_plan(conn, &id).map_err(to_sql_err)
         })
         .map_err(AppError::Database)
@@ -385,6 +390,25 @@ pub fn update_plan(state: State<'_, AppState>, input: UpdatePlanInput) -> Result
                 params.iter().map(|p| p.as_ref()).collect();
             conn.execute(&sql, param_refs.as_slice())?;
 
+            // Re-sync reminders if start_time changed
+            if input.start_time.is_some() {
+                let existing_offsets = crate::commands::reminders::get_unfired_offsets(
+                    conn, "plan", &plan_id,
+                ).unwrap_or_default();
+                let _ = crate::commands::reminders::delete_unfired_reminders_for_entity(
+                    conn, "plan", &plan_id,
+                );
+                if existing_offsets.is_empty() {
+                    let _ = crate::commands::reminders::create_default_reminders(
+                        conn, "plan", &plan_id, effective_start, &existing.workspace_id,
+                    );
+                } else {
+                    let _ = crate::commands::reminders::recreate_reminders_with_offsets(
+                        conn, "plan", &plan_id, effective_start, &existing.workspace_id, &existing_offsets,
+                    );
+                }
+            }
+
             read_plan(conn, &plan_id).map_err(to_sql_err)
         })
         .map_err(|e| {
@@ -424,6 +448,11 @@ pub fn delete_plan(state: State<'_, AppState>, id: String) -> Result<(), AppErro
                 "UPDATE plans SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
                 rusqlite::params![now, id],
             )?;
+
+            // Delete all reminders for this plan
+            let _ = crate::commands::reminders::delete_all_reminders_for_entity(
+                conn, "plan", &id,
+            );
 
             Ok(meta)
         })

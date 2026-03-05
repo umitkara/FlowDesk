@@ -233,6 +233,13 @@ pub fn create_task(state: State<'_, AppState>, task: CreateTask) -> Result<Task,
             ],
         )?;
 
+        // Auto-create default reminders if task has a due date
+        if let Some(ref due_date_val) = task.due_date {
+            let _ = crate::commands::reminders::create_default_reminders(
+                conn, "task", &id, due_date_val, &task.workspace_id,
+            );
+        }
+
         read_task(conn, &id).map_err(|e| match e {
             AppError::Database(db_err) => db_err,
             _ => rusqlite::Error::InvalidQuery,
@@ -693,6 +700,27 @@ pub fn update_task(
             params.iter().map(|p| p.as_ref()).collect();
         conn.execute(&sql, param_refs.as_slice())?;
 
+        // Re-sync reminders if due_date changed
+        if let Some(ref due_opt) = updates.due_date {
+            let existing_offsets = crate::commands::reminders::get_unfired_offsets(
+                conn, "task", &id,
+            ).unwrap_or_default();
+            let _ = crate::commands::reminders::delete_unfired_reminders_for_entity(
+                conn, "task", &id,
+            );
+            if let Some(ref new_due) = due_opt {
+                if existing_offsets.is_empty() {
+                    let _ = crate::commands::reminders::create_default_reminders(
+                        conn, "task", &id, new_due, &existing.workspace_id,
+                    );
+                } else {
+                    let _ = crate::commands::reminders::recreate_reminders_with_offsets(
+                        conn, "task", &id, new_due, &existing.workspace_id, &existing_offsets,
+                    );
+                }
+            }
+        }
+
         read_task(conn, &id).map_err(|e| match e {
             AppError::Database(db_err) => db_err,
             _ => rusqlite::Error::InvalidQuery,
@@ -745,6 +773,11 @@ pub fn delete_task(state: State<'_, AppState>, id: String) -> Result<(), AppErro
                 "DELETE FROM refs WHERE source_type = 'task' AND source_id = ?1",
                 [&id],
             )?;
+
+            // Delete all reminders for this task
+            let _ = crate::commands::reminders::delete_all_reminders_for_entity(
+                conn, "task", &id,
+            );
 
             Ok(meta)
         })
@@ -893,6 +926,61 @@ pub fn toggle_task_status(state: State<'_, AppState>, id: String) -> Result<Task
     let _ = state.db.with_conn(|conn| {
         log_activity(conn, &task.workspace_id, "task", &id_log, Some(&task.title), action, Some(details))
     });
+
+    // If task was completed and has a recurrence rule, generate next occurrence
+    if task.status == "done" {
+        let _ = state.db.with_conn(|conn| {
+            let rule_id: Option<String> = conn
+                .query_row(
+                    "SELECT recurrence_rule_id FROM tasks WHERE id = ?1",
+                    [&id_log],
+                    |row| row.get(0),
+                )
+                .ok()
+                .flatten();
+
+            if let Some(rid) = rule_id {
+                let rule = conn.query_row(
+                    "SELECT id, workspace_id, entity_type, parent_entity_id, pattern,
+                            interval, days_of_week, day_of_month, month_of_year,
+                            end_date, end_after_count, occurrences_created,
+                            next_occurrence_date, is_active, created_at, updated_at
+                     FROM recurrence_rules WHERE id = ?1 AND is_active = 1",
+                    [&rid],
+                    |row| {
+                        let days_str: Option<String> = row.get(6)?;
+                        let days = days_str
+                            .as_deref()
+                            .and_then(|s| serde_json::from_str(s).ok());
+                        Ok(crate::models::recurrence::RecurrenceRule {
+                            id: row.get(0)?,
+                            workspace_id: row.get(1)?,
+                            entity_type: row.get(2)?,
+                            parent_entity_id: row.get(3)?,
+                            pattern: row.get(4)?,
+                            interval: row.get::<_, u32>(5)?,
+                            days_of_week: days,
+                            day_of_month: row.get::<_, Option<u8>>(7)?,
+                            month_of_year: row.get::<_, Option<u8>>(8)?,
+                            end_date: row.get(9)?,
+                            end_after_count: row.get::<_, Option<u32>>(10)?,
+                            occurrences_created: row.get::<_, u32>(11)?,
+                            next_occurrence_date: row.get(12)?,
+                            is_active: row.get(13)?,
+                            created_at: row.get(14)?,
+                            updated_at: row.get(15)?,
+                        })
+                    },
+                );
+
+                if let Ok(rule) = rule {
+                    let _ = crate::commands::recurrence::generate_occurrence(conn, &rule);
+                }
+            }
+
+            Ok(())
+        });
+    }
 
     Ok(task)
 }
