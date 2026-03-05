@@ -10,6 +10,7 @@
     "fs:default",
     "notification:default",
     "window-state:default",
-    "core:tray:default"
+    "core:tray:default",
+    "global-shortcut:default"
   ]
 }

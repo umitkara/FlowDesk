@@ -1,6 +1,6 @@
 [package]
 name = "flowdesk"
-version = "0.7.0"
+version = "0.8.0"
 description = "A unified personal productivity system"
 authors = ["FlowDesk"]
 edition = "2021"
@@ -30,3 +30,7 @@ thiserror = "2"
 dirs = "5"
 hex = "0.4"
 regex = "1"
+similar = "2"
+csv = "1"
+walkdir = "2"
+tauri-plugin-global-shortcut = "2"
