@@ -46,6 +46,18 @@ import type {
   WeeklySummary,
   CreateTaskFromSession,
   CreateNoteFromSession,
+  FilterConfig,
+  CreateFilterInput,
+  UpdateFilterInput,
+  SavedFilter,
+  ActivityQuery,
+  ActivityEntry,
+  GraphQuery,
+  GraphData,
+  FacetedSearchResponse,
+  GroupedViewResult,
+  PlannedVsActualData,
+  BacklinkWithContext,
 } from "./types";
 
 // --- Notes ---
@@ -433,3 +445,73 @@ export const getEntriesForPlan = (planId: string) =>
 /** Updates the system tray tooltip with current tracker status and elapsed time. */
 export const updateTrayStatus = (status: string, elapsed: string) =>
   invoke<void>("update_tray_status", { status, elapsed });
+
+// --- Faceted Search ---
+
+/** Performs a multi-entity faceted search. */
+export const facetedSearch = (workspaceId: string, filter: FilterConfig) =>
+  invoke<FacetedSearchResponse>("faceted_search", { workspaceId, filter });
+
+// --- Saved Filters ---
+
+/** Creates a saved filter. */
+export const createSavedFilter = (input: CreateFilterInput) =>
+  invoke<SavedFilter>("create_saved_filter", { input });
+
+/** Gets a saved filter by ID. */
+export const getSavedFilter = (id: string) =>
+  invoke<SavedFilter>("get_saved_filter", { id });
+
+/** Updates a saved filter. */
+export const updateSavedFilter = (id: string, input: UpdateFilterInput) =>
+  invoke<SavedFilter>("update_saved_filter", { id, input });
+
+/** Deletes a saved filter. */
+export const deleteSavedFilter = (id: string) =>
+  invoke<void>("delete_saved_filter", { id });
+
+/** Lists saved filters for a workspace. */
+export const listSavedFilters = (workspaceId: string) =>
+  invoke<SavedFilter[]>("list_saved_filters", { workspaceId });
+
+/** Reorders saved filters. */
+export const reorderSavedFilters = (ids: string[]) =>
+  invoke<void>("reorder_saved_filters", { ids });
+
+// --- Activity Log ---
+
+/** Queries the activity log. */
+export const listActivity = (query: ActivityQuery) =>
+  invoke<ActivityEntry[]>("list_activity", { query });
+
+/** Gets activity for a specific entity. */
+export const getEntityActivity = (entityType: string, entityId: string, limit?: number) =>
+  invoke<ActivityEntry[]>("get_entity_activity", { entityType, entityId, limit });
+
+// --- Graph ---
+
+/** Gets graph nodes and edges for visualization. */
+export const getGraphData = (query: GraphQuery) =>
+  invoke<GraphData>("get_graph_data", { query });
+
+// --- Grouped View ---
+
+/** Gets entities grouped by a field. */
+export const getGroupedView = (workspaceId: string, entityType: string, groupBy: string, filter?: FilterConfig) =>
+  invoke<GroupedViewResult>("get_grouped_view", { workspaceId, entityType, groupBy, filter });
+
+// --- Planned vs Actual ---
+
+/** Gets planned vs actual comparison for a single day. */
+export const getPlannedVsActual = (workspaceId: string, date: string) =>
+  invoke<PlannedVsActualData>("get_planned_vs_actual", { workspaceId, date });
+
+/** Gets planned vs actual comparison for a date range. */
+export const getPlannedVsActualRange = (workspaceId: string, dateFrom: string, dateTo: string) =>
+  invoke<PlannedVsActualData[]>("get_planned_vs_actual_range", { workspaceId, dateFrom, dateTo });
+
+// --- Backlinks with Context ---
+
+/** Gets backlinks with surrounding context snippets. */
+export const getBacklinksWithContext = (entityType: string, entityId: string) =>
+  invoke<BacklinkWithContext[]>("get_backlinks_with_context", { entityType, entityId });

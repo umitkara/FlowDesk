@@ -776,3 +776,215 @@ export interface TagTime {
   total_mins: number;
   entry_count: number;
 }
+
+// --- Phase 6: Discovery & Advanced Views ---
+
+/** A persisted search filter configuration. */
+export interface SavedFilter {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string | null;
+  filter_config: FilterConfig;
+  sort_order: number;
+  pinned: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Filter configuration for faceted search. */
+export interface FilterConfig {
+  entity_types?: string[];
+  query?: string;
+  tags?: string[];
+  tags_mode?: "any" | "all";
+  categories?: string[];
+  statuses?: string[];
+  priorities?: string[];
+  importance?: string[];
+  date_field?: string;
+  date_from?: string;
+  date_to?: string;
+  folders?: string[];
+  note_types?: string[];
+  front_matter_filters?: FrontMatterFilter[];
+  has_references_to?: string;
+  referenced_by?: string;
+  sort_by?: string;
+  sort_order?: "asc" | "desc";
+  limit?: number;
+}
+
+/** A filter on a custom front matter field. */
+export interface FrontMatterFilter {
+  field: string;
+  operator: "eq" | "neq" | "contains" | "gt" | "gte" | "lt" | "lte" | "exists" | "not_exists";
+  value?: string;
+}
+
+/** Input for creating a saved filter. */
+export interface CreateFilterInput {
+  workspace_id: string;
+  name: string;
+  description?: string;
+  filter_config: FilterConfig;
+  pinned?: boolean;
+}
+
+/** Input for updating a saved filter. */
+export interface UpdateFilterInput {
+  name?: string;
+  description?: string;
+  filter_config?: FilterConfig;
+  pinned?: boolean;
+}
+
+/** A single entry in the activity timeline. */
+export interface ActivityEntry {
+  id: string;
+  workspace_id: string;
+  entity_type: string;
+  entity_id: string;
+  entity_title: string | null;
+  action: string;
+  details: Record<string, unknown> | null;
+  actor: string;
+  created_at: string;
+}
+
+/** Query parameters for the activity log. */
+export interface ActivityQuery {
+  workspace_id: string;
+  entity_type?: string;
+  entity_id?: string;
+  action?: string;
+  date_from?: string;
+  date_to?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** Graph data containing nodes and edges for visualization. */
+export interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+/** A node in the entity relationship graph. */
+export interface GraphNode {
+  id: string;
+  entity_type: string;
+  title: string;
+  color: string | null;
+  importance: string | null;
+  workspace_id: string;
+}
+
+/** An edge in the entity relationship graph. */
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  relation: string;
+}
+
+/** Query parameters for graph data retrieval. */
+export interface GraphQuery {
+  workspace_id: string;
+  entity_types?: string[];
+  center_entity_id?: string;
+  depth?: number;
+  date_from?: string;
+  date_to?: string;
+  max_nodes?: number;
+}
+
+/** A single result from faceted search. */
+export interface FacetedSearchResult {
+  id: string;
+  entity_type: string;
+  title: string;
+  snippet: string | null;
+  rank: number;
+  category: string | null;
+  tags: string[];
+  status: string | null;
+  priority: string | null;
+  importance: string | null;
+  folder: string | null;
+  date: string | null;
+  workspace_id: string;
+  updated_at: string;
+}
+
+/** Full response from a faceted search including facet counts. */
+export interface FacetedSearchResponse {
+  results: FacetedSearchResult[];
+  total_count: number;
+  facets: SearchFacets;
+}
+
+/** Aggregated counts for each facet dimension. */
+export interface SearchFacets {
+  entity_type_counts: Record<string, number>;
+  category_counts: Record<string, number>;
+  tag_counts: Record<string, number>;
+  status_counts: Record<string, number>;
+  priority_counts: Record<string, number>;
+  importance_counts: Record<string, number>;
+}
+
+/** Result of a grouped view query. */
+export interface GroupedViewResult {
+  groups: GroupEntry[];
+}
+
+/** A single group in a grouped view. */
+export interface GroupEntry {
+  key: string;
+  count: number;
+  items: FacetedSearchResult[];
+}
+
+/** Comparison data between planned blocks and actual time entries for a day. */
+export interface PlannedVsActualData {
+  date: string;
+  planned_blocks: PlannedBlock[];
+  actual_entries: ActualEntry[];
+  planned_total_mins: number;
+  actual_total_mins: number;
+  difference_mins: number;
+}
+
+/** A planned time block from a plan entity. */
+export interface PlannedBlock {
+  plan_id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  duration_mins: number;
+  color: string | null;
+}
+
+/** An actual time entry recorded for the day. */
+export interface ActualEntry {
+  time_entry_id: string;
+  start_time: string;
+  end_time: string;
+  active_mins: number;
+  category: string | null;
+  linked_plan_id: string | null;
+  linked_task_id: string | null;
+  notes_preview: string | null;
+}
+
+/** A backlink with surrounding context from the source entity. */
+export interface BacklinkWithContext {
+  reference_id: string;
+  source_type: string;
+  source_id: string;
+  source_title: string;
+  relation: string;
+  context_snippet: string;
+  source_updated_at: string;
+}
