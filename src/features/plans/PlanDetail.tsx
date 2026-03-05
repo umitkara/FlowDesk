@@ -2,9 +2,13 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { usePlanStore } from "../../stores/planStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useUIStore } from "../../stores/uiStore";
+import { useRecurrenceStore } from "../../stores/recurrenceStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { RecurrenceEditor } from "../tasks/RecurrenceEditor";
 import { PLAN_TYPE_CONFIG, IMPORTANCE_CONFIG, STATUS_CONFIG } from "../../lib/types";
-import type { PlanLinkedTask, PlanLinkedNote, TaskStatus, TaskWithChildren } from "../../lib/types";
+import type { PlanLinkedTask, PlanLinkedNote, TaskStatus, TaskWithChildren, RecurrenceRule, CreateRecurrenceRuleInput, UpdateRecurrenceRuleInput } from "../../lib/types";
 import { BacklinksPanel } from "../../components/shared/BacklinksPanel";
+import { EntityReminders } from "../../components/shared/EntityReminders";
 
 /** Side panel showing plan details and linked entities. */
 export default function PlanDetail() {
@@ -22,6 +26,9 @@ export default function PlanDetail() {
   } = usePlanStore();
   const tasks = useTaskStore((s) => s.tasks);
   const { setActiveView } = useUIStore();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const { loadRuleForEntity, createRule, updateRule, deleteRule, skipNext, detachOccurrence: detachOcc } = useRecurrenceStore();
+  const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule | null>(null);
 
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState("");
@@ -32,6 +39,12 @@ export default function PlanDetail() {
   const [showScheduleTask, setShowScheduleTask] = useState(false);
   const [scheduleQuery, setScheduleQuery] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (selectedPlan) {
+      loadRuleForEntity("plan", selectedPlan.plan.id).then(setRecurrenceRule).catch(() => setRecurrenceRule(null));
+    }
+  }, [selectedPlan?.plan.id, loadRuleForEntity]);
 
   useEffect(() => {
     if (editingTitle && titleInputRef.current) {
@@ -234,6 +247,14 @@ export default function PlanDetail() {
           </div>
         )}
 
+        {/* Reminders */}
+        <EntityReminders
+          entityType="plan"
+          entityId={plan.id}
+          referenceTime={plan.start_time}
+          workspaceId={activeWorkspaceId || ""}
+        />
+
         <div className="border-t border-zinc-200 dark:border-zinc-800" />
 
         {/* Actions */}
@@ -432,6 +453,59 @@ export default function PlanDetail() {
               ))}
             </div>
           )}
+        </div>
+
+        <div className="border-t border-zinc-200 dark:border-zinc-800" />
+
+        {/* Recurrence */}
+        <div>
+          <div className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+            Recurrence
+          </div>
+          <div className="mt-1">
+            <RecurrenceEditor
+              rule={recurrenceRule}
+              entityType="plan"
+              workspaceId={activeWorkspaceId || ""}
+              entityId={plan.id}
+              onChange={async (input) => {
+                if (!input) {
+                  if (recurrenceRule) {
+                    await deleteRule(recurrenceRule.id);
+                    setRecurrenceRule(null);
+                  }
+                } else if (recurrenceRule) {
+                  const updated = await updateRule(recurrenceRule.id, input as UpdateRecurrenceRuleInput);
+                  setRecurrenceRule(updated);
+                } else {
+                  const created = await createRule(input as CreateRecurrenceRuleInput);
+                  setRecurrenceRule(created);
+                }
+              }}
+            />
+            {recurrenceRule && (
+              <div className="mt-1.5 flex gap-1">
+                <button
+                  onClick={async () => {
+                    const updated = await skipNext(recurrenceRule.id);
+                    setRecurrenceRule(updated);
+                  }}
+                  className="rounded border border-zinc-200 px-1.5 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                >
+                  Skip Next
+                </button>
+                <button
+                  onClick={async () => {
+                    await detachOcc("plan", plan.id);
+                    setRecurrenceRule(null);
+                  }}
+                  className="rounded border border-zinc-200 px-1.5 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                >
+                  Detach
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="border-t border-zinc-200 dark:border-zinc-800" />

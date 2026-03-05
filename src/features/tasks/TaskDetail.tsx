@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTaskStore } from "../../stores/taskStore";
+import { useRecurrenceStore } from "../../stores/recurrenceStore";
 import { SubtaskTree } from "./SubtaskTree";
+import { RecurrenceEditor } from "./RecurrenceEditor";
 import { BacklinksPanel } from "../../components/shared/BacklinksPanel";
+import { EntityReminders } from "../../components/shared/EntityReminders";
 import { ReferencesSection } from "./ReferencesSection";
-import type { TaskStatus, TaskPriority } from "../../lib/types";
+import type { TaskStatus, TaskPriority, RecurrenceRule, CreateRecurrenceRuleInput, UpdateRecurrenceRuleInput } from "../../lib/types";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "../../lib/types";
 import { timeAgo } from "../../lib/utils";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 
 /** Slide-over panel showing full task details with inline editing. */
 export function TaskDetail() {
@@ -15,10 +19,14 @@ export function TaskDetail() {
   const updateTask = useTaskStore((s) => s.updateTask);
   const deleteTask = useTaskStore((s) => s.deleteTask);
 
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const { loadRuleForEntity, createRule, updateRule, deleteRule, skipNext, detachOccurrence } = useRecurrenceStore();
+
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [editingDescription, setEditingDescription] = useState(false);
+  const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule | null>(null);
 
   useEffect(() => {
     if (selectedTask) {
@@ -26,8 +34,10 @@ export function TaskDetail() {
       setDescription(selectedTask.description ?? "");
       setEditingTitle(false);
       setEditingDescription(false);
+      // Load recurrence rule if task has one
+      loadRuleForEntity("task", selectedTask.id).then(setRecurrenceRule).catch(() => setRecurrenceRule(null));
     }
-  }, [selectedTask?.id]);
+  }, [selectedTask?.id, loadRuleForEntity]);
 
   const handleUpdate = useCallback(
     async (updates: Record<string, unknown>) => {
@@ -341,6 +351,69 @@ export function TaskDetail() {
                 }`}
               />
             </button>
+          </div>
+
+          {/* Reminders */}
+          <EntityReminders
+            entityType="task"
+            entityId={selectedTask.id}
+            referenceTime={selectedTask.due_date ?? null}
+            workspaceId={activeWorkspaceId || ""}
+          />
+
+          {/* Divider */}
+          <div className="border-t border-gray-200 dark:border-gray-800" />
+
+          {/* Recurrence */}
+          <div>
+            <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-gray-400">
+              Recurrence
+            </label>
+            <RecurrenceEditor
+              rule={recurrenceRule}
+              entityType="task"
+              workspaceId={activeWorkspaceId || ""}
+              entityId={selectedTask.id}
+              onChange={async (input) => {
+                if (!input) {
+                  // Remove recurrence
+                  if (recurrenceRule) {
+                    await deleteRule(recurrenceRule.id);
+                    setRecurrenceRule(null);
+                  }
+                } else if (recurrenceRule) {
+                  // Update existing rule
+                  const updated = await updateRule(recurrenceRule.id, input as UpdateRecurrenceRuleInput);
+                  setRecurrenceRule(updated);
+                } else {
+                  // Create new rule
+                  const created = await createRule(input as CreateRecurrenceRuleInput);
+                  setRecurrenceRule(created);
+                }
+              }}
+            />
+            {recurrenceRule && (
+              <div className="mt-1.5 flex gap-1">
+                <button
+                  onClick={async () => {
+                    const updated = await skipNext(recurrenceRule.id);
+                    setRecurrenceRule(updated);
+                  }}
+                  className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                >
+                  Skip Next
+                </button>
+                <button
+                  onClick={async () => {
+                    await detachOccurrence("task", selectedTask.id);
+                    setRecurrenceRule(null);
+                  }}
+                  className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                >
+                  Detach
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Divider */}

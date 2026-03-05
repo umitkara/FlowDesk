@@ -31,6 +31,7 @@ import GraphView from "../../features/discovery/GraphView";
 import TimelineView from "../../features/discovery/TimelineView";
 import GroupedView from "../../features/discovery/GroupedView";
 import PlannedVsActual from "../../features/discovery/PlannedVsActual";
+import { TemplateManager } from "../../features/notes/TemplateManager";
 import { usePlanStore } from "../../stores/planStore";
 import { useTrackerStore } from "../../stores/trackerStore";
 import { todayISO } from "../../lib/utils";
@@ -228,6 +229,7 @@ export function AppShell() {
             {activeView === "timeline" && <TimelineView />}
             {activeView === "grouped" && <GroupedView />}
             {activeView === "planned-vs-actual" && <PlannedVsActual />}
+            {activeView === "templates" && <TemplateManager />}
           </div>
 
           {/* Task detail panel */}

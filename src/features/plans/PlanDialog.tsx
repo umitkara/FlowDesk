@@ -3,11 +3,23 @@ import { usePlanStore } from "../../stores/planStore";
 import { PLAN_TYPE_CONFIG, IMPORTANCE_CONFIG } from "../../lib/types";
 import type { PlanType, Importance } from "../../lib/types";
 import * as ipc from "../../lib/ipc";
+import { EntityReminders } from "../../components/shared/EntityReminders";
 
 /** Color swatches for the color picker. */
 const COLOR_SWATCHES = [
   "#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444",
   "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1",
+];
+
+const DURATION_PRESETS = [
+  { label: "15m", minutes: 15 },
+  { label: "30m", minutes: 30 },
+  { label: "45m", minutes: 45 },
+  { label: "1h", minutes: 60 },
+  { label: "1.5h", minutes: 90 },
+  { label: "2h", minutes: 120 },
+  { label: "3h", minutes: 180 },
+  { label: "4h", minutes: 240 },
 ];
 
 /** Formats a datetime-local input value from an ISO string. */
@@ -58,6 +70,9 @@ export default function PlanDialog() {
   const [error, setError] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState("");
 
+  const [useDuration, setUseDuration] = useState(false);
+  const [durationMinutes, setDurationMinutes] = useState(60);
+
   const titleRef = useRef<HTMLInputElement>(null);
 
   // Get workspace ID
@@ -86,6 +101,19 @@ export default function PlanDialog() {
           ? editingPlan.tags.join(", ")
           : ""
       );
+      // Default to duration mode for timed events
+      if (!editingPlan.all_day && editingPlan.type !== "milestone" && editingPlan.start_time && editingPlan.end_time) {
+        const diffMs = new Date(editingPlan.end_time).getTime() - new Date(editingPlan.start_time).getTime();
+        const diffMins = Math.round(diffMs / 60000);
+        if (diffMins > 0) {
+          setUseDuration(true);
+          setDurationMinutes(diffMins);
+        } else {
+          setUseDuration(false);
+        }
+      } else {
+        setUseDuration(false);
+      }
     } else {
       setTitle("");
       setPlanType(dialogDefaults?.type || "time_block");
@@ -100,6 +128,8 @@ export default function PlanDialog() {
       setColor("");
       setImportance("");
       setTags("");
+      setUseDuration(false);
+      setDurationMinutes(60);
     }
 
     setError(null);
@@ -117,6 +147,17 @@ export default function PlanDialog() {
       setEndTime(startTime);
     }
   }, [planType, startTime]);
+
+  // Recalculate end time when duration mode is active
+  useEffect(() => {
+    if (!useDuration || !startTime || allDay || planType === "milestone") return;
+    try {
+      const startDate = new Date(startTime);
+      if (isNaN(startDate.getTime())) return;
+      const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+      setEndTime(toDatetimeLocal(endDate.toISOString()));
+    } catch { /* ignore */ }
+  }, [useDuration, startTime, durationMinutes, allDay, planType]);
 
   const handleSubmit = useCallback(async () => {
     if (!title.trim()) {
@@ -310,21 +351,81 @@ export default function PlanDialog() {
             <span className="text-xs text-zinc-600 dark:text-zinc-400">All day</span>
           </div>
 
-          {/* Date / Time pickers */}
-          <div className="flex gap-3">
-            <div className="flex-1">
+          {/* Start time + Duration toggle */}
+          <div>
+            <div className="flex items-center justify-between">
               <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-zinc-400">
                 Start *
               </label>
-              <input
-                type={allDay ? "date" : "datetime-local"}
-                className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
+              {!allDay && !isMilestone && (
+                <label className="flex cursor-pointer items-center gap-1.5">
+                  <span className="text-[10px] text-zinc-400">Duration</span>
+                  <div className="relative inline-flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={useDuration}
+                      onChange={() => {
+                        if (!useDuration && startTime && endTime) {
+                          const diffMs = new Date(endTime).getTime() - new Date(startTime).getTime();
+                          const diffMins = Math.round(diffMs / 60000);
+                          if (diffMins > 0) setDurationMinutes(diffMins);
+                        }
+                        setUseDuration(!useDuration);
+                      }}
+                      className="peer sr-only"
+                    />
+                    <div className="h-3.5 w-6 rounded-full bg-zinc-300 after:absolute after:left-[2px] after:top-[1px] after:h-2.5 after:w-2.5 after:rounded-full after:bg-white after:transition-all peer-checked:bg-blue-500 peer-checked:after:translate-x-full dark:bg-zinc-600" />
+                  </div>
+                </label>
+              )}
             </div>
-            {!isMilestone && (
-              <div className="flex-1">
+            <input
+              type={allDay ? "date" : "datetime-local"}
+              className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+          </div>
+
+          {/* Duration presets or End time */}
+          {!isMilestone && (
+            useDuration && !allDay ? (
+              <div>
+                <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+                  Duration
+                </label>
+                <div className="flex flex-wrap gap-1">
+                  {DURATION_PRESETS.map((p) => (
+                    <button
+                      key={p.minutes}
+                      type="button"
+                      onClick={() => setDurationMinutes(p.minutes)}
+                      className={`rounded px-2 py-1 text-xs ${
+                        durationMinutes === p.minutes
+                          ? "bg-blue-500 text-white"
+                          : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={1}
+                    className="w-20 rounded border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+                    value={durationMinutes}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (v > 0) setDurationMinutes(v);
+                    }}
+                  />
+                  <span className="text-xs text-zinc-400">min</span>
+                </div>
+              </div>
+            ) : (
+              <div>
                 <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-zinc-400">
                   End
                 </label>
@@ -335,8 +436,8 @@ export default function PlanDialog() {
                   onChange={(e) => setEndTime(e.target.value)}
                 />
               </div>
-            )}
-          </div>
+            )
+          )}
 
           {/* Description */}
           <div>
@@ -404,6 +505,16 @@ export default function PlanDialog() {
               ))}
             </div>
           </div>
+
+          {/* Reminders (edit mode only) */}
+          {editingPlan && (
+            <EntityReminders
+              entityType="plan"
+              entityId={editingPlan.id}
+              referenceTime={editingPlan.start_time}
+              workspaceId={editingPlan.workspace_id}
+            />
+          )}
 
           {error && (
             <div className="rounded bg-red-50 px-3 py-2 text-xs text-red-600 dark:bg-red-950/30 dark:text-red-400">

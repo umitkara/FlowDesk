@@ -822,11 +822,11 @@ function SavedFiltersDropdown({
 function sanitizeSnippet(snippet: string): string {
   // Replace allowed <mark> and </mark> with placeholders, strip all other tags, then restore
   return snippet
-    .replace(/<mark>/gi, "\x00MARK_OPEN\x00")
-    .replace(/<\/mark>/gi, "\x00MARK_CLOSE\x00")
+    .replace(/<mark>/gi, "___MARK_OPEN___")
+    .replace(/<\/mark>/gi, "___MARK_CLOSE___")
     .replace(/<[^>]*>/g, "")
-    .replace(/\x00MARK_OPEN\x00/g, "<mark>")
-    .replace(/\x00MARK_CLOSE\x00/g, "</mark>");
+    .replace(/___MARK_OPEN___/g, "<mark>")
+    .replace(/___MARK_CLOSE___/g, "</mark>");
 }
 
 function priorityColor(priority: string): string {

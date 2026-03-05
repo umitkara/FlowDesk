@@ -1,5 +1,6 @@
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useUIStore } from "../../stores/uiStore";
+import { ReminderSettings } from "./ReminderSettings";
 
 /** Settings panel with grouped configuration options. */
 export function SettingsPanel() {
@@ -117,6 +118,40 @@ export function SettingsPanel() {
           />
         </SettingRow>
       </SettingsSection>
+
+      {/* Calendar section */}
+      <SettingsSection title="Calendar">
+        <SettingRow label="Start Hour" description="First visible hour in calendar view (0–23)">
+          <input
+            type="number"
+            min={0}
+            max={23}
+            value={settings.calendar_start_hour ?? "0"}
+            onChange={(e) => {
+              const val = Math.max(0, Math.min(23, parseInt(e.target.value, 10) || 0));
+              setSetting("calendar_start_hour", String(val));
+            }}
+            className="w-20 rounded border border-gray-200 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800"
+          />
+        </SettingRow>
+        <SettingRow label="End Hour" description="Last visible hour in calendar view (1–24)">
+          <input
+            type="number"
+            min={1}
+            max={24}
+            value={settings.calendar_end_hour ?? "24"}
+            onChange={(e) => {
+              const start = parseInt(settings.calendar_start_hour ?? "0", 10) || 0;
+              const val = Math.max(start + 1, Math.min(24, parseInt(e.target.value, 10) || 24));
+              setSetting("calendar_end_hour", String(val));
+            }}
+            className="w-20 rounded border border-gray-200 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800"
+          />
+        </SettingRow>
+      </SettingsSection>
+
+      {/* Reminders & Automation */}
+      <ReminderSettings />
 
       {/* About link */}
       <div className="mb-6">

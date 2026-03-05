@@ -7,6 +7,8 @@ import { useNoteStore } from "./stores/noteStore";
 import { useUIStore } from "./stores/uiStore";
 import { useTaskStore } from "./stores/taskStore";
 import { useTrackerStore } from "./stores/trackerStore";
+import { useReminderStore } from "./stores/reminderStore";
+import type { Reminder } from "./lib/types";
 import * as ipc from "./lib/ipc";
 
 /** Root application component. Loads settings, workspaces, and initial data on mount. */
@@ -66,6 +68,21 @@ function App() {
       return () => mq.removeEventListener("change", apply);
     }
   }, [theme]);
+
+  // Load reminder defaults
+  const loadReminderDefaults = useReminderStore((s) => s.loadDefaults);
+  const addFiredReminder = useReminderStore((s) => s.addFiredReminder);
+  useEffect(() => {
+    loadReminderDefaults();
+  }, [loadReminderDefaults]);
+
+  // Listen for reminder-fired events from backend
+  useEffect(() => {
+    const unlisten = listen<Reminder>("reminder-fired", (event) => {
+      addFiredReminder(event.payload);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [addFiredReminder]);
 
   // Listen for system tray tracker actions
   const trackerStart = useTrackerStore((s) => s.start);

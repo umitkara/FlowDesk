@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useTrackerStore, formatMinutes } from "../../stores/trackerStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { SessionTimeline } from "./SessionTimeline";
-import type { Task, Plan } from "../../lib/types";
+import type { Task, Plan, Suggestion } from "../../lib/types";
 import * as ipc from "../../lib/ipc";
 
 /** Modal dialog shown after stopping the tracker, for finalizing the session. */
@@ -35,6 +36,8 @@ export function TrackerDetailForm() {
   // Task/plan suggestions
   const [tasks, setTasks] = useState<Task[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   useEffect(() => {
     setSummary(notes);
@@ -58,7 +61,20 @@ export function TrackerDetailForm() {
       .listPlans({ workspace_id: "" })
       .then(setPlans)
       .catch(() => {});
-  }, [showDetailForm]);
+
+    // Auto-suggestions
+    if (activeWorkspaceId && stoppedEndTime) {
+      ipc
+        .suggestOnTrackerStop(
+          activeWorkspaceId,
+          tagsFromTracker,
+          notes,
+          stoppedEndTime,
+        )
+        .then(setSuggestions)
+        .catch(() => setSuggestions([]));
+    }
+  }, [showDetailForm, activeWorkspaceId, stoppedEndTime, tagsFromTracker, notes]);
 
   if (!showDetailForm) return null;
 
@@ -166,6 +182,47 @@ export function TrackerDetailForm() {
             placeholder="What did you work on?"
           />
         </div>
+
+        {/* Auto-suggestions */}
+        {suggestions.length > 0 && (
+          <div className="mt-4">
+            <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Suggested Links
+            </label>
+            <div className="mt-1 max-h-36 space-y-1 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
+              {suggestions.map((s) => (
+                <button
+                  key={`${s.entity_type}-${s.entity_id}`}
+                  onClick={() => {
+                    if (s.entity_type === "task") setTaskId(s.entity_id);
+                    else setPlanId(s.entity_id);
+                  }}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                    (s.entity_type === "task" && taskId === s.entity_id) ||
+                    (s.entity_type === "plan" && planId === s.entity_id)
+                      ? "bg-blue-50 dark:bg-blue-900/20"
+                      : ""
+                  }`}
+                >
+                  <span className="flex-shrink-0 text-[10px] text-gray-400">
+                    {s.entity_type === "task" ? "&#9744;" : "&#128197;"}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-gray-700 dark:text-gray-300">
+                      {s.title}
+                    </div>
+                    <div className="text-[10px] text-gray-400">
+                      {s.reason}
+                    </div>
+                  </div>
+                  <span className="flex-shrink-0 text-[10px] text-gray-300 dark:text-gray-600">
+                    {Math.round(s.score * 100)}%
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Link to task/plan */}
         <div className="mt-4 grid grid-cols-2 gap-3">

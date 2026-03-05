@@ -14,6 +14,7 @@ import type {
 import type { EventResizeDoneArg, EventReceiveArg } from "@fullcalendar/interaction";
 import type { EventInput } from "@fullcalendar/core";
 import { usePlanStore } from "../../stores/planStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { useUIStore } from "../../stores/uiStore";
 import type { Plan } from "../../lib/types";
 import { PLAN_TYPE_CONFIG } from "../../lib/types";
@@ -65,8 +66,16 @@ export default function CalendarView() {
   } = usePlanStore();
   const setActiveView = useUIStore((s) => s.setActiveView);
   const setDailyPlanDate = usePlanStore((s) => s.setDailyPlanDate);
+  const settings = useSettingsStore((s) => s.settings);
+
+  const startHour = Math.max(0, Math.min(23, parseInt(settings.calendar_start_hour ?? "0", 10) || 0));
+  const endHour = Math.max(startHour + 1, Math.min(24, parseInt(settings.calendar_end_hour ?? "24", 10) || 24));
+  const slotMinTime = `${String(startHour).padStart(2, "0")}:00:00`;
+  const slotMaxTime = `${String(endHour).padStart(2, "0")}:00:00`;
 
   const workspaceIdRef = useRef<string>("");
+  const lastClickRef = useRef<{ eventId: string; time: number } | null>(null);
+  const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch workspace ID, then trigger initial plan load for the visible range
   useEffect(() => {
@@ -99,6 +108,13 @@ export default function CalendarView() {
     return () => draggable.destroy();
   }, []);
 
+  // Cleanup click timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
+    };
+  }, []);
+
   const events: EventInput[] = plans.map(planToEvent);
 
   /** Called when selecting a time range on the calendar (drag on empty area). */
@@ -124,12 +140,33 @@ export default function CalendarView() {
     [setDailyPlanDate, setActiveView]
   );
 
-  /** Called when clicking an event. */
+  /** Called when clicking an event. Single-click → detail panel, double-click → edit dialog. */
   const handleEventClick = useCallback(
     (clickInfo: EventClickArg) => {
-      fetchPlanWithLinks(clickInfo.event.id);
+      const now = Date.now();
+      const last = lastClickRef.current;
+
+      if (last && last.eventId === clickInfo.event.id && now - last.time < 300) {
+        // Double-click — open edit dialog
+        lastClickRef.current = null;
+        if (clickTimeoutRef.current) {
+          clearTimeout(clickTimeoutRef.current);
+          clickTimeoutRef.current = null;
+        }
+        const plan = plans.find((p) => p.id === clickInfo.event.id);
+        if (plan) openDialog(undefined, plan);
+      } else {
+        // Single-click — wait to confirm it's not a double-click
+        lastClickRef.current = { eventId: clickInfo.event.id, time: now };
+        if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
+        const eventId = clickInfo.event.id;
+        clickTimeoutRef.current = setTimeout(() => {
+          clickTimeoutRef.current = null;
+          fetchPlanWithLinks(eventId);
+        }, 300);
+      }
     },
-    [fetchPlanWithLinks]
+    [fetchPlanWithLinks, plans, openDialog]
   );
 
   /** Called when dragging an event to a new time. */
@@ -245,8 +282,8 @@ export default function CalendarView() {
           selectMirror
           eventDurationEditable
           eventStartEditable
-          slotMinTime="06:00:00"
-          slotMaxTime="22:00:00"
+          slotMinTime={slotMinTime}
+          slotMaxTime={slotMaxTime}
           allDaySlot
           nowIndicator
           weekends
