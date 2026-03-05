@@ -1,5 +1,9 @@
 /// Activity logging on entity mutations.
 pub mod activity;
+/// Import services for markdown, Obsidian, and CSV.
+pub mod import;
+/// Note version history snapshots and diffs.
+pub mod versions;
 /// Automated database backup service.
 pub mod backup;
 /// Markdown export service.

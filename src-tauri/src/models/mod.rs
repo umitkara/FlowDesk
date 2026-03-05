@@ -20,3 +20,11 @@ pub mod template;
 pub mod time_entry;
 /// Workspace entity.
 pub mod workspace;
+/// Enhanced export types.
+pub mod export;
+/// Import types and options.
+pub mod import;
+/// Note version history types.
+pub mod note_version;
+/// Undo/redo operation types and history.
+pub mod undo;

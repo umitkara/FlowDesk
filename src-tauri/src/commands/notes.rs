@@ -1,6 +1,7 @@
 use crate::models::note::{
     CreateNoteInput, FolderNode, Note, NoteListItem, NoteQuery, UpdateNoteInput,
 };
+use crate::models::undo::{OperationType, UndoEntityType, UndoableOperation};
 use crate::services::activity::log_activity;
 use crate::state::AppState;
 use crate::utils::errors::AppError;
@@ -262,6 +263,30 @@ pub fn update_note(
 ) -> Result<Note, AppError> {
     let now = now_iso();
 
+    // Capture previous state for undo
+    if let Ok(prev_note) = state.db.with_conn(|conn| {
+        read_note(conn, &id).map_err(|e| match e {
+            AppError::Database(db_err) => db_err,
+            _ => rusqlite::Error::InvalidQuery,
+        })
+    }) {
+        let prev_state = serde_json::json!({
+            "title": prev_note.title,
+            "body": prev_note.body,
+            "body_hash": prev_note.body_hash,
+        });
+        if let Ok(mut history) = state.operation_history.lock() {
+            history.push(UndoableOperation {
+                operation_type: OperationType::Update,
+                entity_type: UndoEntityType::Note,
+                entity_id: id.clone(),
+                previous_state: prev_state,
+                description: format!("Edit note: {}", prev_note.title.as_deref().unwrap_or("Untitled")),
+                timestamp: now.clone(),
+            });
+        }
+    }
+
     state.db.with_conn(|conn| {
         // Verify note exists and is not deleted
         let deleted: Option<String> = conn.query_row(
@@ -389,6 +414,20 @@ pub fn delete_note(state: State<'_, AppState>, id: String) -> Result<(), AppErro
             |row| Ok((row.get(0)?, row.get(1)?)),
         ).ok().map_or(Ok(None), |v| Ok(Some(v)))
     })?;
+
+    // Push undo operation
+    if let Some((ref _ws, ref title)) = meta {
+        if let Ok(mut history) = state.operation_history.lock() {
+            history.push(UndoableOperation {
+                operation_type: OperationType::Delete,
+                entity_type: UndoEntityType::Note,
+                entity_id: id.clone(),
+                previous_state: serde_json::json!({}),
+                description: format!("Delete note: {}", title.as_deref().unwrap_or("Untitled")),
+                timestamp: now_iso(),
+            });
+        }
+    }
 
     let now = now_iso();
     let affected = state.db.with_conn(|conn| {

@@ -1,5 +1,13 @@
 /// Activity log query commands.
 pub mod activity;
+/// Global hotkey management.
+pub mod hotkey;
+/// Import commands for markdown, Obsidian, and CSV.
+pub mod import;
+/// Undo/redo operation commands.
+pub mod undo;
+/// Note version history commands.
+pub mod versions;
 /// Graph data, grouped views, faceted search, planned vs actual, and backlinks with context.
 pub mod discovery;
 /// Markdown export commands.

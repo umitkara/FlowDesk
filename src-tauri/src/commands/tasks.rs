@@ -2,6 +2,7 @@ use crate::models::task::{
     CreateTask, Task, TaskFilter, TaskSort, TaskWithChildren, UpdateTask, VALID_PRIORITIES,
     VALID_STATUSES,
 };
+use crate::models::undo::{OperationType, UndoEntityType, UndoableOperation};
 use crate::services::activity::log_activity;
 use crate::services::references::{get_task_depth, would_create_cycle};
 use crate::state::AppState;
@@ -544,6 +545,31 @@ pub fn update_task(
 ) -> Result<Task, AppError> {
     let now = now_iso();
 
+    // Capture previous state for undo
+    if let Ok(prev_task) = state.db.with_conn(|conn| {
+        read_task(conn, &id).map_err(|e| match e {
+            AppError::Database(db_err) => db_err,
+            _ => rusqlite::Error::InvalidQuery,
+        })
+    }) {
+        let prev_state = serde_json::json!({
+            "title": prev_task.title,
+            "description": prev_task.description,
+            "status": prev_task.status,
+            "priority": prev_task.priority,
+        });
+        if let Ok(mut history) = state.operation_history.lock() {
+            history.push(UndoableOperation {
+                operation_type: OperationType::Update,
+                entity_type: UndoEntityType::Task,
+                entity_id: id.clone(),
+                previous_state: prev_state,
+                description: format!("Edit task: {}", prev_task.title),
+                timestamp: now.clone(),
+            });
+        }
+    }
+
     state.db.with_conn(|conn| {
         // Verify task exists and is not deleted
         let existing = read_task(conn, &id).map_err(|e| match e {
@@ -748,6 +774,25 @@ pub fn update_task(
 #[tauri::command]
 pub fn delete_task(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let now = now_iso();
+
+    // Push undo operation
+    if let Ok(prev_task) = state.db.with_conn(|conn| {
+        read_task(conn, &id).map_err(|e| match e {
+            AppError::Database(db_err) => db_err,
+            _ => rusqlite::Error::InvalidQuery,
+        })
+    }) {
+        if let Ok(mut history) = state.operation_history.lock() {
+            history.push(UndoableOperation {
+                operation_type: OperationType::Delete,
+                entity_type: UndoEntityType::Task,
+                entity_id: id.clone(),
+                previous_state: serde_json::json!({}),
+                description: format!("Delete task: {}", prev_task.title),
+                timestamp: now.clone(),
+            });
+        }
+    }
     let task_meta = state
         .db
         .with_conn(|conn| {
@@ -874,6 +919,29 @@ pub fn restore_task(state: State<'_, AppState>, id: String) -> Result<Task, AppE
 pub fn toggle_task_status(state: State<'_, AppState>, id: String) -> Result<Task, AppError> {
     let now = now_iso();
     let id_log = id.clone();
+
+    // Push undo operation for status change
+    if let Ok(prev_task) = state.db.with_conn(|conn| {
+        read_task(conn, &id).map_err(|e| match e {
+            AppError::Database(db_err) => db_err,
+            _ => rusqlite::Error::InvalidQuery,
+        })
+    }) {
+        let prev_state = serde_json::json!({
+            "status": prev_task.status,
+            "completed_at": prev_task.completed_at,
+        });
+        if let Ok(mut history) = state.operation_history.lock() {
+            history.push(UndoableOperation {
+                operation_type: OperationType::StatusChange,
+                entity_type: UndoEntityType::Task,
+                entity_id: id.clone(),
+                previous_state: prev_state,
+                description: format!("Toggle task: {}", prev_task.title),
+                timestamp: now.clone(),
+            });
+        }
+    }
 
     let (old_status, task) = state
         .db

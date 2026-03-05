@@ -1,4 +1,5 @@
 use crate::models::note::Note;
+use crate::models::task::Task;
 use crate::services::frontmatter;
 use crate::utils::errors::AppError;
 use std::path::Path;
@@ -75,4 +76,77 @@ pub fn export_to_directory(notes: &[Note], output_dir: &Path) -> Result<ExportSe
         output_dir: output_dir.to_string_lossy().to_string(),
         errors,
     })
+}
+
+/// Serializes a set of notes and tasks into a combined JSON workspace export.
+pub fn serialize_workspace_json(
+    notes: &[Note],
+    tasks: &[Task],
+    pretty: bool,
+) -> Result<String, AppError> {
+    let export = serde_json::json!({
+        "version": "1.0",
+        "exported_at": crate::utils::time::now_iso(),
+        "notes": notes,
+        "tasks": tasks,
+    });
+
+    if pretty {
+        serde_json::to_string_pretty(&export).map_err(AppError::Serialization)
+    } else {
+        serde_json::to_string(&export).map_err(AppError::Serialization)
+    }
+}
+
+/// Serializes tasks into a CSV string.
+pub fn serialize_tasks_csv(tasks: &[Task]) -> Result<String, AppError> {
+    let mut wtr = csv::Writer::from_writer(Vec::new());
+
+    wtr.write_record([
+        "id", "title", "description", "status", "priority",
+        "due_date", "scheduled_date", "category", "tags",
+        "estimated_mins", "actual_mins", "created_at", "updated_at",
+    ])
+    .map_err(|e| AppError::Export(e.to_string()))?;
+
+    for task in tasks {
+        let tags_str = task
+            .tags
+            .as_ref()
+            .and_then(|v| {
+                if let serde_json::Value::Array(arr) = v {
+                    Some(
+                        arr.iter()
+                            .filter_map(|item| item.as_str().map(String::from))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                    )
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
+
+        wtr.write_record([
+            &task.id,
+            &task.title,
+            task.description.as_deref().unwrap_or(""),
+            &task.status,
+            &task.priority,
+            task.due_date.as_deref().unwrap_or(""),
+            task.scheduled_date.as_deref().unwrap_or(""),
+            task.category.as_deref().unwrap_or(""),
+            &tags_str,
+            &task.estimated_mins.map(|m| m.to_string()).unwrap_or_default(),
+            &task.actual_mins.to_string(),
+            &task.created_at,
+            &task.updated_at,
+        ])
+        .map_err(|e| AppError::Export(e.to_string()))?;
+    }
+
+    let bytes = wtr
+        .into_inner()
+        .map_err(|e| AppError::Export(e.to_string()))?;
+    String::from_utf8(bytes).map_err(|e| AppError::Export(e.to_string()))
 }

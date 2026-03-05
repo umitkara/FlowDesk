@@ -1,5 +1,6 @@
 use crate::db::connection::DbPool;
-use std::sync::Arc;
+use crate::models::undo::OperationHistory;
+use std::sync::{Arc, Mutex};
 
 /// Shared application state managed by Tauri.
 ///
@@ -10,4 +11,6 @@ pub struct AppState {
     pub db: Arc<DbPool>,
     /// Absolute path to the application data directory (e.g. `~/.flowdesk`).
     pub data_dir: String,
+    /// In-memory undo/redo operation history.
+    pub operation_history: Arc<Mutex<OperationHistory>>,
 }

@@ -12,8 +12,9 @@ pub mod state;
 pub mod utils;
 
 use db::connection::DbPool;
+use models::undo::OperationHistory;
 use state::AppState;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::TrayIconEvent;
@@ -219,6 +220,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             let data_dir = resolve_data_dir();
             ensure_directories(&data_dir);
@@ -260,6 +262,7 @@ pub fn run() {
             app.manage(AppState {
                 db: Arc::clone(&db_pool_arc),
                 data_dir,
+                operation_history: Arc::new(Mutex::new(OperationHistory::new(100))),
             });
 
             // Start background reminder scheduler
@@ -363,7 +366,7 @@ pub fn run() {
             commands::notes::move_note_to_folder,
             commands::notes::get_note_count,
             // Search
-            commands::search::search_notes,
+            commands::search::search_entities,
             // Export
             commands::export::export_notes,
             commands::export::export_single_note,
@@ -488,6 +491,38 @@ pub fn run() {
             commands::reminders::delete_reminder,
             commands::reminders::dismiss_reminder,
             commands::reminders::sync_entity_reminders,
+            // Version History
+            commands::versions::create_version,
+            commands::versions::list_versions,
+            commands::versions::get_version,
+            commands::versions::restore_version,
+            commands::versions::delete_version,
+            commands::versions::prune_versions,
+            commands::versions::get_version_storage_stats,
+            commands::versions::diff_versions,
+            // Import
+            commands::import::import_markdown_folder,
+            commands::import::import_obsidian_vault,
+            commands::import::import_csv_tasks,
+            commands::import::preview_csv,
+            // Enhanced Export
+            commands::export::export_workspace_json,
+            commands::export::export_tasks_csv,
+            commands::export::export_notes_markdown,
+            commands::export::export_single_note_markdown,
+            // Undo/Redo
+            commands::undo::undo_operation,
+            commands::undo::redo_operation,
+            commands::undo::get_undo_redo_state,
+            // Extended Settings
+            commands::settings::get_keyboard_shortcuts,
+            commands::settings::update_keyboard_shortcuts,
+            commands::settings::get_theme,
+            commands::settings::update_theme,
+            commands::settings::get_version_history_config,
+            commands::settings::update_version_history_config,
+            // Global Hotkey
+            commands::hotkey::update_global_hotkey,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

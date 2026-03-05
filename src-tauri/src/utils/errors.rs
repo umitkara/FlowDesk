@@ -37,6 +37,10 @@ pub enum AppError {
     #[error("Export error: {0}")]
     Export(String),
 
+    /// An import operation failed.
+    #[error("Import error: {0}")]
+    Import(String),
+
     /// An unexpected internal error occurred.
     #[error("Internal error: {0}")]
     Internal(String),
