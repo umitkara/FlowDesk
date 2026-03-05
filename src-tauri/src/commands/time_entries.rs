@@ -2,6 +2,7 @@ use crate::models::time_entry::{
     BreakConfig, DailySummary, SaveDetailInput, SessionNote, StartTrackerInput, TimeEntry,
     TrackerState, WeeklySummary,
 };
+use crate::services::activity::log_activity;
 use crate::services::tracker;
 use crate::state::AppState;
 use crate::utils::errors::AppError;
@@ -35,6 +36,7 @@ pub fn tracker_start(
     tags: Option<Vec<String>>,
     break_mode: Option<String>,
 ) -> Result<TrackerState, AppError> {
+    let wid = workspace_id.clone();
     let result = state.db.with_conn(|conn| {
         tracker::start(
             conn,
@@ -49,6 +51,15 @@ pub fn tracker_start(
         )
         .map_err(to_db_err)
     })?;
+
+    // Best-effort activity logging
+    if let Some(ref entry_id) = result.time_entry_id {
+        let eid = entry_id.clone();
+        let _ = state.db.with_conn(|conn| {
+            log_activity(conn, &wid, "time_entry", &eid, None, "started", None)
+        });
+    }
+
     Ok(result)
 }
 
@@ -83,6 +94,20 @@ pub fn tracker_stop(state: State<'_, AppState>) -> Result<TrackerState, AppError
     let result = state
         .db
         .with_conn(|conn| tracker::stop(conn).map_err(to_db_err))?;
+
+    // Best-effort activity logging
+    if let Some(ref entry_id) = result.time_entry_id {
+        let eid = entry_id.clone();
+        let details = result.active_mins.map(|m| serde_json::json!({"active_mins": m}));
+        let _ = state.db.with_conn(|conn| {
+            // Read workspace_id from the time entry
+            if let Ok(entry) = tracker::read_time_entry(conn, &eid).map_err(to_db_err) {
+                let _ = log_activity(conn, &entry.workspace_id, "time_entry", &eid, None, "stopped", details);
+            }
+            Ok::<_, rusqlite::Error>(())
+        });
+    }
+
     Ok(result)
 }
 
@@ -164,6 +189,19 @@ pub fn tracker_save_detail(
         )
         .map_err(to_db_err)
     })?;
+
+    // Best-effort activity logging
+    let details = serde_json::json!({
+        "active_mins": result.active_mins,
+        "category": result.category,
+    });
+    let title = result.category.clone().unwrap_or_else(|| "Session".into());
+    let eid = result.id.clone();
+    let wid = result.workspace_id.clone();
+    let _ = state.db.with_conn(|conn| {
+        log_activity(conn, &wid, "time_entry", &eid, Some(&title), "created", Some(details))
+    });
+
     Ok(result)
 }
 
@@ -173,9 +211,25 @@ pub fn tracker_discard(
     state: State<'_, AppState>,
     time_entry_id: String,
 ) -> Result<(), AppError> {
+    // Read entry before discarding for activity log
+    let meta: Option<(String, Option<String>)> = state.db.with_conn(|conn| {
+        tracker::read_time_entry(conn, &time_entry_id)
+            .map(|e| (e.workspace_id, e.category))
+            .map_err(to_db_err)
+    }).ok();
+
     state
         .db
         .with_conn(|conn| tracker::discard(conn, &time_entry_id).map_err(to_db_err))?;
+
+    // Best-effort activity logging
+    if let Some((wid, category)) = meta {
+        let title = category.unwrap_or_else(|| "Session".into());
+        let _ = state.db.with_conn(|conn| {
+            log_activity(conn, &wid, "time_entry", &time_entry_id, Some(&title), "deleted", None)
+        });
+    }
+
     Ok(())
 }
 
@@ -293,6 +347,15 @@ pub fn update_time_entry(
         tracker::update_time_entry(conn, &id, notes, category, tags, linked_plan_id, linked_task_id)
             .map_err(to_db_err)
     })?;
+
+    // Best-effort activity logging
+    let title = result.category.clone().unwrap_or_else(|| "Session".into());
+    let eid = result.id.clone();
+    let wid = result.workspace_id.clone();
+    let _ = state.db.with_conn(|conn| {
+        log_activity(conn, &wid, "time_entry", &eid, Some(&title), "updated", None)
+    });
+
     Ok(result)
 }
 
@@ -302,9 +365,25 @@ pub fn delete_time_entry(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<(), AppError> {
+    // Read entry before deleting for activity log
+    let meta: Option<(String, Option<String>)> = state.db.with_conn(|conn| {
+        tracker::read_time_entry(conn, &id)
+            .map(|e| (e.workspace_id, e.category))
+            .map_err(to_db_err)
+    }).ok();
+
     state
         .db
         .with_conn(|conn| tracker::delete_time_entry(conn, &id).map_err(to_db_err))?;
+
+    // Best-effort activity logging
+    if let Some((wid, category)) = meta {
+        let title = category.unwrap_or_else(|| "Session".into());
+        let _ = state.db.with_conn(|conn| {
+            log_activity(conn, &wid, "time_entry", &id, Some(&title), "deleted", None)
+        });
+    }
+
     Ok(())
 }
 
