@@ -46,7 +46,7 @@ export function ReferencesSection({ entityType, entityId }: ReferencesSectionPro
 
   useEffect(() => {
     fetchRefs();
-  }, [entityType, entityId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entityType, entityId]);
 
   const handleAdd = async () => {
     if (!addTargetId) return;

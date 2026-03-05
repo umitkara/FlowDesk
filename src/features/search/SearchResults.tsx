@@ -5,9 +5,9 @@ import { useNoteStore } from "../../stores/noteStore";
 import { useUIStore } from "../../stores/uiStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { usePlanStore } from "../../stores/planStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import type { SearchResult } from "../../lib/types";
 import { STATUS_CONFIG } from "../../lib/types";
-import { listWorkspaces } from "../../lib/ipc";
 
 /** Full-text search view with results display. */
 export function SearchResults() {
@@ -29,10 +29,10 @@ export function SearchResults() {
 
     setIsSearching(true);
     try {
-      const workspaces = await listWorkspaces();
-      if (workspaces.length === 0) return;
+      const wsId = useWorkspaceStore.getState().activeWorkspaceId;
+      if (!wsId) return;
       const res = await searchNotes({
-        workspace_id: workspaces[0].id,
+        workspace_id: wsId,
         query,
       });
       setResults(res);

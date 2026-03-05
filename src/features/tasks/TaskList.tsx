@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useTaskStore } from "../../stores/taskStore";
 import { TaskRow } from "./TaskRow";
 import { TaskFilters } from "./TaskFilters";
-import type { TaskSort, TaskWithChildren } from "../../lib/types";
+import type { TaskPriority, TaskSort, TaskWithChildren } from "../../lib/types";
 
 /** Builds a flat list of rows in depth-first order for tree display. */
 function buildTreeRows(tasks: TaskWithChildren[], collapsedIds: Set<string>) {
@@ -129,7 +129,7 @@ export function TaskList() {
       };
       if (priorityMap[e.key] && focusedTaskId && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
-        updateTask(focusedTaskId, { priority: priorityMap[e.key] as any });
+        updateTask(focusedTaskId, { priority: priorityMap[e.key] as TaskPriority });
         return;
       }
     },

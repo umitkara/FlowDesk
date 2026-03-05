@@ -80,7 +80,7 @@ export function NoteEditor() {
         editor.commands.setContent(processed);
       }
     }
-  }, [editor, activeNote?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [editor, activeNote?.id]);
 
   const handleForceSave = useCallback(() => {
     if (editor && activeNote) {
