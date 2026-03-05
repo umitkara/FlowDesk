@@ -44,7 +44,14 @@ pub fn list_activity(
             }
 
             if let Some(ref date_to) = query.date_to {
-                params.push(Box::new(date_to.clone()));
+                // If date_to is a bare date (YYYY-MM-DD), append end-of-day so the
+                // lexicographic comparison includes all timestamps on that day.
+                let effective = if date_to.len() == 10 {
+                    format!("{}T23:59:59.999Z", date_to)
+                } else {
+                    date_to.clone()
+                };
+                params.push(Box::new(effective));
                 sql.push_str(&format!(" AND created_at <= ?{}", params.len()));
             }
 

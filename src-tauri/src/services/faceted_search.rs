@@ -2,7 +2,7 @@ use crate::models::discovery::{
     FacetedSearchResponse, FacetedSearchResult, FilterConfig, SearchFacets,
 };
 use rusqlite::Connection;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Sanitizes a search query for FTS5.
 fn sanitize_fts_query(query: &str) -> String {
@@ -84,6 +84,30 @@ pub fn execute_faceted_search(
         }
     }
 
+    // Apply has_references_to filter: keep results that reference the target entity
+    if let Some(ref target) = filter.has_references_to {
+        let referencing_ids: HashSet<String> = conn
+            .prepare(
+                "SELECT DISTINCT source_id FROM refs WHERE target_id = ?1",
+            )?
+            .query_map([target], |row| row.get::<_, String>(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+        all_results.retain(|r| referencing_ids.contains(&r.id));
+    }
+
+    // Apply referenced_by filter: keep results that are referenced by the source entity
+    if let Some(ref source) = filter.referenced_by {
+        let referenced_ids: HashSet<String> = conn
+            .prepare(
+                "SELECT DISTINCT target_id FROM refs WHERE source_id = ?1",
+            )?
+            .query_map([source], |row| row.get::<_, String>(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+        all_results.retain(|r| referenced_ids.contains(&r.id));
+    }
+
     // Compute facets from all results (before applying limit)
     let facets = compute_facets(&all_results);
     let total_count = all_results.len() as i64;
@@ -110,7 +134,11 @@ fn search_entity_notes(
     if has_query {
         let sanitized = sanitize_fts_query(filter.query.as_deref().unwrap_or(""));
         let mut stmt = conn.prepare(
-            "SELECT n.id, n.title, n.category, n.tags, n.importance, n.folder, n.date,
+            "SELECT n.id, n.title, n.category,
+                    (SELECT COALESCE(json_group_array(t.name), '[]')
+                     FROM note_tags nt JOIN tags t ON nt.tag_id = t.id
+                     WHERE nt.note_id = n.id) as tags,
+                    n.importance, n.folder, n.date,
                     n.workspace_id, n.updated_at,
                     snippet(notes_fts, 1, '<mark>', '</mark>', '...', 32) as snippet,
                     rank
@@ -146,7 +174,11 @@ fn search_entity_notes(
         }
     } else {
         let mut stmt = conn.prepare(
-            "SELECT id, title, category, tags, importance, folder, date,
+            "SELECT id, title, category,
+                    (SELECT COALESCE(json_group_array(t.name), '[]')
+                     FROM note_tags nt JOIN tags t ON nt.tag_id = t.id
+                     WHERE nt.note_id = notes.id) as tags,
+                    importance, folder, date,
                     workspace_id, updated_at
              FROM notes
              WHERE workspace_id = ?1 AND deleted_at IS NULL
@@ -189,8 +221,30 @@ fn search_entity_notes(
     }
 
     if let Some(ref note_types) = filter.note_types {
-        // note_types filter would need the type column; for now we skip if not in result
-        let _ = note_types; // acknowledged but not filterable without extra data
+        if !note_types.is_empty() {
+            let type_set: std::collections::HashSet<&str> =
+                note_types.iter().map(|s| s.as_str()).collect();
+            let ids_with_type: HashSet<String> = results
+                .iter()
+                .filter_map(|r| {
+                    conn.query_row(
+                        "SELECT type FROM notes WHERE id = ?1",
+                        [&r.id],
+                        |row| row.get::<_, Option<String>>(0),
+                    )
+                    .ok()
+                    .flatten()
+                    .and_then(|t| {
+                        if type_set.contains(t.as_str()) {
+                            Some(r.id.clone())
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect();
+            results.retain(|r| ids_with_type.contains(&r.id));
+        }
     }
 
     if let Some(ref imp) = filter.importance {
@@ -199,6 +253,27 @@ fn search_entity_notes(
                 .as_ref()
                 .is_some_and(|i| imp.contains(i))
         });
+    }
+
+    // Apply front matter filters (notes only)
+    if let Some(ref fm_filters) = filter.front_matter_filters {
+        for fm_filter in fm_filters {
+            // Only allow safe field names
+            if fm_filter.field.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                let path = format!("$.{}", fm_filter.field);
+                results.retain(|r| {
+                    let val: Option<String> = conn
+                        .query_row(
+                            "SELECT json_extract(front_matter, ?1) FROM notes WHERE id = ?2",
+                            rusqlite::params![path, r.id],
+                            |row| row.get(0),
+                        )
+                        .ok()
+                        .flatten();
+                    matches_front_matter_filter(&fm_filter.operator, val.as_deref(), fm_filter.value.as_deref())
+                });
+            }
+        }
     }
 
     Ok(results)
@@ -512,5 +587,38 @@ fn compute_facets(results: &[FacetedSearchResult]) -> SearchFacets {
         status_counts,
         priority_counts,
         importance_counts,
+    }
+}
+
+/// Evaluates a front matter filter against an extracted value.
+fn matches_front_matter_filter(operator: &str, actual: Option<&str>, expected: Option<&str>) -> bool {
+    match operator {
+        "exists" => actual.is_some(),
+        "not_exists" => actual.is_none(),
+        "eq" => actual == expected,
+        "neq" => actual != expected,
+        "contains" => {
+            match (actual, expected) {
+                (Some(a), Some(e)) => a.to_lowercase().contains(&e.to_lowercase()),
+                _ => false,
+            }
+        }
+        "gt" => match (actual, expected) {
+            (Some(a), Some(e)) => a > e,
+            _ => false,
+        },
+        "gte" => match (actual, expected) {
+            (Some(a), Some(e)) => a >= e,
+            _ => false,
+        },
+        "lt" => match (actual, expected) {
+            (Some(a), Some(e)) => a < e,
+            _ => false,
+        },
+        "lte" => match (actual, expected) {
+            (Some(a), Some(e)) => a <= e,
+            _ => false,
+        },
+        _ => true, // unknown operator, pass through
     }
 }

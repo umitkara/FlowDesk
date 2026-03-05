@@ -87,16 +87,37 @@ pub fn get_grouped_view(
                     "folder" => {
                         result.folder.clone().unwrap_or_else(|| "(none)".to_string())
                     }
+                    "note_type" if entity_type == "note" => {
+                        conn.query_row(
+                            "SELECT type FROM notes WHERE id = ?1",
+                            [&result.id],
+                            |row| row.get::<_, Option<String>>(0),
+                        )
+                        .unwrap_or(None)
+                        .unwrap_or_else(|| "(none)".to_string())
+                    }
+                    "type" if entity_type == "plan" => {
+                        conn.query_row(
+                            "SELECT type FROM plans WHERE id = ?1",
+                            [&result.id],
+                            |row| row.get::<_, Option<String>>(0),
+                        )
+                        .unwrap_or(None)
+                        .unwrap_or_else(|| "(none)".to_string())
+                    }
                     "entity_type" => result.entity_type.clone(),
                     field if field.starts_with("front_matter.") => {
                         let fm_field = &field["front_matter.".len()..];
-                        if entity_type == "note" {
+                        // Sanitize: only allow alphanumeric and underscore in field names
+                        if entity_type == "note"
+                            && !fm_field.is_empty()
+                            && fm_field
+                                .chars()
+                                .all(|c| c.is_alphanumeric() || c == '_')
+                        {
                             conn.query_row(
-                                &format!(
-                                    "SELECT json_extract(front_matter, '$.{}') FROM notes WHERE id = ?1",
-                                    fm_field.replace('\'', "")
-                                ),
-                                [&result.id],
+                                "SELECT json_extract(front_matter, ?1) FROM notes WHERE id = ?2",
+                                rusqlite::params![format!("$.{}", fm_field), result.id],
                                 |row| row.get::<_, Option<String>>(0),
                             )
                             .unwrap_or(None)
