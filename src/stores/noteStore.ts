@@ -212,7 +212,27 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     const wsId = getWorkspaceId();
     let note = await ipc.getDailyNote(wsId, date);
     if (!note) {
-      note = await ipc.createDailyNote(wsId, date);
+      // Check auto_daily_note setting for template-based creation
+      let useTemplate = false;
+      let templateName = "";
+      try {
+        const raw = await ipc.getSetting("auto_daily_note");
+        if (raw) {
+          const config = JSON.parse(raw) as { enabled: boolean; template: string };
+          if (config.enabled && config.template) {
+            useTemplate = true;
+            templateName = config.template;
+          }
+        }
+      } catch {
+        // Ignore parse errors, fall back to default creation
+      }
+
+      if (useTemplate) {
+        note = await ipc.createNoteFromTemplate(wsId, templateName, {}, date);
+      } else {
+        note = await ipc.createDailyNote(wsId, date);
+      }
       logActivity(`Created daily note: ${date}`, "note", note.id);
       await get().refreshAll();
     }
