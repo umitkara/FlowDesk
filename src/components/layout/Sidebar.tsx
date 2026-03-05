@@ -251,6 +251,68 @@ export function Sidebar() {
           </svg>
           Time Reports
         </button>
+        <button
+          onClick={() => setActiveView("planned-vs-actual")}
+          className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
+            activeView === "planned-vs-actual" ? activeClass : inactiveClass
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Plan vs Actual
+        </button>
+      </div>
+
+      {/* Discovery section */}
+      <div className="space-y-0.5 border-b border-gray-200 px-2 py-2 dark:border-gray-800">
+        <div className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Discovery
+        </div>
+        <button
+          onClick={() => setActiveView("faceted-search")}
+          className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
+            activeView === "faceted-search" ? activeClass : inactiveClass
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          </svg>
+          Advanced Search
+        </button>
+        <button
+          onClick={() => setActiveView("graph")}
+          className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
+            activeView === "graph" ? activeClass : inactiveClass
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          </svg>
+          Graph
+        </button>
+        <button
+          onClick={() => setActiveView("timeline")}
+          className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
+            activeView === "timeline" ? activeClass : inactiveClass
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Timeline
+        </button>
+        <button
+          onClick={() => setActiveView("grouped")}
+          className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
+            activeView === "grouped" ? activeClass : inactiveClass
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          Grouped View
+        </button>
       </div>
 
       {/* Folder tree */}

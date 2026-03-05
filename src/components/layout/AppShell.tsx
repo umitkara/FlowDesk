@@ -26,6 +26,11 @@ import { TrackerDetailForm } from "../../features/tracker/TrackerDetailForm";
 import { TrackerRecoveryDialog } from "../../features/tracker/TrackerRecoveryDialog";
 import { Dashboard } from "../../features/dashboard/Dashboard";
 import { WorkspaceSettings } from "../../features/workspaces/WorkspaceSettings";
+import { FacetedSearch } from "../../features/search/FacetedSearch";
+import GraphView from "../../features/discovery/GraphView";
+import TimelineView from "../../features/discovery/TimelineView";
+import GroupedView from "../../features/discovery/GroupedView";
+import PlannedVsActual from "../../features/discovery/PlannedVsActual";
 import { usePlanStore } from "../../stores/planStore";
 import { useTrackerStore } from "../../stores/trackerStore";
 import { todayISO } from "../../lib/utils";
@@ -218,6 +223,11 @@ export function AppShell() {
             {activeView === "time-reports" && <TimeReports />}
             {activeView === "dashboard" && <Dashboard />}
             {activeView === "workspace-settings" && <WorkspaceSettings />}
+            {activeView === "faceted-search" && <FacetedSearch />}
+            {activeView === "graph" && <GraphView />}
+            {activeView === "timeline" && <TimelineView />}
+            {activeView === "grouped" && <GroupedView />}
+            {activeView === "planned-vs-actual" && <PlannedVsActual />}
           </div>
 
           {/* Task detail panel */}
