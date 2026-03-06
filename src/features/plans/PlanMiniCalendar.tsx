@@ -11,6 +11,7 @@ function todayISO(): string {
 
 /** Mini calendar widget for navigating to calendar/daily plan views. */
 export function PlanMiniCalendar() {
+  const dailyPlanDate = usePlanStore((s) => s.dailyPlanDate);
   const setDailyPlanDate = usePlanStore((s) => s.setDailyPlanDate);
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -104,6 +105,7 @@ export function PlanMiniCalendar() {
 
           const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const isToday = dateStr === today;
+          const isSelected = !isToday && dateStr === dailyPlanDate;
 
           return (
             <button
@@ -112,7 +114,9 @@ export function PlanMiniCalendar() {
               className={`flex h-6 items-center justify-center rounded text-[11px] transition-colors ${
                 isToday
                   ? "bg-blue-500 font-bold text-white"
-                  : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                  : isSelected
+                    ? "bg-blue-100 font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                    : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
               }`}
             >
               {day}

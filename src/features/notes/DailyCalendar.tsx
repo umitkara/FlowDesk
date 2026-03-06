@@ -9,6 +9,7 @@ export function DailyCalendar() {
   const datesWithNotes = useNoteStore((s) => s.datesWithNotes);
   const loadDatesWithNotes = useNoteStore((s) => s.loadDatesWithNotes);
   const openDailyNote = useNoteStore((s) => s.openDailyNote);
+  const activeNoteDate = useNoteStore((s) => s.activeNote?.date ?? null);
 
   const today = todayISO();
   const [year, setYear] = useState(() => new Date().getFullYear());
@@ -95,6 +96,7 @@ export function DailyCalendar() {
 
           const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const isToday = dateStr === today;
+          const isSelected = !isToday && dateStr === activeNoteDate;
           const hasNote = noteDateSet.has(dateStr);
 
           return (
@@ -104,7 +106,9 @@ export function DailyCalendar() {
               className={`relative flex h-6 items-center justify-center rounded text-[11px] transition-colors ${
                 isToday
                   ? "bg-primary-500 font-bold text-white"
-                  : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                  : isSelected
+                    ? "bg-primary-100 font-semibold text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+                    : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
               }`}
             >
               {day}
