@@ -166,6 +166,8 @@ pub fn create_note(
     let now = now_iso();
     let body = input.body.unwrap_or_default();
     let body_hash = compute_body_hash(&body);
+    // Default date to today if not provided
+    let date = input.date.or_else(|| Some(now[..10].to_string()));
 
     let fm_json = input
         .front_matter
@@ -181,7 +183,7 @@ pub fn create_note(
                 id,
                 input.workspace_id,
                 input.title,
-                input.date,
+                date,
                 body,
                 input.folder,
                 input.category,

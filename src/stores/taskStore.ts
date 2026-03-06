@@ -150,6 +150,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const task = await ipc.createTask({ ...input, workspace_id: wsId });
     logActivity(`Created task: ${task.title}`, "task", task.id);
     await get().fetchTasks();
+    useWorkspaceStore.getState().loadWorkspaces();
     return task;
   },
 
@@ -180,11 +181,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
     get().selectedTaskIds.delete(id);
     await get().fetchTasks();
+    useWorkspaceStore.getState().loadWorkspaces();
   },
 
   restoreTask: async (id) => {
     const task = await ipc.restoreTask(id);
     await get().fetchTasks();
+    useWorkspaceStore.getState().loadWorkspaces();
     return task;
   },
 

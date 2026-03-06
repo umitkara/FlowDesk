@@ -147,6 +147,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     set({ activeNote: note });
     logActivity(`Created note: ${note.title}`, "note", note.id);
     await get().refreshAll();
+    useWorkspaceStore.getState().loadWorkspaces();
     return note;
   },
 
@@ -155,8 +156,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     try {
       const updated = await ipc.updateNote(id, input);
       set({ activeNote: updated, isSaving: false });
-      // Refresh list — await to ensure UI stays in sync
-      await get().loadNotes();
+      // Refresh list + folder tree — await to ensure UI stays in sync
+      await Promise.all([get().loadNotes(), get().loadFolderTree()]);
     } catch (e) {
       set({ isSaving: false, saveError: String(e) });
     }
@@ -180,6 +181,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         set({ activeNote: null });
       }
       await get().refreshAll();
+      useWorkspaceStore.getState().loadWorkspaces();
     } catch (e) {
       console.error("Failed to delete note:", e);
     }
@@ -188,6 +190,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   restoreNote: async (id) => {
     await ipc.restoreNote(id);
     await get().refreshAll();
+    useWorkspaceStore.getState().loadWorkspaces();
   },
 
   hardDeleteNote: async (id) => {
@@ -203,6 +206,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         set({ activeNote: null });
       }
       await get().refreshAll();
+      useWorkspaceStore.getState().loadWorkspaces();
     } catch (e) {
       console.error("Failed to permanently delete note:", e);
     }
@@ -235,6 +239,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       }
       logActivity(`Created daily note: ${date}`, "note", note.id);
       await get().refreshAll();
+      useWorkspaceStore.getState().loadWorkspaces();
     }
     set({ activeNote: note });
   },
