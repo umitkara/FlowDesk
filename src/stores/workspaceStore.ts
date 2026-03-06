@@ -8,19 +8,20 @@ import type {
   UpdateWorkspaceInput,
   DashboardData,
 } from "../lib/types";
+import { applyPrimaryPalette } from "../lib/colors";
 
-/** Applies workspace accent color as CSS custom properties. */
+/** Applies workspace accent color as CSS custom properties and primary palette. */
 function applyAccentColor(color: string) {
   document.documentElement.style.setProperty("--workspace-accent", color);
   document.documentElement.style.setProperty(
     "--workspace-accent-light",
     color + "20",
   );
-  // Slightly darker variant
   document.documentElement.style.setProperty(
     "--workspace-accent-dark",
     adjustBrightness(color, -20),
   );
+  applyPrimaryPalette(color);
 }
 
 /** Adjusts the brightness of a hex colour by the given percentage. */

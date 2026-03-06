@@ -1,6 +1,6 @@
-import { useEffect, useCallback } from "react";
-import { useSettingsStore } from "../stores/settingsStore";
+import { useEffect, useCallback, useRef } from "react";
 import * as ipc from "../lib/ipc";
+import { applyPrimaryPalette } from "../lib/colors";
 import type { ThemeSettings } from "../lib/types";
 
 /** Resolves the effective dark/light mode from a theme setting. */
@@ -31,8 +31,10 @@ function applyTheme(mode: string, accentColor: string) {
   // Apply accent color
   root.style.setProperty("--workspace-accent", accentColor);
   root.style.setProperty("--workspace-accent-light", accentColor + "20");
-  // Derive a darker version
   root.style.setProperty("--workspace-accent-dark", accentColor);
+
+  // Generate primary palette from accent color
+  applyPrimaryPalette(accentColor);
 
   // Remove transition class after animation completes
   setTimeout(() => {
@@ -42,37 +44,36 @@ function applyTheme(mode: string, accentColor: string) {
 
 /** Hook that manages theme state, applies it to the DOM, and handles system preference changes. */
 export function useTheme() {
-  const settings = useSettingsStore((s) => s.settings);
-  const mode = settings.theme ?? "system";
-  const accentColor = "#3b82f6"; // Default, overridden by theme_settings
+  const themeRef = useRef<ThemeSettings>({ mode: "system", accent_color: "#3b82f6" });
 
-  // Load theme settings from backend on mount
+  // Load theme settings from backend on mount and apply
   useEffect(() => {
     ipc.getTheme().then((theme: ThemeSettings) => {
+      themeRef.current = theme;
       applyTheme(theme.mode, theme.accent_color);
     }).catch(() => {
-      applyTheme(mode, accentColor);
+      applyTheme("system", "#3b82f6");
     });
   }, []);
 
-  // React to settings changes
+  // Listen for system preference changes
   useEffect(() => {
-    applyTheme(mode, accentColor);
-  }, [mode, accentColor]);
-
-  // Listen for system preference changes when in system mode
-  useEffect(() => {
-    if (mode !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => applyTheme("system", accentColor);
+    const handler = () => {
+      const t = themeRef.current;
+      if (t.mode === "system") {
+        applyTheme("system", t.accent_color);
+      }
+    };
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
-  }, [mode, accentColor]);
+  }, []);
 
   const setTheme = useCallback(async (newTheme: ThemeSettings) => {
+    themeRef.current = newTheme;
     applyTheme(newTheme.mode, newTheme.accent_color);
     await ipc.updateTheme(newTheme);
   }, []);
 
-  return { mode, accentColor, setTheme };
+  return { setTheme };
 }
