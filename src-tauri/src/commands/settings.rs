@@ -203,7 +203,7 @@ pub fn update_theme(
                 "INSERT INTO settings (key, value, updated_at)
                  VALUES ('theme', ?1, ?2)
                  ON CONFLICT(key) DO UPDATE SET value = ?1, updated_at = ?2",
-                rusqlite::params![format!("\"{}\"", theme.mode), now],
+                rusqlite::params![&theme.mode, now],
             )?;
             conn.execute(
                 "INSERT INTO settings (key, value, updated_at)
