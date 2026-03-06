@@ -32,6 +32,7 @@ export function TrackerDetailForm() {
   const [taskTitle, setTaskTitle] = useState("");
   const [createNote, setCreateNote] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   // Task/plan suggestions
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -115,16 +116,24 @@ export function TrackerDetailForm() {
     });
   };
 
+  const handleDiscard = () => {
+    if (activeMins >= 5) {
+      setShowDiscardConfirm(true);
+    } else {
+      discard();
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-2xl dark:bg-gray-900">
+      <div className="relative mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-2xl dark:bg-gray-900">
         {/* Header */}
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             Session Complete
           </h2>
           <button
-            onClick={() => discard()}
+            onClick={handleDiscard}
             className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
             title="Discard"
           >
@@ -334,7 +343,7 @@ export function TrackerDetailForm() {
         {/* Actions */}
         <div className="mt-6 flex justify-end gap-2">
           <button
-            onClick={() => discard()}
+            onClick={handleDiscard}
             disabled={isLoading}
             className="rounded-lg px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 disabled:opacity-50"
           >
@@ -348,6 +357,34 @@ export function TrackerDetailForm() {
             {isLoading ? "Saving..." : "Save Entry"}
           </button>
         </div>
+
+        {/* Discard confirmation overlay */}
+        {showDiscardConfirm && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/95 dark:bg-gray-900/95">
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                Discard {formatMinutes(activeMins)} of tracked time?
+              </p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                This cannot be undone.
+              </p>
+              <div className="mt-4 flex justify-center gap-2">
+                <button
+                  onClick={() => setShowDiscardConfirm(false)}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => discard()}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                >
+                  Discard
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
