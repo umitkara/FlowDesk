@@ -829,6 +829,14 @@ pub fn list_time_entries(
     limit: Option<i64>,
     offset: Option<i64>,
 ) -> Result<Vec<TimeEntry>, AppError> {
+    // Resolve empty workspace_id to the default workspace
+    let resolved_ws = if workspace_id.is_empty() {
+        conn.query_row("SELECT id FROM workspaces LIMIT 1", [], |row| row.get::<_, String>(0))
+            .unwrap_or_default()
+    } else {
+        workspace_id.to_string()
+    };
+
     let mut sql = String::from(
         "SELECT id, workspace_id, start_time, end_time, pauses, active_mins,
                 notes, category, tags, session_notes, linked_plan_id,
@@ -837,7 +845,7 @@ pub fn list_time_entries(
          WHERE workspace_id = ?1 AND deleted_at IS NULL",
     );
 
-    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(workspace_id.to_string())];
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(resolved_ws)];
     let mut idx = 2;
 
     if let Some(sd) = start_date {

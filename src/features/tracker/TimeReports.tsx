@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { formatMinutes } from "../../stores/trackerStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import * as ipc from "../../lib/ipc";
 import type {
   DailySummary,
@@ -13,7 +14,10 @@ import type {
 function shiftDate(iso: string, days: number): string {
   const d = new Date(iso + "T00:00:00");
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function getMonday(iso: string): string {
@@ -21,7 +25,10 @@ function getMonday(iso: string): string {
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function formatDateLabel(iso: string): string {
@@ -35,7 +42,11 @@ function formatDateLabel(iso: string): string {
 }
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 /** Groups entries by date string (YYYY-MM-DD), returns sorted pairs. */
@@ -58,13 +69,16 @@ export function TimeReports() {
   const [weekly, setWeekly] = useState<WeeklySummary | null>(null);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [entityNames, setEntityNames] = useState<Record<string, string>>({});
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId) ?? "";
 
   const fetchDaily = useCallback(async (d: string) => {
     setLoading(true);
     try {
+      const nextDay = shiftDate(d, 1);
       const [summary, entryList] = await Promise.all([
-        ipc.getDailySummary("", d),
-        ipc.listTimeEntries({ workspaceId: "", startDate: d, endDate: d }),
+        ipc.getDailySummary(activeWorkspaceId, d),
+        ipc.listTimeEntries({ workspaceId: activeWorkspaceId, startDate: d, endDate: nextDay }),
       ]);
       setDaily(summary);
       setEntries(entryList);
@@ -73,19 +87,19 @@ export function TimeReports() {
       setEntries([]);
     }
     setLoading(false);
-  }, []);
+  }, [activeWorkspaceId]);
 
   const fetchWeekly = useCallback(async (d: string) => {
     setLoading(true);
     const monday = getMonday(d);
-    const sunday = shiftDate(monday, 6);
+    const nextMonday = shiftDate(monday, 7);
     try {
       const [summary, entryList] = await Promise.all([
-        ipc.getWeeklySummary("", monday),
+        ipc.getWeeklySummary(activeWorkspaceId, monday),
         ipc.listTimeEntries({
-          workspaceId: "",
+          workspaceId: activeWorkspaceId,
           startDate: monday,
-          endDate: sunday,
+          endDate: nextMonday,
         }),
       ]);
       setWeekly(summary);
@@ -95,7 +109,34 @@ export function TimeReports() {
       setEntries([]);
     }
     setLoading(false);
-  }, []);
+  }, [activeWorkspaceId]);
+
+  // Resolve linked entity names when entries change
+  useEffect(() => {
+    const taskIds = new Set<string>();
+    const planIds = new Set<string>();
+    for (const e of entries) {
+      if (e.linked_task_id) taskIds.add(e.linked_task_id);
+      if (e.linked_plan_id) planIds.add(e.linked_plan_id);
+    }
+    if (taskIds.size === 0 && planIds.size === 0) {
+      setEntityNames({});
+      return;
+    }
+    const names: Record<string, string> = {};
+    const fetches: Promise<void>[] = [];
+    for (const tid of taskIds) {
+      fetches.push(
+        ipc.getTask(tid).then((t) => { names[tid] = t.title; }).catch(() => {}),
+      );
+    }
+    for (const pid of planIds) {
+      fetches.push(
+        ipc.getPlan(pid).then((p) => { names[pid] = p.title; }).catch(() => {}),
+      );
+    }
+    Promise.all(fetches).then(() => setEntityNames({ ...names }));
+  }, [entries]);
 
   useEffect(() => {
     if (mode === "daily") {
@@ -115,6 +156,9 @@ export function TimeReports() {
 
   const summary = mode === "daily" ? daily : weekly;
   const totalMins = summary?.total_mins ?? 0;
+  const sessionCount = (mode === "daily" && daily?.entry_count != null)
+    ? daily.entry_count
+    : entries.length;
   const categories = summary?.by_category ?? [];
   const tags = summary?.by_tag ?? [];
 
@@ -195,7 +239,7 @@ export function TimeReports() {
               {formatMinutes(totalMins)}
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              across {entries.length} session{entries.length !== 1 ? "s" : ""}
+              across {sessionCount} session{sessionCount !== 1 ? "s" : ""}
             </div>
           </div>
 
@@ -273,7 +317,7 @@ export function TimeReports() {
                     </div>
                     <div className="space-y-1">
                       {dayEntries.map((entry) => (
-                        <EntryRow key={entry.id} entry={entry} onRefresh={() => fetchWeekly(date)} />
+                        <EntryRow key={entry.id} entry={entry} entityNames={entityNames} onRefresh={() => fetchWeekly(date)} />
                       ))}
                     </div>
                   </div>
@@ -282,7 +326,7 @@ export function TimeReports() {
             ) : (
               <div className="mt-2 space-y-1">
                 {entries.map((entry) => (
-                  <EntryRow key={entry.id} entry={entry} onRefresh={() => fetchDaily(date)} />
+                  <EntryRow key={entry.id} entry={entry} entityNames={entityNames} onRefresh={() => fetchDaily(date)} />
                 ))}
               </div>
             )}
@@ -363,7 +407,7 @@ function TagBadge({ tag }: { tag: TagTime }) {
   );
 }
 
-function EntryRow({ entry, onRefresh }: { entry: TimeEntry; onRefresh?: () => void }) {
+function EntryRow({ entry, entityNames, onRefresh }: { entry: TimeEntry; entityNames?: Record<string, string>; onRefresh?: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [editNotes, setEditNotes] = useState(entry.notes || "");
   const [editCategory, setEditCategory] = useState(entry.category || "");
@@ -432,7 +476,19 @@ function EntryRow({ entry, onRefresh }: { entry: TimeEntry; onRefresh?: () => vo
             {entry.category}
           </span>
         )}
-        <svg className={`h-3 w-3 text-gray-400 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {entry.linked_task_id && (
+          <span className="flex items-center gap-0.5 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" title={entityNames?.[entry.linked_task_id] || "Linked task"}>
+            <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+            <span className="max-w-[80px] truncate">{entityNames?.[entry.linked_task_id] || "Task"}</span>
+          </span>
+        )}
+        {entry.linked_plan_id && (
+          <span className="flex items-center gap-0.5 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] text-violet-600 dark:bg-violet-900/20 dark:text-violet-400" title={entityNames?.[entry.linked_plan_id] || "Linked plan"}>
+            <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            <span className="max-w-[80px] truncate">{entityNames?.[entry.linked_plan_id] || "Plan"}</span>
+          </span>
+        )}
+        <svg className={`h-3 w-3 flex-shrink-0 text-gray-400 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </div>
