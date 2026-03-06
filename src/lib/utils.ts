@@ -21,7 +21,7 @@ export function formatDate(dateStr: string): string {
   });
 }
 
-/** Formats an ISO datetime string to a relative time description. */
+/** Formats an ISO datetime string to a human-readable relative time description. */
 export function timeAgo(isoString: string): string {
   const date = new Date(isoString);
   const now = new Date();
@@ -29,15 +29,28 @@ export function timeAgo(isoString: string): string {
   const diffMins = Math.floor(diffMs / 60000);
 
   if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffMins === 1) return "1 minute ago";
+  if (diffMins < 60) return `${diffMins} minutes ago`;
 
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffHours === 1) return "1 hour ago";
+  if (diffHours < 24) return `${diffHours} hours ago`;
+
+  // Check if it was yesterday
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
 
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 7) return `${diffDays} days ago`;
 
-  return date.toLocaleDateString();
+  // Same year: show "Mar 5"
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
+  // Different year: show "Mar 5, 2025"
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 /** Returns today's date as a YYYY-MM-DD string. */

@@ -70,8 +70,7 @@ export function FrontMatterPanel() {
           value={activeNote.importance ?? ""}
           onChange={(v) => handleFieldChange("importance", v)}
         />
-        <Field
-          label="Color"
+        <ColorField
           value={activeNote.color ?? ""}
           onChange={(v) => handleFieldChange("color", v)}
         />
@@ -112,6 +111,71 @@ function Field({
         placeholder={placeholder}
         className="w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
       />
+    </div>
+  );
+}
+
+const COLOR_PRESETS = [
+  "#ef4444", "#f97316", "#f59e0b", "#eab308",
+  "#84cc16", "#22c55e", "#14b8a6", "#06b6d4",
+  "#3b82f6", "#6366f1", "#8b5cf6", "#a855f7",
+  "#d946ef", "#ec4899", "#f43f5e", "#78716c",
+];
+
+/** Color picker field with swatches and native picker. */
+function ColorField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+        Color
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={value || "#3b82f6"}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-7 w-7 shrink-0 cursor-pointer rounded border border-gray-200 bg-transparent p-0.5 dark:border-gray-700 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border-none [&::-moz-color-swatch]:rounded-sm [&::-moz-color-swatch]:border-none"
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="#hex or name"
+          className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+        />
+        {value && (
+          <button
+            onClick={() => onChange("")}
+            title="Clear color"
+            className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+      <div className="mt-1.5 grid grid-cols-8 gap-1">
+        {COLOR_PRESETS.map((c) => (
+          <button
+            key={c}
+            onClick={() => onChange(c)}
+            title={c}
+            className={`h-5 w-5 rounded-sm border transition-transform hover:scale-110 ${
+              value === c
+                ? "border-gray-800 ring-1 ring-gray-400 dark:border-white dark:ring-gray-500"
+                : "border-gray-200 dark:border-gray-700"
+            }`}
+            style={{ backgroundColor: c }}
+          />
+        ))}
+      </div>
     </div>
   );
 }

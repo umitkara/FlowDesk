@@ -15,7 +15,7 @@ import { useDebounce } from "../../hooks/useDebounce";
 import { useVersionHistory } from "../../hooks/useVersionHistory";
 import { FrontMatterPanel } from "./FrontMatterPanel";
 import { VersionHistory } from "./VersionHistory";
-import { formatDate } from "../../lib/utils";
+import { timeAgo } from "../../lib/utils";
 import { TaskReferenceExtension, preprocessEntityRefs } from "./extensions/TaskReferenceExtension";
 import { syncNoteReferences } from "../../lib/ipc";
 
@@ -142,6 +142,14 @@ export function NoteEditor() {
               className="w-full truncate bg-transparent text-base font-semibold text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-600"
             />
             <div className="mt-0.5 flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+              {activeNote.date && (
+                <span className="flex items-center gap-1">
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  {activeNote.date}
+                </span>
+              )}
               {activeNote.folder && (
                 <span className="flex items-center gap-1">
                   <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -151,7 +159,9 @@ export function NoteEditor() {
                 </span>
               )}
               {activeNote.updated_at && (
-                <span>{formatDate(activeNote.updated_at)}</span>
+                <span title={new Date(activeNote.updated_at).toLocaleString()}>
+                  {timeAgo(activeNote.updated_at)}
+                </span>
               )}
               {activeNote.tags.length > 0 && (
                 <span className="flex items-center gap-1">
