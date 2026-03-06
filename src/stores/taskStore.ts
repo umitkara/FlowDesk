@@ -241,6 +241,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       set({ selectedTask: null, isDetailOpen: false });
     }
     await get().fetchTasks();
+    useWorkspaceStore.getState().loadWorkspaces();
   },
 
   selectTask: (id) => {

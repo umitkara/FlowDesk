@@ -229,6 +229,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           },
         });
       }
+      useWorkspaceStore.getState().loadWorkspaces();
     } catch (e) {
       set({ error: String(e) });
     }
@@ -247,6 +248,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           },
         });
       }
+      useWorkspaceStore.getState().loadWorkspaces();
     } catch (e) {
       set({ error: String(e) });
     }
