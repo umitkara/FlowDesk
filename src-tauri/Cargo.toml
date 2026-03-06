@@ -1,6 +1,6 @@
 [package]
 name = "flowdesk"
-version = "0.8.0"
+version = "0.8.1"
 description = "A unified personal productivity system"
 authors = ["FlowDesk"]
 edition = "2021"
@@ -34,3 +34,4 @@ similar = "2"
 csv = "1"
 walkdir = "2"
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance = "2"
