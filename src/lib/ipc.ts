@@ -396,6 +396,14 @@ export const trackerAddSessionNote = (
   refId?: string,
 ) => invoke<SessionNote>("tracker_add_session_note", { text, refType, refId });
 
+/** Edits a session note at the given index. */
+export const trackerEditSessionNote = (index: number, text: string) =>
+  invoke<SessionNote>("tracker_edit_session_note", { index, text });
+
+/** Deletes a session note at the given index. */
+export const trackerDeleteSessionNote = (index: number) =>
+  invoke<void>("tracker_delete_session_note", { index });
+
 /** Saves the detail form for a completed session. */
 export const trackerSaveDetail = (params: {
   timeEntryId: string;

@@ -608,6 +608,68 @@ pub fn add_session_note(
     Ok(note)
 }
 
+/// Edits the text of a session note at the given index.
+pub fn edit_session_note(conn: &Connection, index: usize, text: String) -> Result<SessionNote, AppError> {
+    let mut state = get_tracker_state(conn)?;
+    if state.status == TrackerStatus::Idle {
+        return Err(AppError::Validation(
+            "Tracker is not active. Cannot edit session note.".to_string(),
+        ));
+    }
+    if index >= state.session_notes.len() {
+        return Err(AppError::Validation(format!(
+            "Session note index {} out of range (total: {}).",
+            index,
+            state.session_notes.len()
+        )));
+    }
+
+    state.session_notes[index].text = text;
+    state.updated_at = now_iso();
+
+    if let Some(ref eid) = state.time_entry_id {
+        let sn_json = serde_json::to_string(&state.session_notes)?;
+        conn.execute(
+            "UPDATE time_entries SET session_notes = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![sn_json, state.updated_at, eid],
+        )?;
+    }
+
+    persist_state(conn, &state)?;
+    Ok(state.session_notes[index].clone())
+}
+
+/// Deletes a session note at the given index.
+pub fn delete_session_note(conn: &Connection, index: usize) -> Result<(), AppError> {
+    let mut state = get_tracker_state(conn)?;
+    if state.status == TrackerStatus::Idle {
+        return Err(AppError::Validation(
+            "Tracker is not active. Cannot delete session note.".to_string(),
+        ));
+    }
+    if index >= state.session_notes.len() {
+        return Err(AppError::Validation(format!(
+            "Session note index {} out of range (total: {}).",
+            index,
+            state.session_notes.len()
+        )));
+    }
+
+    state.session_notes.remove(index);
+    state.updated_at = now_iso();
+
+    if let Some(ref eid) = state.time_entry_id {
+        let sn_json = serde_json::to_string(&state.session_notes)?;
+        conn.execute(
+            "UPDATE time_entries SET session_notes = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![sn_json, state.updated_at, eid],
+        )?;
+    }
+
+    persist_state(conn, &state)?;
+    Ok(())
+}
+
 /// Updates the running notes on an active session.
 pub fn update_notes(conn: &Connection, notes: String) -> Result<(), AppError> {
     let mut state = get_tracker_state(conn)?;

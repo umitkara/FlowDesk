@@ -152,6 +152,31 @@ pub fn tracker_add_session_note(
     Ok(result)
 }
 
+/// Edits the text of a session note at the given index.
+#[tauri::command]
+pub fn tracker_edit_session_note(
+    state: State<'_, AppState>,
+    index: usize,
+    text: String,
+) -> Result<SessionNote, AppError> {
+    let result = state
+        .db
+        .with_conn(|conn| tracker::edit_session_note(conn, index, text).map_err(to_db_err))?;
+    Ok(result)
+}
+
+/// Deletes a session note at the given index.
+#[tauri::command]
+pub fn tracker_delete_session_note(
+    state: State<'_, AppState>,
+    index: usize,
+) -> Result<(), AppError> {
+    state
+        .db
+        .with_conn(|conn| tracker::delete_session_note(conn, index).map_err(to_db_err))?;
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Detail form commands
 // ---------------------------------------------------------------------------
@@ -445,10 +470,12 @@ pub fn get_entries_for_plan(
     Ok(result)
 }
 
-/// Updates the system tray tooltip text and enables/disables menu items
-/// based on the current tracker status.
+/// Updates the system tray tooltip text and rebuilds the menu with correct
+/// enabled/disabled states based on the current tracker status.
 #[tauri::command]
 pub fn update_tray_status(app: AppHandle, status: String, elapsed: String) -> Result<(), AppError> {
+    use tauri::menu::{MenuBuilder, MenuItemBuilder};
+
     if let Some(tray) = app.tray_by_id("main-tray") {
         let tooltip = if status == "idle" {
             "FlowDesk".to_string()
@@ -456,6 +483,40 @@ pub fn update_tray_status(app: AppHandle, status: String, elapsed: String) -> Re
             format!("FlowDesk — {} ({})", elapsed, status)
         };
         let _ = tray.set_tooltip(Some(&tooltip));
+
+        // Rebuild menu with correct enabled/disabled states
+        let show_item = MenuItemBuilder::with_id("show", "Show FlowDesk").build(&app);
+        let start_item = MenuItemBuilder::with_id("tray_start", "Start Tracking")
+            .enabled(status == "idle")
+            .build(&app);
+        let pause_item = MenuItemBuilder::with_id("tray_pause", "Pause")
+            .enabled(status == "running")
+            .build(&app);
+        let resume_item = MenuItemBuilder::with_id("tray_resume", "Resume")
+            .enabled(status == "paused")
+            .build(&app);
+        let stop_item = MenuItemBuilder::with_id("tray_stop", "Stop Tracking")
+            .enabled(status != "idle")
+            .build(&app);
+        let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(&app);
+
+        if let (Ok(show), Ok(start), Ok(pause), Ok(resume), Ok(stop), Ok(quit)) =
+            (show_item, start_item, pause_item, resume_item, stop_item, quit_item)
+        {
+            if let Ok(menu) = MenuBuilder::new(&app)
+                .item(&show)
+                .separator()
+                .item(&start)
+                .item(&pause)
+                .item(&resume)
+                .item(&stop)
+                .separator()
+                .item(&quit)
+                .build()
+            {
+                let _ = tray.set_menu(Some(menu));
+            }
+        }
     }
     Ok(())
 }

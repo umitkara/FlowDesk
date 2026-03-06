@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useTrackerStore, formatElapsed } from "../../stores/trackerStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { SessionTimeline } from "./SessionTimeline";
 import { debounce } from "../../lib/utils";
 
@@ -12,6 +13,10 @@ export function TrackerWidget() {
   const isNotesExpanded = useTrackerStore((s) => s.isNotesExpanded);
   const linkedTaskId = useTrackerStore((s) => s.linkedTaskId);
   const linkedPlanId = useTrackerStore((s) => s.linkedPlanId);
+  const breakMode = useTrackerStore((s) => s.breakMode);
+  const breakConfig = useTrackerStore((s) => s.breakConfig);
+  const pomodoroCycle = useTrackerStore((s) => s.pomodoroCycle);
+  const trackerWorkspaceId = useTrackerStore((s) => s.trackerWorkspaceId);
   const start = useTrackerStore((s) => s.start);
   const pause = useTrackerStore((s) => s.pause);
   const resume = useTrackerStore((s) => s.resume);
@@ -19,6 +24,11 @@ export function TrackerWidget() {
   const toggleNotesExpanded = useTrackerStore((s) => s.toggleNotesExpanded);
   const updateNotes = useTrackerStore((s) => s.updateNotes);
   const addSessionNote = useTrackerStore((s) => s.addSessionNote);
+  const editSessionNote = useTrackerStore((s) => s.editSessionNote);
+  const deleteSessionNote = useTrackerStore((s) => s.deleteSessionNote);
+
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
 
   const [sessionNoteText, setSessionNoteText] = useState("");
   const [showSessionNoteInput, setShowSessionNoteInput] = useState(false);
@@ -101,6 +111,18 @@ export function TrackerWidget() {
           </span>
         )}
 
+        {/* Break mode badge */}
+        {breakMode === "pomodoro" && (
+          <span className="rounded bg-red-100 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider text-red-700 dark:bg-red-900/30 dark:text-red-400">
+            P {pomodoroCycle + 1}/{breakConfig.pomodoro.cycles_before_long || 4}
+          </span>
+        )}
+        {breakMode === "custom" && (
+          <span className="rounded bg-violet-100 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+            {breakConfig.custom.interval_mins}m
+          </span>
+        )}
+
         {/* Linked entity indicator */}
         {(linkedTaskId || linkedPlanId) && (
           <span className="text-[10px] text-gray-400 dark:text-gray-500" title={linkedTaskId ? "Linked to task" : "Linked to plan"}>
@@ -150,6 +172,16 @@ export function TrackerWidget() {
         </button>
       </div>
 
+      {/* Workspace mismatch warning */}
+      {trackerWorkspaceId && activeWorkspaceId && trackerWorkspaceId !== activeWorkspaceId && (() => {
+        const ws = workspaces.find((w) => w.id === trackerWorkspaceId);
+        return (
+          <div className="mt-0.5 text-center text-[9px] text-amber-600 dark:text-amber-400">
+            tracking in {ws?.name || "another workspace"}
+          </div>
+        );
+      })()}
+
       {/* Notes dropdown */}
       {isNotesExpanded && (
         <div className="absolute left-1/2 top-full z-40 mt-1 w-80 -translate-x-1/2 rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-900">
@@ -191,7 +223,12 @@ export function TrackerWidget() {
           )}
 
           <div className="max-h-40 overflow-y-auto">
-            <SessionTimeline sessionNotes={sessionNotes} compact />
+            <SessionTimeline
+              sessionNotes={sessionNotes}
+              compact
+              onEdit={editSessionNote}
+              onDelete={deleteSessionNote}
+            />
           </div>
 
           {/* Running notes */}

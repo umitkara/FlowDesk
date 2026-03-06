@@ -198,6 +198,118 @@ fn start_reminder_scheduler(app_handle: tauri::AppHandle, db: Arc<DbPool>) {
     });
 }
 
+/// Starts a background thread that checks whether a break reminder should fire.
+///
+/// This ensures break notifications fire even when the app window is minimized
+/// to tray and the frontend timer is suspended.
+fn start_break_reminder_scheduler(app_handle: tauri::AppHandle, db: Arc<DbPool>) {
+    std::thread::spawn(move || {
+        let mut last_break_fired_at_secs: f64 = -1.0;
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(10));
+
+            let state = db.with_conn(|conn| {
+                services::tracker::get_tracker_state(conn)
+                    .map_err(|e| match e {
+                        utils::errors::AppError::Database(db_err) => db_err,
+                        other => rusqlite::Error::ToSqlConversionFailure(Box::new(
+                            std::io::Error::other(other.to_string()),
+                        )),
+                    })
+            });
+
+            let Ok(state) = state else { continue };
+
+            if state.status != models::time_entry::TrackerStatus::Running {
+                last_break_fired_at_secs = -1.0;
+                continue;
+            }
+
+            if state.break_mode == models::time_entry::BreakMode::None {
+                continue;
+            }
+
+            let Some(ref started_at) = state.started_at else { continue };
+            let elapsed_mins = services::tracker::calculate_elapsed_now(
+                started_at,
+                &state.pauses,
+                state.paused_at.as_deref(),
+            );
+            let elapsed_secs = elapsed_mins * 60.0;
+
+            // Determine the break interval in seconds
+            let interval_secs = match state.break_mode {
+                models::time_entry::BreakMode::Pomodoro => {
+                    (state.break_config.pomodoro.work_mins as f64) * 60.0
+                }
+                models::time_entry::BreakMode::Custom => {
+                    (state.break_config.custom.interval_mins as f64) * 60.0
+                }
+                _ => continue,
+            };
+
+            if interval_secs <= 0.0 { continue; }
+
+            // How many full intervals have passed
+            let intervals_passed = (elapsed_secs / interval_secs).floor();
+            let threshold = intervals_passed * interval_secs;
+
+            // Fire if we crossed a new threshold since last check
+            if threshold > 0.0 && threshold > last_break_fired_at_secs {
+                last_break_fired_at_secs = threshold;
+
+                let (title, body) = match state.break_mode {
+                    models::time_entry::BreakMode::Pomodoro => {
+                        let cycles_before_long = state.break_config.pomodoro.cycles_before_long.max(1);
+                        let current_cycle = intervals_passed as u32;
+                        let is_long = current_cycle.is_multiple_of(cycles_before_long);
+                        let break_mins = if is_long {
+                            state.break_config.pomodoro.long_break_mins
+                        } else {
+                            state.break_config.pomodoro.short_break_mins
+                        };
+                        let title = if is_long { "Long Break Time!" } else { "Short Break Time!" };
+                        let body = format!(
+                            "You've been working for {} minutes. Take a {}-minute break.",
+                            state.break_config.pomodoro.work_mins, break_mins
+                        );
+                        (title.to_string(), body)
+                    }
+                    models::time_entry::BreakMode::Custom => {
+                        (
+                            "Break Reminder".to_string(),
+                            format!(
+                                "You've been working for {} minutes. Time for a break!",
+                                state.break_config.custom.interval_mins
+                            ),
+                        )
+                    }
+                    _ => continue,
+                };
+
+                // Fire OS notification
+                let _ = app_handle
+                    .notification()
+                    .builder()
+                    .title(&title)
+                    .body(&body)
+                    .show();
+
+                // Emit event to frontend for in-app banner
+                #[derive(serde::Serialize, Clone)]
+                struct BreakReminderPayload {
+                    title: String,
+                    body: String,
+                }
+                let _ = app_handle.emit(
+                    "break-reminder-fired",
+                    BreakReminderPayload { title, body },
+                );
+            }
+        }
+    });
+}
+
 /// Configures and runs the Tauri application.
 ///
 /// Sets up the database, runs migrations, seeds default data, starts the
@@ -275,6 +387,9 @@ pub fn run() {
             // Start background reminder scheduler
             start_reminder_scheduler(app.handle().clone(), Arc::clone(&db_pool_arc));
 
+            // Start background break reminder scheduler
+            start_break_reminder_scheduler(app.handle().clone(), Arc::clone(&db_pool_arc));
+
             // --- System tray setup ---
             let show_item = MenuItemBuilder::with_id("show", "Show FlowDesk").build(app)?;
             let start_item = MenuItemBuilder::with_id("tray_start", "Start Tracking").build(app)?;
@@ -293,6 +408,11 @@ pub fn run() {
                 .separator()
                 .item(&quit_item)
                 .build()?;
+
+            // Disable pause/resume/stop by default (tracker starts idle)
+            let _ = pause_item.set_enabled(false);
+            let _ = resume_item.set_enabled(false);
+            let _ = stop_item.set_enabled(false);
 
             if let Some(tray) = app.tray_by_id("main-tray") {
                 tray.set_menu(Some(menu))?;
@@ -436,6 +556,8 @@ pub fn run() {
             commands::time_entries::tracker_get_state,
             commands::time_entries::tracker_update_notes,
             commands::time_entries::tracker_add_session_note,
+            commands::time_entries::tracker_edit_session_note,
+            commands::time_entries::tracker_delete_session_note,
             commands::time_entries::tracker_save_detail,
             commands::time_entries::tracker_discard,
             commands::time_entries::tracker_set_break_mode,
