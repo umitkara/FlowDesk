@@ -26,7 +26,7 @@ function getDefaultColor(planType: string): string {
 }
 
 /** Maps a Plan entity to a FullCalendar EventInput. */
-function planToEvent(plan: Plan): EventInput {
+function planToEvent(plan: Plan, isSelected: boolean): EventInput {
   return {
     id: plan.id,
     title: plan.title,
@@ -44,6 +44,7 @@ function planToEvent(plan: Plan): EventInput {
     classNames: [
       `plan-type-${plan.type}`,
       plan.importance ? `plan-importance-${plan.importance}` : "",
+      isSelected ? "plan-selected" : "",
     ].filter(Boolean),
     editable: true,
   };
@@ -63,6 +64,10 @@ export default function CalendarView() {
     openDialog,
     setCurrentView,
     setCurrentDate,
+    selectedPlanIds,
+    togglePlanSelection,
+    clearPlanSelection,
+    bulkDeletePlans,
   } = usePlanStore();
   const setActiveView = useUIStore((s) => s.setActiveView);
   const setDailyPlanDate = usePlanStore((s) => s.setDailyPlanDate);
@@ -115,11 +120,40 @@ export default function CalendarView() {
     };
   }, []);
 
-  const events: EventInput[] = plans.map(planToEvent);
+  // Keyboard shortcuts for selection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+
+      if (e.key === "Escape" && selectedPlanIds.size > 0) {
+        e.preventDefault();
+        clearPlanSelection();
+        return;
+      }
+
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedPlanIds.size > 0) {
+        e.preventDefault();
+        bulkDeletePlans();
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === "a" && plans.length > 0) {
+        e.preventDefault();
+        usePlanStore.getState().selectAllVisible();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedPlanIds, clearPlanSelection, bulkDeletePlans, plans]);
+
+  const events: EventInput[] = plans.map((p) => planToEvent(p, selectedPlanIds.has(p.id)));
 
   /** Called when selecting a time range on the calendar (drag on empty area). */
   const handleSelect = useCallback(
     (selectInfo: DateSelectArg) => {
+      clearPlanSelection();
       openDialog({
         workspace_id: workspaceIdRef.current,
         start_time: selectInfo.startStr,
@@ -128,61 +162,108 @@ export default function CalendarView() {
       });
       selectInfo.view.calendar.unselect();
     },
-    [openDialog]
+    [openDialog, clearPlanSelection]
   );
 
   /** Called when clicking a date cell — navigates to daily plan view. */
   const handleDateClick = useCallback(
     (arg: { dateStr: string }) => {
+      clearPlanSelection();
       setDailyPlanDate(arg.dateStr.slice(0, 10));
       setActiveView("daily-plan");
     },
-    [setDailyPlanDate, setActiveView]
+    [setDailyPlanDate, setActiveView, clearPlanSelection]
   );
 
-  /** Called when clicking an event. Single-click → detail panel, double-click → edit dialog. */
+  /** Called when clicking an event. Modifier+click → toggle selection, single-click → detail panel, double-click → edit dialog. */
   const handleEventClick = useCallback(
     (clickInfo: EventClickArg) => {
+      const jsEvent = clickInfo.jsEvent;
+      const isModifierHeld = jsEvent.ctrlKey || jsEvent.metaKey || jsEvent.shiftKey;
+      const eventId = clickInfo.event.id;
+
+      if (isModifierHeld) {
+        togglePlanSelection(eventId);
+        return;
+      }
+
+      // No modifier: clear any existing multi-selection
+      if (selectedPlanIds.size > 0) {
+        clearPlanSelection();
+      }
+
       const now = Date.now();
       const last = lastClickRef.current;
 
-      if (last && last.eventId === clickInfo.event.id && now - last.time < 300) {
+      if (last && last.eventId === eventId && now - last.time < 300) {
         // Double-click — open edit dialog
         lastClickRef.current = null;
         if (clickTimeoutRef.current) {
           clearTimeout(clickTimeoutRef.current);
           clickTimeoutRef.current = null;
         }
-        const plan = plans.find((p) => p.id === clickInfo.event.id);
+        const plan = plans.find((p) => p.id === eventId);
         if (plan) openDialog(undefined, plan);
       } else {
         // Single-click — wait to confirm it's not a double-click
-        lastClickRef.current = { eventId: clickInfo.event.id, time: now };
+        lastClickRef.current = { eventId, time: now };
         if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
-        const eventId = clickInfo.event.id;
         clickTimeoutRef.current = setTimeout(() => {
           clickTimeoutRef.current = null;
           fetchPlanWithLinks(eventId);
         }, 300);
       }
     },
-    [fetchPlanWithLinks, plans, openDialog]
+    [fetchPlanWithLinks, plans, openDialog, togglePlanSelection, clearPlanSelection, selectedPlanIds]
   );
 
-  /** Called when dragging an event to a new time. */
+  /** Called when dragging an event to a new time. Moves all selected events when bulk-selected. */
   const handleEventDrop = useCallback(
     async (dropInfo: EventDropArg) => {
-      try {
-        await updatePlan({
-          id: dropInfo.event.id,
-          start_time: dropInfo.event.startStr,
-          end_time: dropInfo.event.endStr || dropInfo.event.startStr,
-        });
-      } catch {
-        dropInfo.revert();
+      const droppedId = dropInfo.event.id;
+
+      if (selectedPlanIds.has(droppedId) && selectedPlanIds.size > 1) {
+        // Bulk move: compute delta from the original plan data
+        const originalPlan = plans.find((p) => p.id === droppedId);
+        if (!originalPlan) {
+          dropInfo.revert();
+          return;
+        }
+
+        const oldStart = new Date(originalPlan.start_time).getTime();
+        const newStart = dropInfo.event.start ? dropInfo.event.start.getTime() : oldStart;
+        const deltaMs = newStart - oldStart;
+
+        try {
+          const updates = Array.from(selectedPlanIds).map((id) => {
+            const plan = plans.find((p) => p.id === id);
+            if (!plan) return Promise.resolve(null);
+
+            const adjStart = new Date(new Date(plan.start_time).getTime() + deltaMs).toISOString();
+            const adjEnd = new Date(new Date(plan.end_time).getTime() + deltaMs).toISOString();
+
+            return updatePlan({ id: plan.id, start_time: adjStart, end_time: adjEnd });
+          });
+
+          await Promise.allSettled(updates);
+          clearPlanSelection();
+        } catch {
+          dropInfo.revert();
+        }
+      } else {
+        // Single event drop
+        try {
+          await updatePlan({
+            id: droppedId,
+            start_time: dropInfo.event.startStr,
+            end_time: dropInfo.event.endStr || dropInfo.event.startStr,
+          });
+        } catch {
+          dropInfo.revert();
+        }
       }
     },
-    [updatePlan]
+    [updatePlan, selectedPlanIds, plans, clearPlanSelection]
   );
 
   /** Called when resizing an event. */
@@ -245,8 +326,16 @@ export default function CalendarView() {
   /** Custom event content renderer. */
   const renderEventContent = useCallback((eventInfo: EventContentArg) => {
     const { planType, importance } = eventInfo.event.extendedProps;
+    const isSelected = eventInfo.event.classNames.includes("plan-selected");
     return (
       <div className="flex items-center gap-1 overflow-hidden px-1">
+        {isSelected && (
+          <span className="flex h-3 w-3 flex-shrink-0 items-center justify-center rounded-sm bg-white/30">
+            <svg className="h-2.5 w-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          </span>
+        )}
         {planType === "milestone" && <span className="text-[10px]">◆</span>}
         {planType === "event" && <span className="text-[10px]">📅</span>}
         {importance === "critical" && (
@@ -301,6 +390,26 @@ export default function CalendarView() {
           eventContent={renderEventContent}
         />
       </div>
+
+      {selectedPlanIds.size > 0 && (
+        <div className="flex items-center gap-3 border-t border-gray-200 bg-gray-50 px-4 py-2 dark:border-gray-800 dark:bg-gray-900">
+          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+            {selectedPlanIds.size} selected
+          </span>
+          <button
+            onClick={() => bulkDeletePlans()}
+            className="rounded-md px-2 py-1 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+          >
+            Delete
+          </button>
+          <button
+            onClick={clearPlanSelection}
+            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            Clear
+          </button>
+        </div>
+      )}
     </div>
   );
 }

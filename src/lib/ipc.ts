@@ -321,6 +321,10 @@ export const updatePlan = (input: UpdatePlanInput) =>
 export const deletePlan = (id: string) =>
   invoke<void>("delete_plan", { id });
 
+/** Batch soft-delete multiple plans. */
+export const bulkDeletePlans = (planIds: string[]) =>
+  invoke<void>("bulk_delete_plans", { planIds });
+
 /** Lists plans matching the given query parameters. */
 export const listPlans = (query: PlanQuery) =>
   invoke<Plan[]>("list_plans", { query });

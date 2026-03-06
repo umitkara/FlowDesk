@@ -414,6 +414,7 @@ pub fn run() {
             commands::plans::unlink_task_from_plan,
             commands::plans::search_plans,
             commands::plans::get_agenda,
+            commands::plans::bulk_delete_plans,
             // References
             commands::references::create_reference,
             commands::references::delete_reference,

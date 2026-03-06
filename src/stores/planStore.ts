@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { ask } from "@tauri-apps/plugin-dialog";
 import * as ipc from "../lib/ipc";
 import { logActivity } from "../lib/activityLog";
 import type {
@@ -78,6 +79,17 @@ interface PlanState {
   /** Unlinks a task from a plan. */
   unlinkTask: (planId: string, taskId: string) => Promise<void>;
 
+  /** IDs of plans selected for multi-select operations. */
+  selectedPlanIds: Set<string>;
+  /** Toggle a plan in/out of the multi-selection. */
+  togglePlanSelection: (id: string) => void;
+  /** Select all currently visible plans. */
+  selectAllVisible: () => void;
+  /** Clear multi-selection. */
+  clearPlanSelection: () => void;
+  /** Bulk delete all selected plans. */
+  bulkDeletePlans: () => Promise<void>;
+
   /** Sets the calendar view type. */
   setCurrentView: (view: CalendarViewType) => void;
   /** Sets the current calendar date. */
@@ -108,6 +120,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   isDialogOpen: false,
   dialogDefaults: null,
   editingPlan: null,
+  selectedPlanIds: new Set<string>(),
 
   fetchPlans: async (query) => {
     set({ loading: true, error: null });
@@ -163,11 +176,16 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     const title = get().plans.find((p) => p.id === id)?.title ?? "Untitled";
     await ipc.deletePlan(id);
     logActivity(`Deleted plan: ${title}`, "plan", id);
-    set((s) => ({
-      plans: s.plans.filter((p) => p.id !== id),
-      selectedPlan: s.selectedPlan?.plan.id === id ? null : s.selectedPlan,
-      isDetailOpen: s.selectedPlan?.plan.id === id ? false : s.isDetailOpen,
-    }));
+    set((s) => {
+      const nextSelected = new Set(s.selectedPlanIds);
+      nextSelected.delete(id);
+      return {
+        plans: s.plans.filter((p) => p.id !== id),
+        selectedPlan: s.selectedPlan?.plan.id === id ? null : s.selectedPlan,
+        isDetailOpen: s.selectedPlan?.plan.id === id ? false : s.isDetailOpen,
+        selectedPlanIds: nextSelected,
+      };
+    });
     // Best-effort refresh of daily summary if the daily plan view has been used
     const { dailySummary, dailyPlanDate } = get();
     if (dailySummary) {
@@ -255,6 +273,46 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           ),
         },
       });
+    }
+  },
+
+  togglePlanSelection: (id) => {
+    const next = new Set(get().selectedPlanIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    set({ selectedPlanIds: next });
+  },
+
+  selectAllVisible: () => {
+    set({ selectedPlanIds: new Set(get().plans.map((p) => p.id)) });
+  },
+
+  clearPlanSelection: () => set({ selectedPlanIds: new Set() }),
+
+  bulkDeletePlans: async () => {
+    const ids = Array.from(get().selectedPlanIds);
+    if (ids.length === 0) return;
+    const confirmed = await ask(
+      `Delete ${ids.length} plan item(s)?`,
+      { title: "Confirm Bulk Delete", kind: "warning" },
+    );
+    if (!confirmed) return;
+    await ipc.bulkDeletePlans(ids);
+    logActivity(`Bulk deleted ${ids.length} plans`, "plan", ids[0]);
+    set((s) => {
+      const deletedSet = new Set(ids);
+      return {
+        plans: s.plans.filter((p) => !deletedSet.has(p.id)),
+        selectedPlanIds: new Set<string>(),
+        selectedPlan: s.selectedPlan && deletedSet.has(s.selectedPlan.plan.id) ? null : s.selectedPlan,
+        isDetailOpen: s.selectedPlan && deletedSet.has(s.selectedPlan.plan.id) ? false : s.isDetailOpen,
+      };
+    });
+    // Best-effort refresh of daily summary
+    const { dailySummary, dailyPlanDate } = get();
+    if (dailySummary) {
+      const wsId = getWorkspaceId();
+      ipc.getDailyPlanSummary(wsId, dailyPlanDate).then((s) => set({ dailySummary: s })).catch(() => {});
     }
   },
 

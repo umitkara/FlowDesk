@@ -475,6 +475,71 @@ pub fn delete_plan(state: State<'_, AppState>, id: String) -> Result<(), AppErro
     Ok(())
 }
 
+/// Bulk soft-deletes multiple plans.
+#[tauri::command]
+pub fn bulk_delete_plans(
+    state: State<'_, AppState>,
+    plan_ids: Vec<String>,
+) -> Result<(), AppError> {
+    if plan_ids.is_empty() {
+        return Ok(());
+    }
+
+    // Capture metadata before deletion for activity logging
+    let metas: Vec<(String, String, String)> = plan_ids
+        .iter()
+        .filter_map(|pid| {
+            state
+                .db
+                .with_conn(|conn| {
+                    conn.query_row(
+                        "SELECT id, workspace_id, title FROM plans WHERE id = ?1 AND deleted_at IS NULL",
+                        [pid],
+                        |row| {
+                            Ok((
+                                row.get::<_, String>(0)?,
+                                row.get::<_, String>(1)?,
+                                row.get::<_, String>(2)?,
+                            ))
+                        },
+                    )
+                    .ok()
+                    .map_or(Ok(None), |v| Ok(Some(v)))
+                })
+                .ok()
+                .flatten()
+        })
+        .collect();
+
+    let now = now_iso();
+
+    state
+        .db
+        .with_conn(|conn| {
+            let tx = conn.unchecked_transaction()?;
+            for plan_id in &plan_ids {
+                tx.execute(
+                    "UPDATE plans SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2 AND deleted_at IS NULL",
+                    rusqlite::params![now, plan_id],
+                )?;
+                let _ = crate::commands::reminders::delete_all_reminders_for_entity(
+                    &tx, "plan", plan_id,
+                );
+            }
+            tx.commit()
+        })
+        .map_err(AppError::Database)?;
+
+    // Best-effort activity logging
+    for (pid, wid, title) in &metas {
+        let _ = state.db.with_conn(|conn| {
+            log_activity(conn, wid, "plan", pid, Some(title.as_str()), "deleted", None)
+        });
+    }
+
+    Ok(())
+}
+
 /// Lists plans matching the given query parameters.
 ///
 /// Uses an overlapping date range query for calendar views:
