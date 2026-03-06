@@ -76,6 +76,15 @@ function App() {
     return () => { unlisten.then((fn) => fn()); };
   }, [toggleQuickCapture]);
 
+  // Listen for backend break reminder events
+  const setBreakNotification = useTrackerStore((s) => s.setBreakNotification);
+  useEffect(() => {
+    const unlisten = listen<{ title: string; body: string }>("break-reminder-fired", (event) => {
+      setBreakNotification(event.payload);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [setBreakNotification]);
+
   // Listen for system tray tracker actions
   const trackerStart = useTrackerStore((s) => s.start);
   const trackerPause = useTrackerStore((s) => s.pause);

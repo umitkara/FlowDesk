@@ -37,6 +37,7 @@ import { CommandPalette } from "../../features/command-palette/CommandPalette";
 import { QuickCapture } from "../../features/capture/QuickCapture";
 import { usePlanStore } from "../../stores/planStore";
 import { useTrackerStore } from "../../stores/trackerStore";
+import { BreakNotificationBanner } from "../../features/tracker/BreakNotificationBanner";
 import { todayISO } from "../../lib/utils";
 
 /** Root layout container with sidebar, main content, and status bar. */
@@ -66,6 +67,9 @@ export function AppShell() {
   const trackerResume = useTrackerStore((s) => s.resume);
   const trackerStop = useTrackerStore((s) => s.stop);
   const openSessionNoteInput = useTrackerStore((s) => s.openSessionNoteInput);
+  const breakNotification = useTrackerStore((s) => s.breakNotification);
+  const snoozeBreak = useTrackerStore((s) => s.snoozeBreak);
+  const dismissBreakNotification = useTrackerStore((s) => s.dismissBreakNotification);
 
   useEffect(() => {
     if (activeView === "tasks") {
@@ -160,6 +164,17 @@ export function AppShell() {
           if (trackerStatus !== "idle") openSessionNoteInput();
         },
       },
+      {
+        key: "b",
+        ctrl: true,
+        shift: true,
+        handler: () => {
+          if (breakNotification) {
+            snoozeBreak();
+            dismissBreakNotification();
+          }
+        },
+      },
     ],
     [
       handleNewNote,
@@ -176,6 +191,9 @@ export function AppShell() {
       trackerResume,
       trackerStop,
       openSessionNoteInput,
+      breakNotification,
+      snoozeBreak,
+      dismissBreakNotification,
     ],
   );
 
@@ -207,11 +225,13 @@ export function AppShell() {
       { id: "action:quick-capture", title: "Quick Capture", category: "Actions", shortcut: "Ctrl+Shift+Space", handler: () => toggleQuickCapture(), keywords: ["capture", "quick", "inbox"] },
       { id: "action:new-task", title: "New Task", category: "Actions", shortcut: "Ctrl+Shift+T", handler: () => openQuickAdd(), keywords: ["create", "new", "task", "todo"] },
       { id: "action:import", title: "Import Data", category: "Actions", handler: () => setActiveView("import-wizard"), keywords: ["import", "csv", "markdown", "obsidian"] },
+      { id: "action:snooze-break", title: "Snooze Break Reminder", category: "Actions", shortcut: "Ctrl+Shift+B", handler: () => { snoozeBreak(); dismissBreakNotification(); }, keywords: ["break", "snooze", "reminder"] },
     ]);
-  }, [registerCommands, setActiveView, handleNewNote, openDailyNote, toggleQuickCapture, openQuickAdd]);
+  }, [registerCommands, setActiveView, handleNewNote, openDailyNote, toggleQuickCapture, openQuickAdd, snoozeBreak, dismissBreakNotification]);
 
   return (
     <div className="flex h-full flex-col bg-white dark:bg-gray-950">
+      <BreakNotificationBanner />
       <TopBar />
 
       <div className="flex flex-1 overflow-hidden">
