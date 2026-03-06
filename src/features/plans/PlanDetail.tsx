@@ -9,6 +9,7 @@ import { PLAN_TYPE_CONFIG, IMPORTANCE_CONFIG, STATUS_CONFIG } from "../../lib/ty
 import type { PlanLinkedTask, PlanLinkedNote, TaskStatus, TaskWithChildren, RecurrenceRule, CreateRecurrenceRuleInput, UpdateRecurrenceRuleInput } from "../../lib/types";
 import { BacklinksPanel } from "../../components/shared/BacklinksPanel";
 import { EntityReminders } from "../../components/shared/EntityReminders";
+import { useTrackerStore } from "../../stores/trackerStore";
 
 /** Side panel showing plan details and linked entities. */
 export default function PlanDetail() {
@@ -263,6 +264,25 @@ export default function PlanDetail() {
             Actions
           </div>
           <div className="mt-1 flex flex-wrap gap-1">
+            {(() => {
+              const trackerStatus = useTrackerStore.getState().status;
+              const trackerLinkedPlanId = useTrackerStore.getState().linkedPlanId;
+              const trackerStart = useTrackerStore.getState().start;
+              const isTrackingThis = trackerStatus !== "idle" && trackerLinkedPlanId === selectedPlan.plan.id;
+              return (
+                <button
+                  onClick={() => trackerStart({ linkedPlanId: selectedPlan.plan.id })}
+                  disabled={trackerStatus !== "idle"}
+                  className={`rounded border px-2 py-1 text-[10px] font-medium ${
+                    isTrackingThis
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+                      : "border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                >
+                  {isTrackingThis ? "Tracking..." : "Start Tracking"}
+                </button>
+              );
+            })()}
             <button
               onClick={() => setShowSpawnTask(true)}
               className="rounded border border-zinc-200 px-2 py-1 text-[10px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"

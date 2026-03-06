@@ -10,6 +10,7 @@ import type { TaskStatus, TaskPriority, RecurrenceRule, CreateRecurrenceRuleInpu
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "../../lib/types";
 import { timeAgo } from "../../lib/utils";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { useTrackerStore } from "../../stores/trackerStore";
 
 /** Slide-over panel showing full task details with inline editing. */
 export function TaskDetail() {
@@ -352,6 +353,27 @@ export function TaskDetail() {
               />
             </button>
           </div>
+
+          {/* Start Tracking */}
+          {(() => {
+            const trackerStatus = useTrackerStore.getState().status;
+            const trackerLinkedTaskId = useTrackerStore.getState().linkedTaskId;
+            const trackerStart = useTrackerStore.getState().start;
+            const isTrackingThis = trackerStatus !== "idle" && trackerLinkedTaskId === selectedTask.id;
+            return (
+              <button
+                onClick={() => trackerStart({ linkedTaskId: selectedTask.id, category: selectedTask.category || undefined })}
+                disabled={trackerStatus !== "idle"}
+                className={`w-full rounded-lg border px-3 py-1.5 text-xs font-medium ${
+                  isTrackingThis
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+                    : "border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                } disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                {isTrackingThis ? "Tracking..." : "Start Tracking"}
+              </button>
+            );
+          })()}
 
           {/* Reminders */}
           <EntityReminders

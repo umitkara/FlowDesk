@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { usePlanStore } from "../../stores/planStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useUIStore } from "../../stores/uiStore";
+import { useTrackerStore } from "../../stores/trackerStore";
 import { PLAN_TYPE_CONFIG, STATUS_CONFIG } from "../../lib/types";
 import type { Plan, PlanLinkedTask, PlanWithLinks, TaskStatus, Task } from "../../lib/types";
 import * as ipc from "../../lib/ipc";
@@ -299,31 +300,47 @@ export default function DailyPlanView() {
                 const linkedTasks = planLinkedTasks[plan.id] ?? [];
                 return (
                   <div key={plan.id}>
-                    <button
-                      onClick={() => handlePlanClick(plan.id)}
-                      className="flex w-full items-start gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-left hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50"
-                    >
-                      <div
-                        className="mt-0.5 h-2.5 w-2.5 flex-shrink-0 rounded-sm"
-                        style={{ backgroundColor: plan.color || typeCfg?.color || "#6b7280" }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-zinc-400">
-                            {formatTime(plan.start_time)} – {formatTime(plan.end_time)}
-                          </span>
-                          <span
-                            className="rounded px-1 py-0.5 text-[9px] font-medium text-white"
-                            style={{ backgroundColor: typeCfg?.color || "#6b7280" }}
-                          >
-                            {typeCfg?.label || plan.type}
-                          </span>
+                    <div className="group relative">
+                      <button
+                        onClick={() => handlePlanClick(plan.id)}
+                        className="flex w-full items-start gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-left hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50"
+                      >
+                        <div
+                          className="mt-0.5 h-2.5 w-2.5 flex-shrink-0 rounded-sm"
+                          style={{ backgroundColor: plan.color || typeCfg?.color || "#6b7280" }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-zinc-400">
+                              {formatTime(plan.start_time)} – {formatTime(plan.end_time)}
+                            </span>
+                            <span
+                              className="rounded px-1 py-0.5 text-[9px] font-medium text-white"
+                              style={{ backgroundColor: typeCfg?.color || "#6b7280" }}
+                            >
+                              {typeCfg?.label || plan.type}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 truncate text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                            {plan.title}
+                          </div>
                         </div>
-                        <div className="mt-0.5 truncate text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                          {plan.title}
-                        </div>
-                      </div>
-                    </button>
+                      </button>
+                      {useTrackerStore.getState().status === "idle" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            useTrackerStore.getState().start({ linkedPlanId: plan.id });
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-zinc-400 opacity-0 transition-opacity hover:bg-emerald-50 hover:text-emerald-600 group-hover:opacity-100 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                          title="Start tracking this plan"
+                        >
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                     {/* Nested linked tasks */}
                     {linkedTasks.length > 0 && (
                       <div className="ml-5 mt-0.5 space-y-0.5 border-l-2 border-zinc-100 pl-2 dark:border-zinc-800">
