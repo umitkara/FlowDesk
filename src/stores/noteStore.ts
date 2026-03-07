@@ -89,9 +89,10 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       // When query is provided, it replaces currentQuery (new filter).
       // When query is omitted, reload with existing currentQuery (refresh).
       const baseQuery = query !== undefined ? query : get().currentQuery;
+      const { workspace_id: _old, ...rest } = baseQuery as NoteQuery;
       const merged: NoteQuery = {
+        ...rest,
         workspace_id: wsId,
-        ...baseQuery,
       };
       if (get().currentFolder) {
         merged.folder = get().currentFolder ?? undefined;

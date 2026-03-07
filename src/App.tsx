@@ -21,6 +21,8 @@ function App() {
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const loadNotes = useNoteStore((s) => s.loadNotes);
   const loadFolderTree = useNoteStore((s) => s.loadFolderTree);
+  const clearActiveNote = useNoteStore((s) => s.clearActiveNote);
+  const fetchTasks = useTaskStore((s) => s.fetchTasks);
   const fetchStickyTasks = useTaskStore((s) => s.fetchStickyTasks);
   const fetchTrackerState = useTrackerStore((s) => s.fetchState);
 
@@ -44,10 +46,12 @@ function App() {
   // When the active workspace changes, reload all entity stores
   useEffect(() => {
     if (!activeWorkspaceId) return;
+    clearActiveNote();
     loadNotes();
     loadFolderTree();
+    fetchTasks();
     fetchStickyTasks();
-  }, [activeWorkspaceId, loadNotes, loadFolderTree, fetchStickyTasks]);
+  }, [activeWorkspaceId, clearActiveNote, loadNotes, loadFolderTree, fetchTasks, fetchStickyTasks]);
 
   // Apply theme via hook (replaces inline theme effect)
   useTheme();
