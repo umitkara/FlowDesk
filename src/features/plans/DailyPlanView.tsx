@@ -3,6 +3,7 @@ import { usePlanStore } from "../../stores/planStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useUIStore } from "../../stores/uiStore";
 import { useTrackerStore } from "../../stores/trackerStore";
+import { BulkMoveToWorkspaceMenu } from "../../components/shared/BulkMoveToWorkspaceMenu";
 import { PLAN_TYPE_CONFIG, STATUS_CONFIG } from "../../lib/types";
 import type { Plan, PlanLinkedTask, PlanWithLinks, TaskStatus, Task } from "../../lib/types";
 import * as ipc from "../../lib/ipc";
@@ -52,11 +53,22 @@ export default function DailyPlanView() {
   const [initialized, setInitialized] = useState(false);
   /** Map from plan ID to its linked tasks (fetched per time block/event). */
   const [planLinkedTasks, setPlanLinkedTasks] = useState<Record<string, PlanLinkedTask[]>>({});
+  const [selectedPlanIds, setSelectedPlanIds] = useState<Set<string>>(new Set());
+
+  const togglePlanSelection = useCallback((id: string) => {
+    setSelectedPlanIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     fetchDailySummary(dailyPlanDate);
     fetchStickyTasks();
     setInitialized(true);
+    setSelectedPlanIds(new Set());
   }, [dailyPlanDate, fetchDailySummary, fetchStickyTasks]);
 
   // Fetch linked tasks for each duration-based plan
@@ -222,6 +234,15 @@ export default function DailyPlanView() {
     (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
   );
 
+  const allPlanIds = [
+    ...(dailyPlan ? [dailyPlan.id] : []),
+    ...chronological.map((p) => p.id),
+    ...habits.map((h) => h.id),
+    ...markers.map((m) => m.id),
+  ];
+  const allPlansSelected = allPlanIds.length > 0 && selectedPlanIds.size === allPlanIds.length;
+  const hasSelection = selectedPlanIds.size > 0;
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Date navigation header */}
@@ -257,25 +278,52 @@ export default function DailyPlanView() {
 
       {/* Content */}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        {/* Select all */}
+        {allPlanIds.length > 0 && (
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={allPlansSelected}
+              onChange={() =>
+                allPlansSelected
+                  ? setSelectedPlanIds(new Set())
+                  : setSelectedPlanIds(new Set(allPlanIds))
+              }
+              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
+            />
+            <span className="text-[10px] text-zinc-400">Select all plans</span>
+          </div>
+        )}
+
         {/* Daily Plan */}
         <section>
           <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
             Daily Plan
           </div>
           {dailyPlan ? (
-            <button
-              onClick={() => handlePlanClick(dailyPlan.id)}
-              className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50"
-            >
-              <div className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                {dailyPlan.title}
-              </div>
-              {dailyPlan.description && (
-                <div className="mt-0.5 text-xs text-emerald-600/70 dark:text-emerald-500/60 line-clamp-2">
-                  {dailyPlan.description}
+            <div className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={selectedPlanIds.has(dailyPlan.id)}
+                onChange={() => togglePlanSelection(dailyPlan.id)}
+                className={`mt-2.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 ${
+                  hasSelection ? "opacity-100" : "opacity-0 hover:opacity-100"
+                } transition-opacity`}
+              />
+              <button
+                onClick={() => handlePlanClick(dailyPlan.id)}
+                className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50"
+              >
+                <div className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                  {dailyPlan.title}
                 </div>
-              )}
-            </button>
+                {dailyPlan.description && (
+                  <div className="mt-0.5 text-xs text-emerald-600/70 dark:text-emerald-500/60 line-clamp-2">
+                    {dailyPlan.description}
+                  </div>
+                )}
+              </button>
+            </div>
           ) : (
             <button
               onClick={handleCreateDailyPlan}
@@ -300,7 +348,15 @@ export default function DailyPlanView() {
                 const linkedTasks = planLinkedTasks[plan.id] ?? [];
                 return (
                   <div key={plan.id}>
-                    <div className="group relative">
+                    <div className="group relative flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedPlanIds.has(plan.id)}
+                        onChange={() => togglePlanSelection(plan.id)}
+                        className={`mt-2.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 ${
+                          hasSelection ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        } transition-opacity`}
+                      />
                       <button
                         onClick={() => handlePlanClick(plan.id)}
                         className="flex w-full items-start gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-left hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50"
@@ -447,19 +503,28 @@ export default function DailyPlanView() {
             </div>
             <div className="space-y-1">
               {habits.map((h: Plan) => (
-                <button
-                  key={h.id}
-                  onClick={() => handlePlanClick(h.id)}
-                  className="flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                >
-                  <span style={{ color: "#a855f7" }} className="text-[10px]">↻</span>
-                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    {h.title}
-                  </span>
-                  <span className="text-[9px] text-zinc-400">
-                    {formatTime(h.start_time)}
-                  </span>
-                </button>
+                <div key={h.id} className="group flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedPlanIds.has(h.id)}
+                    onChange={() => togglePlanSelection(h.id)}
+                    className={`rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 ${
+                      hasSelection ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    } transition-opacity`}
+                  />
+                  <button
+                    onClick={() => handlePlanClick(h.id)}
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded px-2 py-1 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  >
+                    <span style={{ color: "#a855f7" }} className="text-[10px]">↻</span>
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      {h.title}
+                    </span>
+                    <span className="text-[9px] text-zinc-400">
+                      {formatTime(h.start_time)}
+                    </span>
+                  </button>
+                </div>
               ))}
             </div>
           </section>
@@ -476,26 +541,58 @@ export default function DailyPlanView() {
                 const typeCfg = PLAN_TYPE_CONFIG[m.type as keyof typeof PLAN_TYPE_CONFIG];
                 const markerIcon = m.type === "deadline" ? "⚑" : m.type === "reminder" ? "🔔" : "◆";
                 return (
-                  <button
-                    key={m.id}
-                    onClick={() => handlePlanClick(m.id)}
-                    className="flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                  >
-                    <span style={{ color: typeCfg?.color }} className="text-[10px]">{markerIcon}</span>
-                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                      {m.title}
-                    </span>
-                    <span
-                      className="rounded px-1 py-0.5 text-[9px] font-medium text-white"
-                      style={{ backgroundColor: typeCfg?.color || "#6b7280" }}
+                  <div key={m.id} className="group flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedPlanIds.has(m.id)}
+                      onChange={() => togglePlanSelection(m.id)}
+                      className={`rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 ${
+                        hasSelection ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                      } transition-opacity`}
+                    />
+                    <button
+                      onClick={() => handlePlanClick(m.id)}
+                      className="flex min-w-0 flex-1 items-center gap-2 rounded px-2 py-1 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                     >
-                      {typeCfg?.label || m.type}
-                    </span>
-                  </button>
+                      <span style={{ color: typeCfg?.color }} className="text-[10px]">{markerIcon}</span>
+                      <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                        {m.title}
+                      </span>
+                      <span
+                        className="rounded px-1 py-0.5 text-[9px] font-medium text-white"
+                        style={{ backgroundColor: typeCfg?.color || "#6b7280" }}
+                      >
+                        {typeCfg?.label || m.type}
+                      </span>
+                    </button>
+                  </div>
                 );
               })}
             </div>
           </section>
+        )}
+
+        {/* Bulk action bar */}
+        {hasSelection && (
+          <div className="flex items-center gap-3 rounded-md bg-gray-50 px-3 py-2 dark:bg-gray-900">
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+              {selectedPlanIds.size} selected
+            </span>
+            <BulkMoveToWorkspaceMenu
+              entityIds={Array.from(selectedPlanIds)}
+              entityType="plan"
+              onMoved={() => {
+                setSelectedPlanIds(new Set());
+                fetchDailySummary(dailyPlanDate);
+              }}
+            />
+            <button
+              onClick={() => setSelectedPlanIds(new Set())}
+              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              Clear
+            </button>
+          </div>
         )}
 
         {/* Actions */}

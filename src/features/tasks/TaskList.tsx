@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useTaskStore } from "../../stores/taskStore";
 import { TaskRow } from "./TaskRow";
 import { TaskFilters } from "./TaskFilters";
+import { BulkMoveToWorkspaceMenu } from "../../components/shared/BulkMoveToWorkspaceMenu";
 import type { TaskPriority, TaskSort, TaskWithChildren } from "../../lib/types";
 
 /** Builds a flat list of rows in depth-first order for tree display. */
@@ -288,6 +289,11 @@ export function TaskList() {
               Add Tags
             </button>
           )}
+          <BulkMoveToWorkspaceMenu
+            entityIds={Array.from(selectedTaskIds)}
+            entityType="task"
+            onMoved={() => { clearSelection(); fetchTasks(); }}
+          />
           <button
             onClick={() => bulkDelete()}
             className="rounded-md px-2 py-1 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"

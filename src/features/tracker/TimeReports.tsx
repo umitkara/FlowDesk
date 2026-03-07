@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { formatMinutes } from "../../stores/trackerStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { MoveToWorkspaceMenu } from "../../components/shared/MoveToWorkspaceMenu";
+import { BulkMoveToWorkspaceMenu } from "../../components/shared/BulkMoveToWorkspaceMenu";
 import * as ipc from "../../lib/ipc";
 import type {
   DailySummary,
@@ -71,7 +72,17 @@ export function TimeReports() {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [entityNames, setEntityNames] = useState<Record<string, string>>({});
+  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId) ?? "";
+
+  const toggleEntrySelection = useCallback((id: string) => {
+    setSelectedEntryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const fetchDaily = useCallback(async (d: string) => {
     setLoading(true);
@@ -83,6 +94,7 @@ export function TimeReports() {
       ]);
       setDaily(summary);
       setEntries(entryList);
+      setSelectedEntryIds(new Set());
     } catch {
       setDaily(null);
       setEntries([]);
@@ -105,6 +117,7 @@ export function TimeReports() {
       ]);
       setWeekly(summary);
       setEntries(entryList);
+      setSelectedEntryIds(new Set());
     } catch {
       setWeekly(null);
       setEntries([]);
@@ -304,7 +317,21 @@ export function TimeReports() {
 
           {/* Entry list */}
           <div className="mt-5">
-            <SectionHeader>Entries</SectionHeader>
+            <div className="flex items-center gap-2">
+              {entries.length > 0 && (
+                <input
+                  type="checkbox"
+                  checked={entries.length > 0 && selectedEntryIds.size === entries.length}
+                  onChange={() =>
+                    selectedEntryIds.size === entries.length
+                      ? setSelectedEntryIds(new Set())
+                      : setSelectedEntryIds(new Set(entries.map((e) => e.id)))
+                  }
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
+                />
+              )}
+              <SectionHeader>Entries</SectionHeader>
+            </div>
             {entries.length === 0 ? (
               <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
                 No time entries for this {mode === "daily" ? "day" : "week"}.
@@ -318,7 +345,7 @@ export function TimeReports() {
                     </div>
                     <div className="space-y-1">
                       {dayEntries.map((entry) => (
-                        <EntryRow key={entry.id} entry={entry} entityNames={entityNames} onRefresh={() => fetchWeekly(date)} />
+                        <EntryRow key={entry.id} entry={entry} entityNames={entityNames} onRefresh={() => fetchWeekly(date)} isSelected={selectedEntryIds.has(entry.id)} onToggleSelect={toggleEntrySelection} hasSelection={selectedEntryIds.size > 0} />
                       ))}
                     </div>
                   </div>
@@ -327,8 +354,30 @@ export function TimeReports() {
             ) : (
               <div className="mt-2 space-y-1">
                 {entries.map((entry) => (
-                  <EntryRow key={entry.id} entry={entry} entityNames={entityNames} onRefresh={() => fetchDaily(date)} />
+                  <EntryRow key={entry.id} entry={entry} entityNames={entityNames} onRefresh={() => fetchDaily(date)} isSelected={selectedEntryIds.has(entry.id)} onToggleSelect={toggleEntrySelection} hasSelection={selectedEntryIds.size > 0} />
                 ))}
+              </div>
+            )}
+            {selectedEntryIds.size > 0 && (
+              <div className="mt-2 flex items-center gap-3 rounded-md bg-gray-50 px-3 py-2 dark:bg-gray-900">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  {selectedEntryIds.size} selected
+                </span>
+                <BulkMoveToWorkspaceMenu
+                  entityIds={Array.from(selectedEntryIds)}
+                  entityType="time_entry"
+                  onMoved={() => {
+                    setSelectedEntryIds(new Set());
+                    if (mode === "daily") fetchDaily(date);
+                    else fetchWeekly(date);
+                  }}
+                />
+                <button
+                  onClick={() => setSelectedEntryIds(new Set())}
+                  className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  Clear
+                </button>
               </div>
             )}
           </div>
@@ -408,7 +457,7 @@ function TagBadge({ tag }: { tag: TagTime }) {
   );
 }
 
-function EntryRow({ entry, entityNames, onRefresh }: { entry: TimeEntry; entityNames?: Record<string, string>; onRefresh?: () => void }) {
+function EntryRow({ entry, entityNames, onRefresh, isSelected, onToggleSelect, hasSelection }: { entry: TimeEntry; entityNames?: Record<string, string>; onRefresh?: () => void; isSelected?: boolean; onToggleSelect?: (id: string) => void; hasSelection?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const [editNotes, setEditNotes] = useState(entry.notes || "");
   const [editCategory, setEditCategory] = useState(entry.category || "");
@@ -461,8 +510,19 @@ function EntryRow({ entry, entityNames, onRefresh }: { entry: TimeEntry; entityN
     <div>
       <div
         onClick={() => setExpanded(!expanded)}
-        className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-gray-800/50"
+        className={`group flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-gray-800/50 ${isSelected ? "bg-primary-50/70 dark:bg-primary-900/30" : ""}`}
       >
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={!!isSelected}
+            onChange={(e) => { e.stopPropagation(); onToggleSelect(entry.id); }}
+            onClick={(e) => e.stopPropagation()}
+            className={`rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 ${
+              hasSelection || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            } transition-opacity`}
+          />
+        )}
         <span className="w-24 font-mono text-gray-500 dark:text-gray-400">
           {startTime}–{endTime}
         </span>

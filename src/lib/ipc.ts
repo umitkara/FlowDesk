@@ -232,6 +232,13 @@ export const moveEntityToWorkspace = (
   targetWorkspaceId: string,
 ) => invoke<void>("move_entity_to_workspace", { entityId, entityType, targetWorkspaceId });
 
+/** Moves multiple entities of the same type to a different workspace. */
+export const bulkMoveEntitiesToWorkspace = (
+  entityIds: string[],
+  entityType: "note" | "task" | "plan" | "time_entry",
+  targetWorkspaceId: string,
+) => invoke<number>("bulk_move_entities_to_workspace", { entityIds, entityType, targetWorkspaceId });
+
 /** Gets dashboard data for a workspace. */
 export const getDashboardData = (workspaceId: string, widgets: string[]) =>
   invoke<DashboardData>("get_dashboard_data", { workspaceId, widgets });

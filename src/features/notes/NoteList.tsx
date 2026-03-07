@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useNoteStore } from "../../stores/noteStore";
 import { useUIStore } from "../../stores/uiStore";
+import { BulkMoveToWorkspaceMenu } from "../../components/shared/BulkMoveToWorkspaceMenu";
 import { timeAgo, truncate } from "../../lib/utils";
 import type { NoteListItem } from "../../lib/types";
 
@@ -13,6 +14,11 @@ export function NoteList() {
   const deleteNote = useNoteStore((s) => s.deleteNote);
   const isLoading = useNoteStore((s) => s.isLoading);
   const navigateTo = useUIStore((s) => s.navigateTo);
+  const selectedNoteIds = useNoteStore((s) => s.selectedNoteIds);
+  const toggleNoteSelection = useNoteStore((s) => s.toggleNoteSelection);
+  const selectAllNotes = useNoteStore((s) => s.selectAllNotes);
+  const clearNoteSelection = useNoteStore((s) => s.clearNoteSelection);
+  const loadNotes = useNoteStore((s) => s.loadNotes);
 
   const handleSelect = useCallback(
     async (id: string) => {
@@ -31,16 +37,30 @@ export function NoteList() {
     navigateTo(note.id);
   }, [createNote, selectNote, navigateTo]);
 
+  const allSelected = notes.length > 0 && selectedNoteIds.size === notes.length;
+  const hasSelection = selectedNoteIds.size > 0;
+
   return (
     <div className="flex h-full flex-col bg-white dark:bg-gray-950">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2 dark:border-gray-800">
-        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-          Notes
+        <div className="flex items-center gap-2">
           {notes.length > 0 && (
-            <span className="ml-1.5 font-normal">{notes.length}</span>
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={() => (allSelected ? clearNoteSelection() : selectAllNotes())}
+              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
+              title={allSelected ? "Deselect all" : "Select all"}
+            />
           )}
-        </span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            Notes
+            {notes.length > 0 && (
+              <span className="ml-1.5 font-normal">{notes.length}</span>
+            )}
+          </span>
+        </div>
         <button
           onClick={handleNewNote}
           className="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
@@ -77,11 +97,34 @@ export function NoteList() {
             key={note.id}
             note={note}
             isActive={activeNote?.id === note.id}
+            isSelected={selectedNoteIds.has(note.id)}
+            hasSelection={hasSelection}
             onSelect={handleSelect}
+            onToggleSelect={toggleNoteSelection}
             onDelete={deleteNote}
           />
         ))}
       </div>
+
+      {/* Bulk action bar */}
+      {hasSelection && (
+        <div className="flex items-center gap-3 border-t border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
+          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+            {selectedNoteIds.size} selected
+          </span>
+          <BulkMoveToWorkspaceMenu
+            entityIds={Array.from(selectedNoteIds)}
+            entityType="note"
+            onMoved={() => { clearNoteSelection(); loadNotes(); }}
+          />
+          <button
+            onClick={clearNoteSelection}
+            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            Clear
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -90,33 +133,55 @@ export function NoteList() {
 function NoteListCard({
   note,
   isActive,
+  isSelected,
+  hasSelection,
   onSelect,
+  onToggleSelect,
   onDelete,
 }: {
   note: NoteListItem;
   isActive: boolean;
+  isSelected: boolean;
+  hasSelection: boolean;
   onSelect: (id: string) => void;
+  onToggleSelect: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
   return (
     <div
       onClick={() => onSelect(note.id)}
       className={`group relative w-full cursor-pointer border-b border-gray-100 px-3 py-2.5 text-left transition-colors dark:border-gray-800/50 ${
-        isActive
-          ? "bg-primary-50 dark:bg-primary-900/20"
-          : "hover:bg-gray-50 dark:hover:bg-gray-900/50"
+        isSelected
+          ? "bg-primary-50/70 dark:bg-primary-900/30"
+          : isActive
+            ? "bg-primary-50 dark:bg-primary-900/20"
+            : "hover:bg-gray-50 dark:hover:bg-gray-900/50"
       }`}
     >
       <div className="flex items-start justify-between gap-2">
-        <h3
-          className={`text-sm font-medium leading-snug ${
-            isActive
-              ? "text-primary-900 dark:text-primary-100"
-              : "text-gray-800 dark:text-gray-200"
-          }`}
-        >
-          {note.title || "Untitled"}
-        </h3>
+        <div className="flex items-start gap-2">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleSelect(note.id);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className={`mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 ${
+              hasSelection || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            } transition-opacity`}
+          />
+          <h3
+            className={`text-sm font-medium leading-snug ${
+              isActive
+                ? "text-primary-900 dark:text-primary-100"
+                : "text-gray-800 dark:text-gray-200"
+            }`}
+          >
+            {note.title || "Untitled"}
+          </h3>
+        </div>
         <span className="flex-shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
           {timeAgo(note.updated_at)}
         </span>

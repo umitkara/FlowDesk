@@ -60,6 +60,15 @@ interface NoteState {
   setFolder: (folder: string | null) => void;
   /** Clears the active note selection. */
   clearActiveNote: () => void;
+
+  /** IDs of notes selected for bulk operations. */
+  selectedNoteIds: Set<string>;
+  /** Toggles a note in/out of the selection set. */
+  toggleNoteSelection: (id: string) => void;
+  /** Selects all notes in the current list. */
+  selectAllNotes: () => void;
+  /** Clears the note selection. */
+  clearNoteSelection: () => void;
 }
 
 import { useWorkspaceStore } from "./workspaceStore";
@@ -98,7 +107,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         merged.folder = get().currentFolder ?? undefined;
       }
       const notes = await ipc.listNotes(merged);
-      set({ notes, currentQuery: merged, isLoading: false });
+      set({ notes, currentQuery: merged, isLoading: false, selectedNoteIds: new Set() });
     } catch {
       set({ isLoading: false });
     }
@@ -256,4 +265,17 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   clearActiveNote: () => set({ activeNote: null }),
+
+  selectedNoteIds: new Set<string>(),
+  toggleNoteSelection: (id) => {
+    const next = new Set(get().selectedNoteIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    set({ selectedNoteIds: next });
+  },
+  selectAllNotes: () => {
+    const ids = new Set(get().notes.map((n) => n.id));
+    set({ selectedNoteIds: ids });
+  },
+  clearNoteSelection: () => set({ selectedNoteIds: new Set() }),
 }));
