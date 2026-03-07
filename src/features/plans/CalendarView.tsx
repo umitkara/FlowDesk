@@ -150,7 +150,7 @@ export default function CalendarView() {
     (selectInfo: DateSelectArg) => {
       clearPlanSelection();
       openDialog({
-        workspace_id: activeWorkspaceId,
+        workspace_id: activeWorkspaceId ?? "",
         start_time: selectInfo.startStr,
         end_time: selectInfo.endStr,
         all_day: selectInfo.allDay,
@@ -302,7 +302,7 @@ export default function CalendarView() {
       try {
         // Create a new time block for the dropped task
         const plan = await createPlan({
-          workspace_id: activeWorkspaceId,
+          workspace_id: activeWorkspaceId ?? "",
           title: receiveInfo.event.title,
           start_time: receiveInfo.event.startStr,
           end_time: receiveInfo.event.endStr || new Date(new Date(receiveInfo.event.startStr).getTime() + 3600000).toISOString(),
