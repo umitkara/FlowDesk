@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useActivityStore } from "../../stores/activityStore";
 import { useNoteStore } from "../../stores/noteStore";
 import { useTaskStore } from "../../stores/taskStore";
@@ -125,6 +125,18 @@ function describeAction(entry: ActivityEntry): string {
   }
 }
 
+/** Discriminated union for collapsed/single timeline items. */
+type TimelineItem =
+  | { kind: "single"; entry: ActivityEntry }
+  | {
+      kind: "collapsed";
+      entries: ActivityEntry[];
+      entity_id: string;
+      entity_title: string;
+      action: string;
+      entity_type: string;
+    };
+
 /** Groups an array of entries by their date (YYYY-MM-DD). */
 function groupByDate(
   entries: ActivityEntry[],
@@ -143,6 +155,51 @@ function groupByDate(
   return Array.from(map.entries())
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([date, entries]) => ({ date, entries }));
+}
+
+/**
+ * Collapses sequential "updated" entries for the same entity into a single
+ * collapsed item. Entries are assumed sorted newest-first.
+ */
+function collapseSequentialUpdates(entries: ActivityEntry[]): TimelineItem[] {
+  const items: TimelineItem[] = [];
+  let buffer: ActivityEntry[] = [];
+
+  function flushBuffer() {
+    if (buffer.length === 0) return;
+    if (buffer.length === 1) {
+      items.push({ kind: "single", entry: buffer[0] });
+    } else {
+      items.push({
+        kind: "collapsed",
+        entries: [...buffer],
+        entity_id: buffer[0].entity_id,
+        entity_title: buffer[0].entity_title || "Untitled",
+        action: "updated",
+        entity_type: buffer[0].entity_type,
+      });
+    }
+    buffer = [];
+  }
+
+  for (const entry of entries) {
+    if (entry.action === "updated") {
+      if (
+        buffer.length > 0 &&
+        buffer[0].entity_id === entry.entity_id
+      ) {
+        buffer.push(entry);
+      } else {
+        flushBuffer();
+        buffer = [entry];
+      }
+    } else {
+      flushBuffer();
+      items.push({ kind: "single", entry });
+    }
+  }
+  flushBuffer();
+  return items;
 }
 
 /** Entity type label for display. */
@@ -361,13 +418,21 @@ export default function TimelineView() {
               {/* Vertical timeline line */}
               <div className="absolute left-[5px] top-2 bottom-2 w-px bg-gray-200 dark:bg-gray-700" />
 
-              {group.entries.map((entry) => (
-                <TimelineEntry
-                  key={entry.id}
-                  entry={entry}
-                  onClick={handleEntryClick}
-                />
-              ))}
+              {collapseSequentialUpdates(group.entries).map((item, idx) =>
+                item.kind === "single" ? (
+                  <TimelineEntry
+                    key={item.entry.id}
+                    entry={item.entry}
+                    onClick={handleEntryClick}
+                  />
+                ) : (
+                  <CollapsedTimelineEntry
+                    key={`collapsed-${item.entity_id}-${idx}`}
+                    item={item}
+                    onClick={handleEntryClick}
+                  />
+                ),
+              )}
             </div>
           </div>
         ))}
@@ -407,6 +472,84 @@ export default function TimelineView() {
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Chevron icon that rotates when expanded. */
+function ChevronIcon({ expanded }: { expanded: boolean }): ReactNode {
+  return (
+    <svg
+      className={`h-3.5 w-3.5 flex-shrink-0 text-gray-400 transition-transform dark:text-gray-500 ${
+        expanded ? "rotate-180" : ""
+      }`}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M19 9l-7 7-7-7"
+      />
+    </svg>
+  );
+}
+
+/** A collapsed group of sequential update entries for the same entity. */
+function CollapsedTimelineEntry({
+  item,
+  onClick,
+}: {
+  item: Extract<TimelineItem, { kind: "collapsed" }>;
+  onClick: (entry: ActivityEntry) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const dotColor = ENTITY_DOT_COLORS[item.entity_type] ?? "bg-gray-400";
+  const count = item.entries.length;
+  // Entries are newest-first; oldest is last
+  const newest = item.entries[0];
+  const oldest = item.entries[count - 1];
+  const timeRange = `${formatTime(oldest.created_at)} – ${formatTime(newest.created_at)}`;
+
+  return (
+    <div>
+      {/* Summary row */}
+      <button
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
+        className="relative flex w-full items-start gap-3 rounded-md px-1 py-2 text-left transition-colors cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/60"
+      >
+        <div
+          className={`relative z-10 mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full ${dotColor} ring-2 ring-gray-50 dark:ring-gray-900`}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="flex-shrink-0 text-[11px] font-medium text-gray-400 dark:text-gray-500">
+              {timeRange}
+            </span>
+            <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+              {entityTypeLabel(item.entity_type)}
+            </span>
+          </div>
+          <p className="mt-0.5 text-sm text-gray-800 dark:text-gray-200">
+            Updated {item.entity_title} &middot; {count} edits
+          </p>
+        </div>
+        <div className="mt-1.5">
+          <ChevronIcon expanded={expanded} />
+        </div>
+      </button>
+
+      {/* Expanded sub-entries */}
+      {expanded && (
+        <div className="ml-4 border-l-2 border-gray-200 pl-2 dark:border-gray-700">
+          {item.entries.map((entry) => (
+            <TimelineEntry key={entry.id} entry={entry} onClick={onClick} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
