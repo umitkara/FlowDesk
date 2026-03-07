@@ -16,9 +16,9 @@ import type { EventInput } from "@fullcalendar/core";
 import { usePlanStore } from "../../stores/planStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useUIStore } from "../../stores/uiStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import type { Plan } from "../../lib/types";
 import { PLAN_TYPE_CONFIG } from "../../lib/types";
-import * as ipc from "../../lib/ipc";
 
 /** Returns the default color for a plan type. */
 function getDefaultColor(planType: string): string {
@@ -72,33 +72,28 @@ export default function CalendarView() {
   const setActiveView = useUIStore((s) => s.setActiveView);
   const setDailyPlanDate = usePlanStore((s) => s.setDailyPlanDate);
   const settings = useSettingsStore((s) => s.settings);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   const startHour = Math.max(0, Math.min(23, parseInt(settings.calendar_start_hour ?? "0", 10) || 0));
   const endHour = Math.max(startHour + 1, Math.min(24, parseInt(settings.calendar_end_hour ?? "24", 10) || 24));
   const slotMinTime = `${String(startHour).padStart(2, "0")}:00:00`;
   const slotMaxTime = `${String(endHour).padStart(2, "0")}:00:00`;
 
-  const workspaceIdRef = useRef<string>("");
   const lastClickRef = useRef<{ eventId: string; time: number } | null>(null);
   const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch workspace ID, then trigger initial plan load for the visible range
+  // Re-fetch plans when workspace changes
   useEffect(() => {
-    ipc.listWorkspaces().then((ws) => {
-      if (ws.length > 0) {
-        workspaceIdRef.current = ws[0].id;
-        // FullCalendar already fired datesSet before workspace was ready — re-fetch now
-        const api = calendarRef.current?.getApi();
-        if (api) {
-          fetchPlans({
-            workspace_id: ws[0].id,
-            start_after: api.view.activeStart.toISOString(),
-            end_before: api.view.activeEnd.toISOString(),
-          });
-        }
-      }
-    });
-  }, [fetchPlans]);
+    if (!activeWorkspaceId) return;
+    const api = calendarRef.current?.getApi();
+    if (api) {
+      fetchPlans({
+        workspace_id: activeWorkspaceId,
+        start_after: api.view.activeStart.toISOString(),
+        end_before: api.view.activeEnd.toISOString(),
+      });
+    }
+  }, [activeWorkspaceId, fetchPlans]);
 
   // Initialize FullCalendar Draggable for external task elements
   useEffect(() => {
@@ -155,14 +150,14 @@ export default function CalendarView() {
     (selectInfo: DateSelectArg) => {
       clearPlanSelection();
       openDialog({
-        workspace_id: workspaceIdRef.current,
+        workspace_id: activeWorkspaceId,
         start_time: selectInfo.startStr,
         end_time: selectInfo.endStr,
         all_day: selectInfo.allDay,
       });
       selectInfo.view.calendar.unselect();
     },
-    [openDialog, clearPlanSelection]
+    [openDialog, clearPlanSelection, activeWorkspaceId]
   );
 
   /** Called when clicking a date cell — navigates to daily plan view. */
@@ -284,16 +279,16 @@ export default function CalendarView() {
   /** Called when the visible date range changes. */
   const handleDatesSet = useCallback(
     (dateInfo: DatesSetArg) => {
-      if (!workspaceIdRef.current) return;
+      if (!activeWorkspaceId) return;
       fetchPlans({
-        workspace_id: workspaceIdRef.current,
+        workspace_id: activeWorkspaceId,
         start_after: dateInfo.startStr,
         end_before: dateInfo.endStr,
       });
       setCurrentDate(dateInfo.start.toISOString());
       setCurrentView(dateInfo.view.type as typeof currentView);
     },
-    [fetchPlans, setCurrentDate, setCurrentView, currentView]
+    [fetchPlans, setCurrentDate, setCurrentView, currentView, activeWorkspaceId]
   );
 
   /** Called when an external draggable (task) is dropped onto the calendar. */
@@ -307,7 +302,7 @@ export default function CalendarView() {
       try {
         // Create a new time block for the dropped task
         const plan = await createPlan({
-          workspace_id: workspaceIdRef.current,
+          workspace_id: activeWorkspaceId,
           title: receiveInfo.event.title,
           start_time: receiveInfo.event.startStr,
           end_time: receiveInfo.event.endStr || new Date(new Date(receiveInfo.event.startStr).getTime() + 3600000).toISOString(),
@@ -320,7 +315,7 @@ export default function CalendarView() {
       // Remove the external event from the calendar since we created a proper plan
       receiveInfo.event.remove();
     },
-    [createPlan, linkTask]
+    [createPlan, linkTask, activeWorkspaceId]
   );
 
   /** Custom event content renderer. */
