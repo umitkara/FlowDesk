@@ -14,6 +14,10 @@ interface EntityRemindersProps {
   entityId: string;
   referenceTime: string | null;
   workspaceId: string;
+  /** Whether reminders are muted for this plan (plans only). */
+  remindersMuted?: boolean;
+  /** Callback when mute toggle changes (plans only). */
+  onMuteChange?: (muted: boolean) => void;
 }
 
 export function EntityReminders({
@@ -21,13 +25,15 @@ export function EntityReminders({
   entityId,
   referenceTime,
   workspaceId,
+  remindersMuted,
+  onMuteChange,
 }: EntityRemindersProps) {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (!referenceTime) {
+    if (!referenceTime || remindersMuted) {
       setReminders([]);
       return;
     }
@@ -37,7 +43,7 @@ export function EntityReminders({
       .then(setReminders)
       .catch(() => setReminders([]))
       .finally(() => setLoading(false));
-  }, [entityType, entityId, referenceTime]);
+  }, [entityType, entityId, referenceTime, remindersMuted]);
 
   const activeOffsets = new Set<string>(
     reminders.filter((r) => !r.is_fired && !r.is_dismissed).map((r) => r.offset_type),
@@ -91,8 +97,21 @@ export function EntityReminders({
       </button>
 
       {open && (
-        <div className="mt-1.5 space-y-1">
-          {!referenceTime ? (
+        <div className="mt-1.5 space-y-1.5">
+          {entityType === "plan" && onMuteChange && (
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!remindersMuted}
+                onChange={(e) => onMuteChange(e.target.checked)}
+                className="h-3 w-3 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800"
+              />
+              <span className="text-xs text-gray-500 dark:text-gray-400">Do not remind</span>
+            </label>
+          )}
+          {remindersMuted ? (
+            <p className="text-xs text-gray-400 italic">Reminders are muted for this plan</p>
+          ) : !referenceTime ? (
             <p className="text-xs text-gray-400 italic">
               Set a {entityType === "task" ? "due date" : "start time"} to enable reminders
             </p>

@@ -36,6 +36,8 @@ pub struct Plan {
     pub updated_at: String,
     /// Soft-delete timestamp, if deleted.
     pub deleted_at: Option<String>,
+    /// Whether reminders are muted for this plan.
+    pub reminders_muted: bool,
 }
 
 /// Input for creating a new plan.
@@ -66,6 +68,8 @@ pub struct CreatePlanInput {
     pub tags: Option<serde_json::Value>,
     /// Optional recurrence rule.
     pub recurrence: Option<serde_json::Value>,
+    /// Whether to mute reminders for this plan.
+    pub reminders_muted: Option<bool>,
 }
 
 /// Input for updating an existing plan. All fields optional (patch semantics).
@@ -99,6 +103,8 @@ pub struct UpdatePlanInput {
     pub tags: Option<serde_json::Value>,
     /// New recurrence rule (Some(None) clears).
     pub recurrence: Option<Option<serde_json::Value>>,
+    /// Whether to mute reminders for this plan.
+    pub reminders_muted: Option<bool>,
 }
 
 /// Query parameters for listing plans.

@@ -14,7 +14,8 @@ fn read_plan(conn: &rusqlite::Connection, id: &str) -> Result<Plan, AppError> {
     let plan = conn.query_row(
         "SELECT id, workspace_id, title, description, start_time, end_time,
                 all_day, type, category, color, importance,
-                tags, recurrence, created_at, updated_at, deleted_at
+                tags, recurrence, created_at, updated_at, deleted_at,
+                reminders_muted
          FROM plans WHERE id = ?1",
         [id],
         |row| {
@@ -45,6 +46,7 @@ fn read_plan(conn: &rusqlite::Connection, id: &str) -> Result<Plan, AppError> {
                 created_at: row.get(13)?,
                 updated_at: row.get(14)?,
                 deleted_at: row.get(15)?,
+                reminders_muted: row.get(16)?,
             })
         },
     );
@@ -189,11 +191,12 @@ pub fn create_plan(state: State<'_, AppState>, input: CreatePlanInput) -> Result
     state
         .db
         .with_conn(|conn| {
+            let reminders_muted = input.reminders_muted.unwrap_or(false);
             conn.execute(
                 "INSERT INTO plans (id, workspace_id, title, description, start_time, end_time,
                                     all_day, type, category, color, importance,
-                                    tags, recurrence, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+                                    tags, recurrence, created_at, updated_at, reminders_muted)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
                 rusqlite::params![
                     id,
                     input.workspace_id,
@@ -210,13 +213,16 @@ pub fn create_plan(state: State<'_, AppState>, input: CreatePlanInput) -> Result
                     recurrence_json,
                     now,
                     now,
+                    reminders_muted,
                 ],
             )?;
 
-            // Auto-create default reminders for the plan's start time
-            let _ = crate::commands::reminders::create_default_reminders(
-                conn, "plan", &id, &input.start_time, &input.workspace_id,
-            );
+            // Auto-create default reminders for the plan's start time (unless muted)
+            if !reminders_muted {
+                let _ = crate::commands::reminders::create_default_reminders(
+                    conn, "plan", &id, &input.start_time, &input.workspace_id,
+                );
+            }
 
             read_plan(conn, &id).map_err(to_sql_err)
         })
@@ -369,6 +375,11 @@ pub fn update_plan(state: State<'_, AppState>, input: UpdatePlanInput) -> Result
                 params.push(Box::new(rec_json));
                 pidx += 1;
             }
+            if let Some(muted) = input.reminders_muted {
+                set_clauses.push(format!("reminders_muted = ?{}", pidx));
+                params.push(Box::new(muted));
+                pidx += 1;
+            }
 
             // Always update timestamp
             set_clauses.push(format!("updated_at = ?{}", pidx));
@@ -390,8 +401,16 @@ pub fn update_plan(state: State<'_, AppState>, input: UpdatePlanInput) -> Result
                 params.iter().map(|p| p.as_ref()).collect();
             conn.execute(&sql, param_refs.as_slice())?;
 
-            // Re-sync reminders if start_time changed
-            if input.start_time.is_some() {
+            // Handle reminders: if muted, delete all unfired; otherwise re-sync on start_time change
+            let is_muted = input.reminders_muted.unwrap_or(existing.reminders_muted);
+            if is_muted {
+                // Muted: delete all unfired reminders
+                if input.reminders_muted == Some(true) || input.start_time.is_some() {
+                    let _ = crate::commands::reminders::delete_unfired_reminders_for_entity(
+                        conn, "plan", &plan_id,
+                    );
+                }
+            } else if input.start_time.is_some() {
                 let existing_offsets = crate::commands::reminders::get_unfired_offsets(
                     conn, "plan", &plan_id,
                 ).unwrap_or_default();
@@ -407,6 +426,11 @@ pub fn update_plan(state: State<'_, AppState>, input: UpdatePlanInput) -> Result
                         conn, "plan", &plan_id, effective_start, &existing.workspace_id, &existing_offsets,
                     );
                 }
+            } else if input.reminders_muted == Some(false) && existing.reminders_muted {
+                // Unmuting: create default reminders
+                let _ = crate::commands::reminders::create_default_reminders(
+                    conn, "plan", &plan_id, effective_start, &existing.workspace_id,
+                );
             }
 
             read_plan(conn, &plan_id).map_err(to_sql_err)
@@ -553,7 +577,8 @@ pub fn list_plans(state: State<'_, AppState>, query: PlanQuery) -> Result<Vec<Pl
             let mut sql = String::from(
                 "SELECT id, workspace_id, title, description, start_time, end_time,
                         all_day, type, category, color, importance,
-                        tags, recurrence, created_at, updated_at, deleted_at
+                        tags, recurrence, created_at, updated_at, deleted_at,
+                        reminders_muted
                  FROM plans WHERE workspace_id = ?1",
             );
             let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -636,6 +661,7 @@ pub fn list_plans(state: State<'_, AppState>, query: PlanQuery) -> Result<Vec<Pl
                         created_at: row.get(13)?,
                         updated_at: row.get(14)?,
                         deleted_at: row.get(15)?,
+                        reminders_muted: row.get(16)?,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -665,7 +691,8 @@ pub fn get_daily_plan_summary(
             let mut stmt = conn.prepare(
                 "SELECT id, workspace_id, title, description, start_time, end_time,
                         all_day, type, category, color, importance,
-                        tags, recurrence, created_at, updated_at, deleted_at
+                        tags, recurrence, created_at, updated_at, deleted_at,
+                        reminders_muted
                  FROM plans
                  WHERE workspace_id = ?1
                    AND deleted_at IS NULL
@@ -702,6 +729,7 @@ pub fn get_daily_plan_summary(
                         created_at: row.get(13)?,
                         updated_at: row.get(14)?,
                         deleted_at: row.get(15)?,
+                        reminders_muted: row.get(16)?,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -1261,7 +1289,8 @@ pub fn search_plans(
                 "SELECT p.id, p.workspace_id, p.title, p.description,
                         p.start_time, p.end_time, p.all_day, p.type,
                         p.category, p.color, p.importance,
-                        p.tags, p.recurrence, p.created_at, p.updated_at, p.deleted_at
+                        p.tags, p.recurrence, p.created_at, p.updated_at, p.deleted_at,
+                        p.reminders_muted
                  FROM plans_fts
                  JOIN plans p ON plans_fts.rowid = p.rowid
                  WHERE plans_fts MATCH ?1 AND p.workspace_id = ?2 AND p.deleted_at IS NULL
@@ -1297,6 +1326,7 @@ pub fn search_plans(
                         created_at: row.get(13)?,
                         updated_at: row.get(14)?,
                         deleted_at: row.get(15)?,
+                        reminders_muted: row.get(16)?,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;

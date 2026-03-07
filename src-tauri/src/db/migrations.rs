@@ -86,6 +86,11 @@ pub fn run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
             "014_phase8_settings",
             include_str!("../../migrations/014_phase8_settings.sql"),
         ),
+        (
+            15,
+            "015_plan_reminders_muted",
+            include_str!("../../migrations/015_plan_reminders_muted.sql"),
+        ),
     ];
 
     for (version, name, sql) in migrations {

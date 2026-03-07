@@ -529,6 +529,7 @@ export interface Plan {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  reminders_muted: boolean;
 }
 
 /** Input for creating a new plan. */
@@ -545,6 +546,7 @@ export interface CreatePlanInput {
   importance?: Importance;
   tags?: string[] | null;
   recurrence?: RecurrenceRule;
+  reminders_muted?: boolean;
 }
 
 /** Input for updating an existing plan (partial update). */
@@ -561,6 +563,7 @@ export interface UpdatePlanInput {
   importance?: Importance | null;
   tags?: string[] | null;
   recurrence?: RecurrenceRule | null;
+  reminders_muted?: boolean;
 }
 
 /** Query parameters for listing plans. */
