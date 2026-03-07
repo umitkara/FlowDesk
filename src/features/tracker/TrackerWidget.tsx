@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useTrackerStore, formatElapsed } from "../../stores/trackerStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { SessionTimeline } from "./SessionTimeline";
+import { SessionActivityLog } from "./SessionActivityLog";
 import { debounce } from "../../lib/utils";
 
 /** Persistent time tracker widget rendered in the TopBar. Always visible. */
@@ -19,6 +20,7 @@ export function TrackerWidget() {
   const breakConfig = useTrackerStore((s) => s.breakConfig);
   const pomodoroCycle = useTrackerStore((s) => s.pomodoroCycle);
   const trackerWorkspaceId = useTrackerStore((s) => s.trackerWorkspaceId);
+  const startedAt = useTrackerStore((s) => s.startedAt);
   const start = useTrackerStore((s) => s.start);
   const pause = useTrackerStore((s) => s.pause);
   const resume = useTrackerStore((s) => s.resume);
@@ -257,6 +259,16 @@ export function TrackerWidget() {
               className="mt-1 w-full resize-none rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs leading-relaxed text-gray-700 placeholder:text-gray-400 focus:border-blue-300 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
             />
           </div>
+
+          {/* Session activity log */}
+          {startedAt && (
+            <SessionActivityLog
+              startedAt={startedAt}
+              workspaceId={trackerWorkspaceId || activeWorkspaceId || ""}
+              compact
+              collapsible
+            />
+          )}
         </div>
       )}
     </div>

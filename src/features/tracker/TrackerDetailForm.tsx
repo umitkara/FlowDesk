@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useTrackerStore, formatMinutes } from "../../stores/trackerStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { SessionTimeline } from "./SessionTimeline";
+import { SessionActivityLog } from "./SessionActivityLog";
 import type { Task, Plan, Suggestion } from "../../lib/types";
 import * as ipc from "../../lib/ipc";
 
@@ -176,6 +177,15 @@ export function TrackerDetailForm() {
               <SessionTimeline sessionNotes={sessionNotes} />
             </div>
           </div>
+        )}
+
+        {/* Session activity log */}
+        {startedAt && (
+          <SessionActivityLog
+            startedAt={startedAt}
+            endTime={stoppedEndTime}
+            workspaceId={activeWorkspaceId || ""}
+          />
         )}
 
         {/* Summary */}
