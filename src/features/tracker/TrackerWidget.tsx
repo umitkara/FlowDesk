@@ -8,8 +8,10 @@ import { debounce } from "../../lib/utils";
 export function TrackerWidget() {
   const status = useTrackerStore((s) => s.status);
   const elapsedSeconds = useTrackerStore((s) => s.elapsedSeconds);
+  const currentSessionSeconds = useTrackerStore((s) => s.currentSessionSeconds);
   const notes = useTrackerStore((s) => s.notes);
   const sessionNotes = useTrackerStore((s) => s.sessionNotes);
+  const pauses = useTrackerStore((s) => s.pauses);
   const isNotesExpanded = useTrackerStore((s) => s.isNotesExpanded);
   const linkedTaskId = useTrackerStore((s) => s.linkedTaskId);
   const linkedPlanId = useTrackerStore((s) => s.linkedPlanId);
@@ -93,16 +95,27 @@ export function TrackerWidget() {
           }`}
         />
 
-        {/* Elapsed time */}
-        <span
-          className={`font-mono text-sm font-semibold tabular-nums tracking-tight ${
-            isPaused
-              ? "text-amber-600 dark:text-amber-400"
-              : "text-gray-900 dark:text-gray-100"
-          }`}
-        >
-          {formatElapsed(elapsedSeconds)}
-        </span>
+        {/* Time display: total + current session */}
+        <div className="flex flex-col items-end leading-none">
+          <span
+            className={`font-mono text-sm font-semibold tabular-nums tracking-tight ${
+              isPaused
+                ? "text-amber-600 dark:text-amber-400"
+                : "text-gray-900 dark:text-gray-100"
+            }`}
+            title="Total active time"
+          >
+            {formatElapsed(elapsedSeconds)}
+          </span>
+          {pauses.length > 0 && (
+            <span
+              className="font-mono text-[10px] tabular-nums text-gray-400 dark:text-gray-500"
+              title="Current session time"
+            >
+              {formatElapsed(currentSessionSeconds)}
+            </span>
+          )}
+        </div>
 
         {/* PAUSED label */}
         {isPaused && (

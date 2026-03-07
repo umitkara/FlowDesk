@@ -43,6 +43,27 @@ export function calculateElapsedSeconds(
   return Math.max(0, Math.floor((totalMs - pauseMs) / 1000));
 }
 
+/** Computes seconds elapsed in the current session (since last resume, or since start if never paused). */
+export function calculateCurrentSessionSeconds(
+  startedAt: string,
+  pauses: Pause[],
+  pausedAt: string | null,
+): number {
+  // If currently paused, current session is 0 (resets on resume)
+  if (pausedAt) return 0;
+
+  // Find the start of the current session: last pause's resumed_at, or startedAt
+  let sessionStart = new Date(startedAt).getTime();
+  for (const p of pauses) {
+    if (p.resumed_at) {
+      const resumed = new Date(p.resumed_at).getTime();
+      if (resumed > sessionStart) sessionStart = resumed;
+    }
+  }
+
+  return Math.max(0, Math.floor((Date.now() - sessionStart) / 1000));
+}
+
 /** Formats seconds as HH:MM:SS. */
 export function formatElapsed(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
@@ -84,8 +105,10 @@ interface TrackerStore {
   pomodoroCycle: number;
 
   // --- Frontend-only state ---
-  /** Active elapsed seconds, updated every second. */
+  /** Active elapsed seconds (total), updated every second. */
   elapsedSeconds: number;
+  /** Seconds elapsed in current session (since last resume), updated every second. */
+  currentSessionSeconds: number;
   /** Whether the detail form modal is shown (after stop). */
   showDetailForm: boolean;
   /** Whether the recovery dialog is shown (on startup with interrupted session). */
@@ -159,7 +182,8 @@ function startElapsedTimer(get: () => TrackerStore, set: (partial: Partial<Track
     const { startedAt, pauses, pausedAt, status } = get();
     if (!startedAt || status === "idle") return;
     const elapsed = calculateElapsedSeconds(startedAt, pauses, pausedAt);
-    set({ elapsedSeconds: elapsed });
+    const session = calculateCurrentSessionSeconds(startedAt, pauses, pausedAt);
+    set({ elapsedSeconds: elapsed, currentSessionSeconds: session });
     // Check break reminder on every tick
     checkBreakReminder(get, set);
     // Update tray tooltip every 5 seconds to avoid excessive IPC
@@ -359,6 +383,7 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
   breakConfig: DEFAULT_BREAK_CONFIG,
   pomodoroCycle: 0,
   elapsedSeconds: 0,
+  currentSessionSeconds: 0,
   showDetailForm: false,
   showRecoveryDialog: false,
   isNotesExpanded: false,
@@ -385,6 +410,7 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
       set({
         ...syncFromBackend(result),
         elapsedSeconds: 0,
+        currentSessionSeconds: 0,
         showDetailForm: false,
         isLoading: false,
         trackerWorkspaceId: wsId,
@@ -461,6 +487,7 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
         category: null,
         tags: [],
         elapsedSeconds: 0,
+        currentSessionSeconds: 0,
         showDetailForm: false,
         stoppedActiveMins: null,
         stoppedEndTime: null,
@@ -635,7 +662,12 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
               result.pauses,
               result.paused_at,
             );
-            set({ elapsedSeconds: elapsed });
+            const session = calculateCurrentSessionSeconds(
+              result.started_at,
+              result.pauses,
+              result.paused_at,
+            );
+            set({ elapsedSeconds: elapsed, currentSessionSeconds: session });
           }
           startElapsedTimer(get, set);
         }
