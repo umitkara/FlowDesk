@@ -10,6 +10,7 @@ import type { PlanLinkedTask, PlanLinkedNote, TaskStatus, TaskWithChildren, Recu
 import { BacklinksPanel } from "../../components/shared/BacklinksPanel";
 import { EntityReminders } from "../../components/shared/EntityReminders";
 import { useTrackerStore } from "../../stores/trackerStore";
+import { MoveToWorkspaceMenu } from "../../components/shared/MoveToWorkspaceMenu";
 
 /** Side panel showing plan details and linked entities. */
 export default function PlanDetail() {
@@ -24,6 +25,7 @@ export default function PlanDetail() {
     unlinkTask,
     linkTask,
     openDialog,
+    fetchPlans,
   } = usePlanStore();
   const tasks = useTaskStore((s) => s.tasks);
   const { setActiveView } = useUIStore();
@@ -151,6 +153,14 @@ export default function PlanDetail() {
           </h3>
         )}
         <div className="ml-2 flex items-center gap-1">
+          <MoveToWorkspaceMenu
+            entityId={plan.id}
+            entityType="plan"
+            onMoved={() => {
+              closeDetail();
+              if (activeWorkspaceId) fetchPlans({ workspace_id: activeWorkspaceId });
+            }}
+          />
           <button
             onClick={() => openDialog(undefined, plan)}
             className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
@@ -254,6 +264,10 @@ export default function PlanDetail() {
           entityId={plan.id}
           referenceTime={plan.start_time}
           workspaceId={activeWorkspaceId || ""}
+          remindersMuted={plan.reminders_muted}
+          onMuteChange={(muted) => {
+            updatePlan({ id: plan.id, reminders_muted: muted });
+          }}
         />
 
         <div className="border-t border-zinc-200 dark:border-zinc-800" />

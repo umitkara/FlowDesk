@@ -494,6 +494,79 @@ pub fn resolve_cross_workspace_ref(
         .map_err(AppError::Database)
 }
 
+/// Moves an entity (note, task, or plan) to a different workspace.
+#[tauri::command]
+pub fn move_entity_to_workspace(
+    state: State<'_, AppState>,
+    entity_id: String,
+    entity_type: String,
+    target_workspace_id: String,
+) -> Result<(), AppError> {
+    let now = now_iso();
+
+    state
+        .db
+        .with_conn(|conn| {
+            let table = match entity_type.as_str() {
+                "note" => "notes",
+                "task" => "tasks",
+                "plan" => "plans",
+                "time_entry" => "time_entries",
+                _ => {
+                    return Err(rusqlite::Error::ToSqlConversionFailure(Box::new(
+                        std::io::Error::other("INVALID_ENTITY_TYPE"),
+                    )));
+                }
+            };
+
+            // Verify target workspace exists
+            let ws_exists: bool = conn.query_row(
+                "SELECT COUNT(*) > 0 FROM workspaces WHERE id = ?1 AND deleted_at IS NULL",
+                [&target_workspace_id],
+                |row| row.get(0),
+            )?;
+            if !ws_exists {
+                return Err(rusqlite::Error::ToSqlConversionFailure(Box::new(
+                    std::io::Error::other("TARGET_WORKSPACE_NOT_FOUND"),
+                )));
+            }
+
+            let affected = conn.execute(
+                &format!(
+                    "UPDATE {} SET workspace_id = ?1, updated_at = ?2 WHERE id = ?3 AND deleted_at IS NULL",
+                    table
+                ),
+                rusqlite::params![target_workspace_id, now, entity_id],
+            )?;
+
+            if affected == 0 {
+                return Err(rusqlite::Error::ToSqlConversionFailure(Box::new(
+                    std::io::Error::other("ENTITY_NOT_FOUND"),
+                )));
+            }
+
+            Ok(())
+        })
+        .map_err(|e| {
+            let msg = e.to_string();
+            if msg.contains("INVALID_ENTITY_TYPE") {
+                AppError::Validation("Invalid entity type. Must be note, task, plan, or time_entry".to_string())
+            } else if msg.contains("TARGET_WORKSPACE_NOT_FOUND") {
+                AppError::NotFound {
+                    entity: "Workspace".to_string(),
+                    id: target_workspace_id,
+                }
+            } else if msg.contains("ENTITY_NOT_FOUND") {
+                AppError::NotFound {
+                    entity: entity_type,
+                    id: entity_id,
+                }
+            } else {
+                AppError::Database(e)
+            }
+        })
+}
+
 /// Gets dashboard data for a workspace. Only computes data for requested widgets.
 #[tauri::command]
 pub fn get_dashboard_data(

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { formatMinutes } from "../../stores/trackerStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { MoveToWorkspaceMenu } from "../../components/shared/MoveToWorkspaceMenu";
 import * as ipc from "../../lib/ipc";
 import type {
   DailySummary,
@@ -526,17 +527,20 @@ function EntryRow({ entry, entityNames, onRefresh }: { entry: TimeEntry; entityN
             </div>
           </div>
           <div className="flex items-center justify-between pt-1">
-            {confirmDelete ? (
-              <div className="flex items-center gap-1.5 text-[10px]">
-                <span className="text-red-600 dark:text-red-400">Delete this entry?</span>
-                <button onClick={handleDelete} disabled={saving} className="rounded bg-red-600 px-2 py-0.5 text-white hover:bg-red-700 disabled:opacity-50">Yes</button>
-                <button onClick={() => setConfirmDelete(false)} className="rounded bg-gray-200 px-2 py-0.5 text-gray-600 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300">No</button>
-              </div>
-            ) : (
-              <button onClick={() => setConfirmDelete(true)} className="text-[10px] text-red-500 hover:text-red-700 dark:text-red-400">
-                Delete
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {confirmDelete ? (
+                <div className="flex items-center gap-1.5 text-[10px]">
+                  <span className="text-red-600 dark:text-red-400">Delete this entry?</span>
+                  <button onClick={handleDelete} disabled={saving} className="rounded bg-red-600 px-2 py-0.5 text-white hover:bg-red-700 disabled:opacity-50">Yes</button>
+                  <button onClick={() => setConfirmDelete(false)} className="rounded bg-gray-200 px-2 py-0.5 text-gray-600 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300">No</button>
+                </div>
+              ) : (
+                <button onClick={() => setConfirmDelete(true)} className="text-[10px] text-red-500 hover:text-red-700 dark:text-red-400">
+                  Delete
+                </button>
+              )}
+              <MoveToWorkspaceMenu entityId={entry.id} entityType="time_entry" onMoved={() => onRefresh?.()} />
+            </div>
             <div className="flex gap-1.5">
               <button onClick={() => setExpanded(false)} className="rounded px-2 py-1 text-[10px] text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700">Cancel</button>
               <button onClick={handleSave} disabled={saving} className="rounded bg-blue-600 px-2 py-1 text-[10px] text-white hover:bg-blue-700 disabled:opacity-50">

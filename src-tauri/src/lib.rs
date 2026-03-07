@@ -513,6 +513,7 @@ pub fn run() {
             commands::workspaces::get_workspace_badge,
             commands::workspaces::resolve_cross_workspace_ref,
             commands::workspaces::get_dashboard_data,
+            commands::workspaces::move_entity_to_workspace,
             // Tasks
             commands::tasks::create_task,
             commands::tasks::get_task,

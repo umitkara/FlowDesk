@@ -11,6 +11,7 @@ import { STATUS_CONFIG, PRIORITY_CONFIG } from "../../lib/types";
 import { timeAgo } from "../../lib/utils";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useTrackerStore } from "../../stores/trackerStore";
+import { MoveToWorkspaceMenu } from "../../components/shared/MoveToWorkspaceMenu";
 
 /** Slide-over panel showing full task details with inline editing. */
 export function TaskDetail() {
@@ -19,6 +20,7 @@ export function TaskDetail() {
   const closeDetail = useTaskStore((s) => s.closeDetail);
   const updateTask = useTaskStore((s) => s.updateTask);
   const deleteTask = useTaskStore((s) => s.deleteTask);
+  const fetchTasks = useTaskStore((s) => s.fetchTasks);
 
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const { loadRuleForEntity, createRule, updateRule, deleteRule, skipNext, detachOccurrence } = useRecurrenceStore();
@@ -85,15 +87,25 @@ export function TaskDetail() {
         <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
           Task Detail
         </span>
-        <button
-          onClick={closeDetail}
-          className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
-          title="Close (Esc)"
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1">
+          <MoveToWorkspaceMenu
+            entityId={selectedTask.id}
+            entityType="task"
+            onMoved={() => {
+              closeDetail();
+              fetchTasks();
+            }}
+          />
+          <button
+            onClick={closeDetail}
+            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+            title="Close (Esc)"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Content */}

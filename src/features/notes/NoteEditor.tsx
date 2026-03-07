@@ -18,6 +18,7 @@ import { VersionHistory } from "./VersionHistory";
 import { timeAgo } from "../../lib/utils";
 import { TaskReferenceExtension, preprocessEntityRefs } from "./extensions/TaskReferenceExtension";
 import { syncNoteReferences } from "../../lib/ipc";
+import { MoveToWorkspaceMenu } from "../../components/shared/MoveToWorkspaceMenu";
 
 /** Tiptap-based markdown editor for notes with title bar and metadata drawer. */
 export function NoteEditor() {
@@ -29,6 +30,8 @@ export function NoteEditor() {
     (s) => s.settings.auto_save_debounce_ms ?? "1000",
   );
   const deleteNote = useNoteStore((s) => s.deleteNote);
+  const loadNotes = useNoteStore((s) => s.loadNotes);
+  const clearActiveNote = useNoteStore((s) => s.clearActiveNote);
   const detailPanelOpen = useUIStore((s) => s.detailPanelOpen);
   const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel);
   const trackerStatus = useTrackerStore((s) => s.status);
@@ -194,6 +197,14 @@ export function NoteEditor() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </button>
+            <MoveToWorkspaceMenu
+              entityId={activeNote.id}
+              entityType="note"
+              onMoved={() => {
+                clearActiveNote();
+                loadNotes();
+              }}
+            />
             <button
               onClick={() => deleteNote(activeNote.id)}
               title="Delete note"
