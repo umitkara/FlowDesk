@@ -6,8 +6,8 @@ import {
   EntitySuggestionList,
   type SuggestionItem,
 } from "./EntitySuggestionList";
-import * as ipc from "../../../lib/ipc";
-import type { TaskFilter, TaskWithChildren, Plan } from "../../../lib/types";
+import { getSuggestionItems, invalidateCache } from "./suggestionCache";
+import { useTaskStore } from "../../../stores/taskStore";
 import { TaskReferenceView } from "./TaskReferenceView";
 
 /**
@@ -15,66 +15,6 @@ import { TaskReferenceView } from "./TaskReferenceView";
  * Used by the input rule to convert typed text into TaskReference nodes.
  */
 const ENTITY_REF_INPUT_REGEX = /@(task|note|plan)\[([a-zA-Z0-9_-]+)\]$/;
-
-/** Cache for autocomplete results to avoid repeated IPC calls. */
-let cachedTasks: TaskWithChildren[] | null = null;
-let cachedPlans: Plan[] | null = null;
-let cacheExpiry = 0;
-
-async function getSuggestionItems(query: string): Promise<SuggestionItem[]> {
-  try {
-    // Refresh cache every 30 seconds
-    if (!cachedTasks || !cachedPlans || Date.now() > cacheExpiry) {
-      const workspaces = await ipc.listWorkspaces();
-      if (!workspaces.length) return [];
-      const wsId = workspaces[0].id;
-      const filter: TaskFilter = { workspace_id: wsId };
-      const now = new Date();
-      const monthAgo = new Date(now.getTime() - 30 * 86400000);
-      const monthAhead = new Date(now.getTime() + 30 * 86400000);
-      const [tasks, plans] = await Promise.all([
-        ipc.listTasks(filter, { field: "updated_at", direction: "desc" }),
-        ipc.listPlans({
-          workspace_id: wsId,
-          start_after: monthAgo.toISOString(),
-          end_before: monthAhead.toISOString(),
-        }),
-      ]);
-      cachedTasks = tasks;
-      cachedPlans = plans;
-      cacheExpiry = Date.now() + 30000;
-    }
-
-    const q = query.toLowerCase();
-
-    const taskResults: SuggestionItem[] = (q
-      ? cachedTasks.filter((t) => t.title.toLowerCase().includes(q))
-      : cachedTasks
-    ).slice(0, 6).map((t) => ({
-      entityType: "task" as const,
-      id: t.id,
-      title: t.title,
-      status: t.status,
-      priority: t.priority,
-    }));
-
-    const planResults: SuggestionItem[] = (q
-      ? cachedPlans.filter((p) => p.title.toLowerCase().includes(q))
-      : cachedPlans
-    ).slice(0, 4).map((p) => ({
-      entityType: "plan" as const,
-      id: p.id,
-      title: p.title,
-      planType: p.type,
-      startTime: p.start_time,
-    }));
-
-    // Interleave: tasks first, then plans
-    return [...taskResults, ...planResults].slice(0, 8);
-  } catch {
-    return [];
-  }
-}
 
 /**
  * Custom Tiptap inline node extension for rendering entity references
@@ -167,10 +107,37 @@ export const TaskReferenceExtension = Node.create({
         items: async ({ query }) => {
           // Don't show autocomplete when user is typing the manual @task[id] pattern
           if (/^(task|note|plan)\[/.test(query)) return [];
-          return await getSuggestionItems(query);
+          const results = await getSuggestionItems(query);
+          // Append "Create task" option when there's a non-empty query
+          const trimmed = query.trim();
+          if (trimmed.length > 0) {
+            results.push({
+              entityType: "task",
+              id: "__create__",
+              title: trimmed,
+            });
+          }
+          return results;
         },
         command: ({ editor, range, props }) => {
           const item = props as unknown as SuggestionItem;
+          if (item.id === "__create__") {
+            // Create a new task and insert reference
+            useTaskStore.getState().createTask({ workspace_id: "", title: item.title }).then((task) => {
+              invalidateCache();
+              editor
+                .chain()
+                .focus()
+                .deleteRange(range)
+                .insertContent({
+                  type: "taskReference",
+                  attrs: { entityType: "task", entityId: task.id },
+                })
+                .insertContent(" ")
+                .run();
+            });
+            return;
+          }
           editor
             .chain()
             .focus()

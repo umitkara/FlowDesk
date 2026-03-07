@@ -7,6 +7,10 @@ import TaskItem from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
 import Typography from "@tiptap/extension-typography";
 import CharacterCount from "@tiptap/extension-character-count";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import { common, createLowlight } from "lowlight";
+
+const lowlight = createLowlight(common);
 import { useNoteStore } from "../../stores/noteStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useUIStore } from "../../stores/uiStore";
@@ -17,6 +21,7 @@ import { FrontMatterPanel } from "./FrontMatterPanel";
 import { VersionHistory } from "./VersionHistory";
 import { timeAgo } from "../../lib/utils";
 import { TaskReferenceExtension, preprocessEntityRefs } from "./extensions/TaskReferenceExtension";
+import { SlashCommandExtension } from "./extensions/SlashCommandExtension";
 import { syncNoteReferences } from "../../lib/ipc";
 import { MoveToWorkspaceMenu } from "../../components/shared/MoveToWorkspaceMenu";
 
@@ -69,7 +74,9 @@ export function NoteEditor() {
       }),
       Typography,
       CharacterCount,
+      CodeBlockLowlight.configure({ lowlight }),
       TaskReferenceExtension,
+      SlashCommandExtension,
     ],
     content: preprocessEntityRefs(activeNote?.body || ""),
     onUpdate: ({ editor: ed }) => {
@@ -305,6 +312,15 @@ export function NoteEditor() {
               title="Inline Code"
             >
               {"</>"}
+            </ToolbarButton>
+            <ToolbarButton
+              active={editor.isActive("codeBlock")}
+              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+              title="Code Block"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+              </svg>
             </ToolbarButton>
             <ToolbarButton
               active={false}

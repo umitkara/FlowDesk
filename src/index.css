@@ -130,6 +130,29 @@
     @apply bg-transparent p-0;
   }
 
+  /* Syntax highlighting — light theme */
+  .tiptap-editor .ProseMirror pre .hljs-keyword { color: #c678dd; }
+  .tiptap-editor .ProseMirror pre .hljs-string { color: #98c379; }
+  .tiptap-editor .ProseMirror pre .hljs-comment { color: #5c6370; font-style: italic; }
+  .tiptap-editor .ProseMirror pre .hljs-function,
+  .tiptap-editor .ProseMirror pre .hljs-title { color: #61afef; }
+  .tiptap-editor .ProseMirror pre .hljs-number,
+  .tiptap-editor .ProseMirror pre .hljs-literal { color: #d19a66; }
+  .tiptap-editor .ProseMirror pre .hljs-variable,
+  .tiptap-editor .ProseMirror pre .hljs-params { color: #e06c75; }
+  .tiptap-editor .ProseMirror pre .hljs-built_in { color: #e6c07b; }
+  .tiptap-editor .ProseMirror pre .hljs-type { color: #e6c07b; }
+  .tiptap-editor .ProseMirror pre .hljs-attr,
+  .tiptap-editor .ProseMirror pre .hljs-property { color: #d19a66; }
+  .tiptap-editor .ProseMirror pre .hljs-meta { color: #61afef; }
+  .tiptap-editor .ProseMirror pre .hljs-tag { color: #e06c75; }
+  .tiptap-editor .ProseMirror pre .hljs-name { color: #e06c75; }
+  .tiptap-editor .ProseMirror pre .hljs-selector-class,
+  .tiptap-editor .ProseMirror pre .hljs-selector-tag { color: #e6c07b; }
+
+  /* Syntax highlighting — dark theme (same colors work well on dark bg, but tweak comment visibility) */
+  .dark .tiptap-editor .ProseMirror pre .hljs-comment { color: #7f848e; }
+
   .tiptap-editor .ProseMirror blockquote {
     @apply my-3 border-l-4 border-primary-400 pl-4 italic text-gray-600 dark:text-gray-400;
   }
