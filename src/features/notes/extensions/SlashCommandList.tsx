@@ -27,14 +27,18 @@ export const SlashCommandList = forwardRef<
   SlashCommandListProps
 >(({ items, command }, ref) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [phase, setPhase] = useState<"command" | "pick_parent">("command");
+  const [phase, setPhase] = useState<"command" | "pick_parent" | "input_title">("command");
   const [pendingTitle, setPendingTitle] = useState("");
   const [parentCandidates, setParentCandidates] = useState<TaskWithChildren[]>([]);
   const [parentFilter, setParentFilter] = useState("");
   const [parentIndex, setParentIndex] = useState(0);
+  const [inputCommand, setInputCommand] = useState<"task" | "subtask">("task");
+  const [inputTitle, setInputTitle] = useState("");
 
   useEffect(() => {
     setSelectedIndex(0);
+    setPhase("command");
+    setInputTitle("");
   }, [items]);
 
   const filteredParents = parentFilter
@@ -76,24 +80,33 @@ export const SlashCommandList = forwardRef<
 
   const handleCommandSelect = useCallback(
     (item: SlashCommandItem) => {
-      if (item.id === "subtask") {
-        if (!item.title.trim()) {
-          // No title yet — cancel
-          command({ id: "", label: "", description: "", title: "" });
-          return;
+      if (item.title.trim()) {
+        // Title provided inline — proceed directly
+        if (item.id === "subtask") {
+          setPendingTitle(item.title.trim());
+          setParentCandidates(getCachedTasks());
+          setPhase("pick_parent");
+        } else {
+          createTask(item.title);
         }
-        setPendingTitle(item.title.trim());
-        setParentCandidates(getCachedTasks());
-        setPhase("pick_parent");
       } else {
-        createTask(item.title);
+        // No title — transition to input phase
+        setInputCommand(item.id as "task" | "subtask");
+        setInputTitle("");
+        setPhase("input_title");
       }
     },
-    [command, createTask]
+    [createTask]
   );
 
   useImperativeHandle(ref, () => ({
     onKeyDown: ({ event }: { event: KeyboardEvent }) => {
+      if (phase === "input_title") {
+        // The real <input> handles keyboard events directly.
+        // Block everything to prevent editor insertion.
+        return true;
+      }
+
       if (phase === "pick_parent") {
         if (event.key === "ArrowUp") {
           setParentIndex((i) =>
@@ -105,7 +118,7 @@ export const SlashCommandList = forwardRef<
           setParentIndex((i) => (i + 1) % filteredParents.length);
           return true;
         }
-        if (event.key === "Enter") {
+        if (event.key === "Enter" || event.key === "Tab") {
           const parent = filteredParents[parentIndex];
           if (parent) {
             createTask(pendingTitle, parent.id);
@@ -132,7 +145,7 @@ export const SlashCommandList = forwardRef<
         setSelectedIndex((i) => (i + 1) % items.length);
         return true;
       }
-      if (event.key === "Enter") {
+      if (event.key === "Enter" || event.key === "Tab") {
         if (items[selectedIndex]) {
           handleCommandSelect(items[selectedIndex]);
         }
@@ -140,7 +153,53 @@ export const SlashCommandList = forwardRef<
       }
       return false;
     },
-  }));
+  }), [phase, items, selectedIndex, handleCommandSelect, filteredParents, parentIndex, createTask, pendingTitle, parentFilter, inputTitle, inputCommand]);
+
+  // Title input phase
+  if (phase === "input_title") {
+    const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const title = inputTitle.trim();
+        if (!title) return;
+        if (inputCommand === "subtask") {
+          setPendingTitle(title);
+          setParentCandidates(getCachedTasks());
+          setPhase("pick_parent");
+        } else {
+          createTask(title);
+        }
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        command({ id: "", label: "", description: "", title: "" });
+      }
+    };
+
+    return (
+      <div className="min-w-[280px] rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+        <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-700/50">
+          <div className="text-[10px] font-medium uppercase text-gray-400 dark:text-gray-500">
+            New {inputCommand === "subtask" ? "Subtask" : "Task"}
+          </div>
+        </div>
+        <div className="px-3 py-2">
+          <input
+            type="text"
+            autoFocus
+            value={inputTitle}
+            onChange={(e) => setInputTitle(e.target.value)}
+            onKeyDown={handleInputKeyDown}
+            placeholder="Task title..."
+            className="w-full rounded border border-gray-200 bg-transparent px-2 py-1.5 text-xs text-gray-800 placeholder-gray-400 outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400 dark:border-gray-600 dark:text-gray-200 dark:placeholder-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-500"
+          />
+          <div className="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500">
+            Enter to create &middot; Esc to cancel
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Parent picker phase
   if (phase === "pick_parent") {

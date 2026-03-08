@@ -122,13 +122,13 @@ export const TaskReferenceExtension = Node.create({
         command: ({ editor, range, props }) => {
           const item = props as unknown as SuggestionItem;
           if (item.id === "__create__") {
-            // Create a new task and insert reference
+            // Delete the typed text immediately, then create task and insert chip
+            editor.chain().focus().deleteRange(range).run();
             useTaskStore.getState().createTask({ workspace_id: "", title: item.title }).then((task) => {
               invalidateCache();
               editor
                 .chain()
                 .focus()
-                .deleteRange(range)
                 .insertContent({
                   type: "taskReference",
                   attrs: { entityType: "task", entityId: task.id },
@@ -155,9 +155,13 @@ export const TaskReferenceExtension = Node.create({
         render: () => {
           let component: ReactRenderer;
           let popup: Instance;
+          let currentItems: SuggestionItem[] = [];
+          let currentCommand: ((item: SuggestionItem) => void) | null = null;
 
           return {
             onStart: (props) => {
+              currentItems = props.items;
+              currentCommand = props.command;
               component = new ReactRenderer(EntitySuggestionList, {
                 props,
                 editor: props.editor,
@@ -178,6 +182,8 @@ export const TaskReferenceExtension = Node.create({
             },
 
             onUpdate(props) {
+              currentItems = props.items;
+              currentCommand = props.command;
               component?.updateProps(props);
               if (props.clientRect) {
                 popup?.setProps({
@@ -192,7 +198,16 @@ export const TaskReferenceExtension = Node.create({
                 return true;
               }
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              return (component?.ref as any)?.onKeyDown(props) ?? false;
+              const handled = (component?.ref as any)?.onKeyDown(props);
+              if (handled) return true;
+              // Fallback: if component ref isn't available, handle Enter/Tab directly
+              if (props.event.key === "Enter" || props.event.key === "Tab") {
+                if (currentItems.length > 0 && currentCommand) {
+                  currentCommand(currentItems[0]);
+                  return true;
+                }
+              }
+              return false;
             },
 
             onExit() {

@@ -1,10 +1,12 @@
 import * as ipc from "../../../lib/ipc";
 import type { TaskFilter, TaskWithChildren, Plan } from "../../../lib/types";
 import type { SuggestionItem } from "./EntitySuggestionList";
+import { useWorkspaceStore } from "../../../stores/workspaceStore";
 
 let cachedTasks: TaskWithChildren[] | null = null;
 let cachedPlans: Plan[] | null = null;
 let cacheExpiry = 0;
+let cachedWorkspaceId = "";
 
 export function invalidateCache(): void {
   cacheExpiry = 0;
@@ -16,10 +18,15 @@ export function getCachedTasks(): TaskWithChildren[] {
 
 export async function getSuggestionItems(query: string): Promise<SuggestionItem[]> {
   try {
+    const wsId = useWorkspaceStore.getState().activeWorkspaceId;
+    if (!wsId) return [];
+    // Invalidate cache if workspace changed
+    if (wsId !== cachedWorkspaceId) {
+      cachedTasks = null;
+      cachedPlans = null;
+      cachedWorkspaceId = wsId;
+    }
     if (!cachedTasks || !cachedPlans || Date.now() > cacheExpiry) {
-      const workspaces = await ipc.listWorkspaces();
-      if (!workspaces.length) return [];
-      const wsId = workspaces[0].id;
       const filter: TaskFilter = { workspace_id: wsId };
       const now = new Date();
       const monthAgo = new Date(now.getTime() - 30 * 86400000);

@@ -64,7 +64,7 @@ export const EntitySuggestionList = forwardRef<
         setSelectedIndex((i) => (i + 1) % items.length);
         return true;
       }
-      if (event.key === "Enter") {
+      if (event.key === "Enter" || event.key === "Tab") {
         if (items[selectedIndex]) {
           command(items[selectedIndex]);
         }
@@ -72,7 +72,7 @@ export const EntitySuggestionList = forwardRef<
       }
       return false;
     },
-  }));
+  }), [items, selectedIndex, command]);
 
   if (items.length === 0) {
     return (

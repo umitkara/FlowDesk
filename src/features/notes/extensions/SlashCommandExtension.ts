@@ -1,8 +1,11 @@
 import { Extension } from "@tiptap/core";
 import { ReactRenderer } from "@tiptap/react";
 import Suggestion from "@tiptap/suggestion";
+import { PluginKey } from "@tiptap/pm/state";
 import tippy, { type Instance } from "tippy.js";
 import { SlashCommandList, type SlashCommandItem } from "./SlashCommandList";
+
+const slashCommandPluginKey = new PluginKey("slashCommand");
 
 const COMMANDS: Omit<SlashCommandItem, "title">[] = [
   {
@@ -23,6 +26,7 @@ export const SlashCommandExtension = Extension.create({
   addProseMirrorPlugins() {
     return [
       Suggestion({
+        pluginKey: slashCommandPluginKey,
         editor: this.editor,
         char: "/",
         allowSpaces: true,
@@ -39,34 +43,34 @@ export const SlashCommandExtension = Extension.create({
             .map((c) => ({ ...c, title: titlePart }));
         },
         command: ({ editor, range, props }) => {
-          // The actual creation is handled inside SlashCommandList
-          // because subtask needs a two-phase flow (parent picker).
-          // This command is called when the list signals completion.
           const item = props as unknown as SlashCommandItem & {
             taskId?: string;
           };
+          // Always clean up the typed slash command text first
+          editor.chain().focus().deleteRange(range).run();
+          // Then insert the reference chip if a task was created
           if (item.taskId) {
             editor
               .chain()
               .focus()
-              .deleteRange(range)
               .insertContent({
                 type: "taskReference",
                 attrs: { entityType: "task", entityId: item.taskId },
               })
               .insertContent(" ")
               .run();
-          } else {
-            // No task created (cancelled or empty) — just clean up the slash text
-            editor.chain().focus().deleteRange(range).run();
           }
         },
         render: () => {
           let component: ReactRenderer;
           let popup: Instance;
+          let currentItems: SlashCommandItem[] = [];
+          let currentCommand: ((item: SlashCommandItem) => void) | null = null;
 
           return {
             onStart: (props) => {
+              currentItems = props.items;
+              currentCommand = props.command;
               component = new ReactRenderer(SlashCommandList, {
                 props,
                 editor: props.editor,
@@ -87,6 +91,8 @@ export const SlashCommandExtension = Extension.create({
             },
 
             onUpdate(props) {
+              currentItems = props.items;
+              currentCommand = props.command;
               component?.updateProps(props);
               if (props.clientRect) {
                 popup?.setProps({
@@ -101,7 +107,16 @@ export const SlashCommandExtension = Extension.create({
                 return true;
               }
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              return (component?.ref as any)?.onKeyDown(props) ?? false;
+              const handled = (component?.ref as any)?.onKeyDown(props);
+              if (handled) return true;
+              // Fallback: if component ref isn't available, handle Enter/Tab directly
+              if (props.event.key === "Enter" || props.event.key === "Tab") {
+                if (currentItems.length > 0 && currentCommand) {
+                  currentCommand(currentItems[0]);
+                  return true;
+                }
+              }
+              return false;
             },
 
             onExit() {
