@@ -17,7 +17,7 @@ pub fn suggest_on_tracker_stop(
     tracker_notes: &str,
     stopped_at: &str,
 ) -> Result<Vec<Suggestion>, rusqlite::Error> {
-    let today = &stopped_at[..10]; // Extract date portion
+    let today = if stopped_at.len() >= 10 { &stopped_at[..10] } else { return Ok(Vec::new()) };
     let mut suggestions: Vec<Suggestion> = Vec::new();
     let mut seen_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 

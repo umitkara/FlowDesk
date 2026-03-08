@@ -374,7 +374,8 @@ fn compute_planned_vs_actual(
                 let notes: Option<String> = row.get(7)?;
                 let preview = notes.map(|n| {
                     if n.len() > 100 {
-                        format!("{}...", &n[..100])
+                        let end = n.floor_char_boundary(100);
+                        format!("{}...", &n[..end])
                     } else {
                         n
                     }
@@ -433,33 +434,8 @@ fn extract_minutes_of_day(timestamp: &str) -> i64 {
 
 /// Increments a date string (YYYY-MM-DD) by one day.
 fn increment_date(date: &str) -> String {
-    let parts: Vec<&str> = date.split('-').collect();
-    if parts.len() != 3 {
-        return date.to_string();
-    }
-
-    let year: i32 = parts[0].parse().unwrap_or(2025);
-    let month: u32 = parts[1].parse().unwrap_or(1);
-    let day: u32 = parts[2].parse().unwrap_or(1);
-
-    let days_in_month = match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 => {
-            if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) {
-                29
-            } else {
-                28
-            }
-        }
-        _ => 30,
-    };
-
-    if day < days_in_month {
-        format!("{:04}-{:02}-{:02}", year, month, day + 1)
-    } else if month < 12 {
-        format!("{:04}-{:02}-01", year, month + 1)
-    } else {
-        format!("{:04}-01-01", year + 1)
-    }
+    chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
+        .map(|d| d.succ_opt().unwrap_or(d))
+        .map(|d| d.format("%Y-%m-%d").to_string())
+        .unwrap_or_else(|_| date.to_string())
 }

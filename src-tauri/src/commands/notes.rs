@@ -166,8 +166,7 @@ pub fn create_note(
     let now = now_iso();
     let body = input.body.unwrap_or_default();
     let body_hash = compute_body_hash(&body);
-    // Default date to today if not provided
-    let date = input.date.or_else(|| Some(now[..10].to_string()));
+    let date = input.date;
 
     let fm_json = input
         .front_matter
@@ -313,7 +312,11 @@ pub fn update_note(
         }
         if let Some(ref date) = input.date {
             set_clauses.push(format!("date = ?{}", idx));
-            params.push(Box::new(date.clone()));
+            if date.is_empty() {
+                params.push(Box::new(None::<String>));
+            } else {
+                params.push(Box::new(date.clone()));
+            }
             idx += 1;
         }
         if let Some(ref body) = input.body {

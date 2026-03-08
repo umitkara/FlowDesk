@@ -16,6 +16,7 @@ pub fn scan_markdown_directory(
 
     for entry in walkdir::WalkDir::new(root)
         .follow_links(true)
+        .max_depth(64)
         .into_iter()
         .filter_map(|e| e.ok())
     {
