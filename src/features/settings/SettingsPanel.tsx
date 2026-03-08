@@ -38,17 +38,6 @@ export function SettingsPanel() {
             className="w-20 rounded border border-gray-200 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800"
           />
         </SettingRow>
-        <SettingRow label="Editor Mode" description="WYSIWYG, split, or source view">
-          <select
-            value={settings.editor_mode ?? "wysiwyg"}
-            onChange={(e) => setSetting("editor_mode", e.target.value)}
-            className="rounded border border-gray-200 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800"
-          >
-            <option value="wysiwyg">WYSIWYG</option>
-            <option value="split">Split</option>
-            <option value="source">Source</option>
-          </select>
-        </SettingRow>
         <SettingRow label="Auto-save Delay" description="Milliseconds of inactivity before saving">
           <input
             type="number"
