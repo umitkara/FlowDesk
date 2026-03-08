@@ -44,7 +44,13 @@ export function NoteEditor() {
   const addSessionNote = useTrackerStore((s) => s.addSessionNote);
 
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+  const [localTitle, setLocalTitle] = useState(activeNote?.title ?? "");
   const { scheduleSnapshot } = useVersionHistory(activeNote?.id ?? "");
+
+  // Sync local title when switching notes
+  useEffect(() => {
+    setLocalTitle(activeNote?.title ?? "");
+  }, [activeNote?.id]);
 
   const delayMs = Math.max(200, Math.min(5000, parseInt(debounceMs, 10) || 1000));
 
@@ -85,6 +91,13 @@ export function NoteEditor() {
     editorProps: {
       attributes: {
         class: "prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[300px] px-8 py-6",
+      },
+      handleKeyDown: (_view, event) => {
+        if (event.key === "Tab") {
+          event.preventDefault();
+          return true;
+        }
+        return false;
       },
     },
   });
@@ -146,9 +159,19 @@ export function NoteEditor() {
           <div className="min-w-0 flex-1">
             <input
               type="text"
-              value={activeNote.title ?? ""}
+              value={localTitle}
               placeholder="Untitled"
-              onChange={(e) => updateNote(activeNote.id, { title: e.target.value })}
+              onChange={(e) => setLocalTitle(e.target.value)}
+              onBlur={() => {
+                if (localTitle !== (activeNote.title ?? "")) {
+                  updateNote(activeNote.id, { title: localTitle });
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
               className="w-full truncate bg-transparent text-base font-semibold text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-600"
             />
             <div className="mt-0.5 flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">

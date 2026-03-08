@@ -43,10 +43,13 @@ export function FrontMatterPanel() {
           value={activeNote.title ?? ""}
           onChange={(v) => handleFieldChange("title", v)}
         />
-        <Field
+        <ClearableField
           label="Date"
           value={activeNote.date ?? ""}
-          onChange={(v) => handleFieldChange("date", v)}
+          onChange={(v) => {
+            if (!activeNote) return;
+            updateNote(activeNote.id, { date: v });
+          }}
           type="date"
         />
         <Field
@@ -111,6 +114,46 @@ function Field({
         placeholder={placeholder}
         className="w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
       />
+    </div>
+  );
+}
+
+/** A metadata field with an optional clear button (useful for date inputs that browsers won't let you empty). */
+function ClearableField({
+  label,
+  value,
+  onChange,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+        {label}
+      </label>
+      <div className="flex items-center gap-1">
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+        />
+        {value && (
+          <button
+            onClick={() => onChange("")}
+            title={`Clear ${label.toLowerCase()}`}
+            className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

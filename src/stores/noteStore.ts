@@ -166,8 +166,37 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     try {
       const updated = await ipc.updateNote(id, input);
       set({ activeNote: updated, isSaving: false });
-      // Refresh list + folder tree — await to ensure UI stays in sync
-      await Promise.all([get().loadNotes(), get().loadFolderTree()]);
+
+      // Patch the note list item in-place instead of full reload
+      set((state) => ({
+        notes: state.notes.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                title: updated.title,
+                date: updated.date,
+                folder: updated.folder,
+                category: updated.category,
+                note_type: updated.note_type,
+                color: updated.color,
+                importance: updated.importance,
+                tags: updated.tags,
+                updated_at: updated.updated_at,
+              }
+            : n
+        ),
+      }));
+
+      // Only reload folder tree if folder changed
+      if ('folder' in input) {
+        get().loadFolderTree();
+      }
+
+      // Only reload calendar dates if date changed
+      if ('date' in input) {
+        const now = new Date();
+        get().loadDatesWithNotes(now.getFullYear(), now.getMonth() + 1);
+      }
     } catch (e) {
       set({ isSaving: false, saveError: String(e) });
     }

@@ -160,7 +160,19 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (get().selectedTask?.id === id) {
       set({ selectedTask: task });
     }
-    await get().fetchTasks();
+
+    // Patch the task in the list instead of full refetch
+    set((state) => ({
+      tasks: state.tasks.map((t) =>
+        t.id === id ? { ...t, ...task } : t
+      ),
+    }));
+
+    // Full refetch only for structural changes that affect list shape
+    if ('status' in updates || 'parent_id' in updates) {
+      await get().fetchTasks();
+    }
+
     return task;
   },
 

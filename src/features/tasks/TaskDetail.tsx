@@ -30,6 +30,10 @@ export function TaskDetail() {
   const [description, setDescription] = useState("");
   const [editingDescription, setEditingDescription] = useState(false);
   const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule | null>(null);
+  const [localCategory, setLocalCategory] = useState("");
+  const [localColor, setLocalColor] = useState("");
+  const [localEstimatedMins, setLocalEstimatedMins] = useState("");
+  const [localActualMins, setLocalActualMins] = useState("0");
 
   useEffect(() => {
     if (selectedTask) {
@@ -37,6 +41,10 @@ export function TaskDetail() {
       setDescription(selectedTask.description ?? "");
       setEditingTitle(false);
       setEditingDescription(false);
+      setLocalCategory(selectedTask.category ?? "");
+      setLocalColor(selectedTask.color ?? "");
+      setLocalEstimatedMins(selectedTask.estimated_mins != null ? String(selectedTask.estimated_mins) : "");
+      setLocalActualMins(String(selectedTask.actual_mins));
       // Load recurrence rule if task has one
       loadRuleForEntity("task", selectedTask.id).then(setRecurrenceRule).catch(() => setRecurrenceRule(null));
     }
@@ -274,10 +282,14 @@ export function TaskDetail() {
               </label>
               <input
                 type="text"
-                value={selectedTask.category ?? ""}
-                onChange={(e) =>
-                  handleUpdate({ category: e.target.value || null })
-                }
+                value={localCategory}
+                onChange={(e) => setLocalCategory(e.target.value)}
+                onBlur={() => {
+                  const val = localCategory || null;
+                  if (val !== (selectedTask.category ?? null)) {
+                    handleUpdate({ category: val });
+                  }
+                }}
                 placeholder="Category..."
                 className="w-full rounded border border-gray-200 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
               />
@@ -288,10 +300,14 @@ export function TaskDetail() {
               </label>
               <input
                 type="text"
-                value={selectedTask.color ?? ""}
-                onChange={(e) =>
-                  handleUpdate({ color: e.target.value || null })
-                }
+                value={localColor}
+                onChange={(e) => setLocalColor(e.target.value)}
+                onBlur={() => {
+                  const val = localColor || null;
+                  if (val !== (selectedTask.color ?? null)) {
+                    handleUpdate({ color: val });
+                  }
+                }}
                 placeholder="Color..."
                 className="w-full rounded border border-gray-200 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
               />
@@ -317,12 +333,15 @@ export function TaskDetail() {
               </label>
               <input
                 type="number"
-                value={selectedTask.estimated_mins ?? ""}
-                onChange={(e) =>
-                  handleUpdate({
-                    estimated_mins: e.target.value ? Number(e.target.value) : null,
-                  })
-                }
+                value={localEstimatedMins}
+                onChange={(e) => setLocalEstimatedMins(e.target.value)}
+                onBlur={() => {
+                  const val = localEstimatedMins ? Number(localEstimatedMins) : null;
+                  const prev = selectedTask.estimated_mins ?? null;
+                  if (val !== prev) {
+                    handleUpdate({ estimated_mins: val });
+                  }
+                }}
                 min={0}
                 className="w-full rounded border border-gray-200 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
               />
@@ -333,10 +352,14 @@ export function TaskDetail() {
               </label>
               <input
                 type="number"
-                value={selectedTask.actual_mins}
-                onChange={(e) =>
-                  handleUpdate({ actual_mins: Number(e.target.value) || 0 })
-                }
+                value={localActualMins}
+                onChange={(e) => setLocalActualMins(e.target.value)}
+                onBlur={() => {
+                  const val = Number(localActualMins) || 0;
+                  if (val !== selectedTask.actual_mins) {
+                    handleUpdate({ actual_mins: val });
+                  }
+                }}
                 min={0}
                 className="w-full rounded border border-gray-200 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
               />
