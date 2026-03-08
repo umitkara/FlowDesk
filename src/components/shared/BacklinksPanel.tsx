@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Backlink, BacklinkWithContext, EntityType } from "../../lib/types";
 import * as ipc from "../../lib/ipc";
-import { useNoteStore } from "../../stores/noteStore";
-import { useUIStore } from "../../stores/uiStore";
-import { useTaskStore } from "../../stores/taskStore";
+import { openEntity } from "../../lib/openEntity";
 
 /** Props for the shared backlinks panel. */
 interface BacklinksPanelProps {
@@ -17,10 +15,6 @@ export function BacklinksPanel({ targetType, targetId }: BacklinksPanelProps) {
   const [contextBacklinks, setContextBacklinks] = useState<BacklinkWithContext[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [useContext, setUseContext] = useState(true);
-  const selectNote = useNoteStore((s) => s.selectNote);
-  const setActiveView = useUIStore((s) => s.setActiveView);
-  const navigateTo = useUIStore((s) => s.navigateTo);
-  const openDetail = useTaskStore((s) => s.openDetail);
 
   useEffect(() => {
     const fetchBacklinks = async () => {
@@ -41,24 +35,15 @@ export function BacklinksPanel({ targetType, targetId }: BacklinksPanelProps) {
     fetchBacklinks();
   }, [targetType, targetId]);
 
-  const handleClickContext = async (bl: BacklinkWithContext) => {
-    if (bl.source_type === "note") {
-      await selectNote(bl.source_id);
-      navigateTo(bl.source_id);
-      setActiveView("notes");
-    } else if (bl.source_type === "task") {
-      openDetail(bl.source_id);
-    }
+  const handleClickContext = (bl: BacklinkWithContext) => {
+    openEntity({ type: bl.source_type as EntityType, id: bl.source_id });
   };
 
-  const handleClickBasic = async (backlink: Backlink) => {
-    if (backlink.reference.source_type === "note") {
-      await selectNote(backlink.reference.source_id);
-      navigateTo(backlink.reference.source_id);
-      setActiveView("notes");
-    } else if (backlink.reference.source_type === "task") {
-      openDetail(backlink.reference.source_id);
-    }
+  const handleClickBasic = (backlink: Backlink) => {
+    openEntity({
+      type: backlink.reference.source_type as EntityType,
+      id: backlink.reference.source_id,
+    });
   };
 
   if (isLoading) {

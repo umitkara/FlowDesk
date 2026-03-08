@@ -1,12 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { NodeViewWrapper } from "@tiptap/react";
 import type { NodeViewProps } from "@tiptap/react";
-import type { Task, Plan, TaskStatus } from "../../../lib/types";
+import type { Task, Plan, TaskStatus, EntityType } from "../../../lib/types";
 import { STATUS_CONFIG, PRIORITY_CONFIG, PLAN_TYPE_CONFIG } from "../../../lib/types";
 import * as ipc from "../../../lib/ipc";
-import { useTaskStore } from "../../../stores/taskStore";
-import { usePlanStore } from "../../../stores/planStore";
-import { useUIStore } from "../../../stores/uiStore";
+import { openEntity } from "../../../lib/openEntity";
 
 /**
  * React NodeView component for rendering entity reference nodes
@@ -24,10 +22,6 @@ export function TaskReferenceView({ node }: NodeViewProps) {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
-
-  const openDetail = useTaskStore((s) => s.openDetail);
-  const fetchPlanWithLinks = usePlanStore((s) => s.fetchPlanWithLinks);
-  const setActiveView = useUIStore((s) => s.setActiveView);
 
   const fetchEntity = useCallback(async () => {
     try {
@@ -79,8 +73,7 @@ export function TaskReferenceView({ node }: NodeViewProps) {
     e.preventDefault();
     e.stopPropagation();
     if (entityType === "task") {
-      setActiveView("tasks");
-      openDetail(entityId);
+      openEntity({ type: "task", id: entityId });
     }
   };
 
@@ -119,8 +112,7 @@ export function TaskReferenceView({ node }: NodeViewProps) {
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            setActiveView("plans");
-            fetchPlanWithLinks(entityId);
+            openEntity({ type: "plan", id: entityId });
           }}
           className="entity-ref-title"
           title={`${plan.title} — ${typeCfg?.label || plan.type}`}
@@ -137,7 +129,18 @@ export function TaskReferenceView({ node }: NodeViewProps) {
     return (
       <NodeViewWrapper as="span" className="entity-ref-chip">
         <span className="entity-ref-badge">{entityType}</span>
-        <span className="entity-ref-text">@{entityType}[{entityId.slice(0, 8)}...]</span>
+        <span
+          role="button"
+          tabIndex={-1}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openEntity({ type: entityType as EntityType, id: entityId });
+          }}
+          className="entity-ref-text cursor-pointer hover:underline"
+        >
+          @{entityType}[{entityId.slice(0, 8)}...]
+        </span>
       </NodeViewWrapper>
     );
   }

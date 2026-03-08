@@ -1,14 +1,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useUIStore } from "../../stores/uiStore";
 import { useCommandPaletteStore } from "../../stores/commandPaletteStore";
-import { useNoteStore } from "../../stores/noteStore";
-import { useTaskStore } from "../../stores/taskStore";
-import { usePlanStore } from "../../stores/planStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { searchEntities } from "../../lib/ipc";
 import { filterCommands } from "./fuzzyMatch";
-import type { SearchResult } from "../../lib/types";
+import type { SearchResult, EntityType } from "../../lib/types";
 import { STATUS_CONFIG } from "../../lib/types";
+import { openEntity } from "../../lib/openEntity";
 
 type ResultItem =
   | { kind: "command"; id: string; title: string; category: string; shortcut?: string; handler: () => void }
@@ -19,11 +17,6 @@ export function CommandPalette() {
   const isOpen = useUIStore((s) => s.commandPaletteOpen);
   const toggle = useUIStore((s) => s.toggleCommandPalette);
   const commands = useCommandPaletteStore((s) => s.commands);
-  const selectNote = useNoteStore((s) => s.selectNote);
-  const setActiveView = useUIStore((s) => s.setActiveView);
-  const navigateTo = useUIStore((s) => s.navigateTo);
-  const openTaskDetail = useTaskStore((s) => s.openDetail);
-  const fetchPlanWithLinks = usePlanStore((s) => s.fetchPlanWithLinks);
 
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -107,20 +100,10 @@ export function CommandPalette() {
         item.handler();
       } else {
         const { result } = item;
-        if (result.entity_type === "task") {
-          setActiveView("tasks");
-          openTaskDetail(result.id);
-        } else if (result.entity_type === "plan") {
-          setActiveView("plans");
-          fetchPlanWithLinks(result.id);
-        } else {
-          await selectNote(result.id);
-          navigateTo(result.id);
-          setActiveView("notes");
-        }
+        await openEntity({ type: result.entity_type as EntityType, id: result.id });
       }
     },
-    [toggle, selectNote, navigateTo, setActiveView, openTaskDetail, fetchPlanWithLinks],
+    [toggle],
   );
 
   const handleKeyDown = useCallback(

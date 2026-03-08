@@ -1,10 +1,7 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useSearchStore } from "../../stores/searchStore";
-import { useUIStore } from "../../stores/uiStore";
-import { useNoteStore } from "../../stores/noteStore";
-import { useTaskStore } from "../../stores/taskStore";
-import { usePlanStore } from "../../stores/planStore";
-import type { FacetedSearchResult, SavedFilter } from "../../lib/types";
+import type { FacetedSearchResult, SavedFilter, EntityType } from "../../lib/types";
+import { openEntity } from "../../lib/openEntity";
 
 /* ------------------------------------------------------------------ */
 /*  Inline SVG icon helpers                                            */
@@ -113,12 +110,6 @@ export function FacetedSearch() {
   const applySavedFilter = useSearchStore((s) => s.applySavedFilter);
   const removeSavedFilter = useSearchStore((s) => s.removeSavedFilter);
 
-  const selectNote = useNoteStore((s) => s.selectNote);
-  const navigateTo = useUIStore((s) => s.navigateTo);
-  const setActiveView = useUIStore((s) => s.setActiveView);
-  const openDetail = useTaskStore((s) => s.openDetail);
-  const fetchPlanWithLinks = usePlanStore((s) => s.fetchPlanWithLinks);
-
   const [savedDropdownOpen, setSavedDropdownOpen] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveFilterName, setSaveFilterName] = useState("");
@@ -150,20 +141,10 @@ export function FacetedSearch() {
 
   // Navigate to entity
   const handleSelectResult = useCallback(
-    async (result: FacetedSearchResult) => {
-      if (result.entity_type === "task") {
-        setActiveView("tasks");
-        openDetail(result.id);
-      } else if (result.entity_type === "plan") {
-        setActiveView("plans");
-        fetchPlanWithLinks(result.id);
-      } else {
-        await selectNote(result.id);
-        navigateTo(result.id);
-        setActiveView("notes");
-      }
+    (result: FacetedSearchResult) => {
+      openEntity({ type: result.entity_type as EntityType, id: result.id });
     },
-    [selectNote, navigateTo, setActiveView, openDetail, fetchPlanWithLinks],
+    [],
   );
 
   // Toggle a value in an array-based filter

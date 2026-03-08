@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import ForceGraph2D from "react-force-graph-2d";
 import * as ipc from "../../lib/ipc";
-import type { GraphData, GraphNode } from "../../lib/types";
+import type { GraphData, GraphNode, EntityType } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
-import { useNoteStore } from "../../stores/noteStore";
-import { useTaskStore } from "../../stores/taskStore";
-import { useUIStore } from "../../stores/uiStore";
+import { openEntity } from "../../lib/openEntity";
 
 // ---------------------------------------------------------------------------
 // Constants & mappings
@@ -267,9 +265,6 @@ function useIsDark() {
 
 export default function GraphView() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspace?.id);
-  const selectNote = useNoteStore((s) => s.selectNote);
-  const openDetail = useTaskStore((s) => s.openDetail);
-  const setActiveView = useUIStore((s) => s.setActiveView);
   const isDark = useIsDark();
 
   // Controls
@@ -431,24 +426,9 @@ export default function GraphView() {
   // Navigate to entity from detail card
   const navigateToEntity = useCallback(
     (node: InternalNode) => {
-      switch (node.entity_type) {
-        case "note":
-          selectNote(node.id);
-          setActiveView("notes");
-          break;
-        case "task":
-          openDetail(node.id);
-          setActiveView("tasks");
-          break;
-        case "plan":
-          setActiveView("plans");
-          break;
-        case "time_entry":
-          setActiveView("time-reports");
-          break;
-      }
+      openEntity({ type: node.entity_type as EntityType, id: node.id });
     },
-    [selectNote, openDetail, setActiveView],
+    [],
   );
 
   // Close detail card on background click

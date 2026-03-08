@@ -1,11 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import * as ipc from "../../lib/ipc";
-import type { GroupedViewResult, GroupEntry, FacetedSearchResult } from "../../lib/types";
+import type { GroupedViewResult, GroupEntry, FacetedSearchResult, EntityType } from "../../lib/types";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
-import { useNoteStore } from "../../stores/noteStore";
-import { useTaskStore } from "../../stores/taskStore";
-import { usePlanStore } from "../../stores/planStore";
-import { useUIStore } from "../../stores/uiStore";
+import { openEntity } from "../../lib/openEntity";
 
 /** Group-by field options per entity type. */
 const GROUP_BY_OPTIONS: Record<string, { value: string; label: string }[]> = {
@@ -49,11 +46,6 @@ function relativeTime(iso: string): string {
 /** Grouped entity view with collapsible accordion sections. */
 export default function GroupedView() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const selectNote = useNoteStore((s) => s.selectNote);
-  const navigateTo = useUIStore((s) => s.navigateTo);
-  const setActiveView = useUIStore((s) => s.setActiveView);
-  const openDetail = useTaskStore((s) => s.openDetail);
-  const fetchPlanWithLinks = usePlanStore((s) => s.fetchPlanWithLinks);
 
   const [entityType, setEntityType] = useState("note");
   const [groupBy, setGroupBy] = useState("category");
@@ -105,20 +97,10 @@ export default function GroupedView() {
 
   /** Navigate to an entity when clicked. */
   const handleItemClick = useCallback(
-    async (item: FacetedSearchResult) => {
-      if (item.entity_type === "note") {
-        await selectNote(item.id);
-        navigateTo(item.id);
-        setActiveView("notes");
-      } else if (item.entity_type === "task") {
-        openDetail(item.id);
-        setActiveView("tasks");
-      } else if (item.entity_type === "plan") {
-        await fetchPlanWithLinks(item.id);
-        setActiveView("plans");
-      }
+    (item: FacetedSearchResult) => {
+      openEntity({ type: item.entity_type as EntityType, id: item.id });
     },
-    [selectNote, navigateTo, setActiveView, openDetail, fetchPlanWithLinks],
+    [],
   );
 
   const groupByOptions = GROUP_BY_OPTIONS[entityType] ?? [];

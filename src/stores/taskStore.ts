@@ -87,6 +87,8 @@ interface TaskState {
   setSort: (sort: TaskSort) => void;
   /** Open detail panel for a task. */
   openDetail: (taskId: string) => void;
+  /** Fetch a task by ID (from memory or backend) and open its detail panel. */
+  fetchAndOpenDetail: (taskId: string) => Promise<void>;
   /** Close detail panel. */
   closeDetail: () => void;
   /** Open quick-add modal. */
@@ -304,6 +306,20 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const task = get().tasks.find((t) => t.id === taskId);
     if (task) {
       set({ selectedTask: task, isDetailOpen: true });
+    }
+  },
+
+  fetchAndOpenDetail: async (taskId) => {
+    const local = get().tasks.find((t) => t.id === taskId);
+    if (local) {
+      set({ selectedTask: local, isDetailOpen: true });
+      return;
+    }
+    try {
+      const task = await ipc.getTask(taskId);
+      set({ selectedTask: task, isDetailOpen: true });
+    } catch {
+      console.warn(`Failed to open task ${taskId}`);
     }
   },
 

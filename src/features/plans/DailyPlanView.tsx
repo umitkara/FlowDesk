@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { usePlanStore } from "../../stores/planStore";
 import { useTaskStore } from "../../stores/taskStore";
-import { useUIStore } from "../../stores/uiStore";
 import { useTrackerStore } from "../../stores/trackerStore";
 import { BulkMoveToWorkspaceMenu } from "../../components/shared/BulkMoveToWorkspaceMenu";
 import { PLAN_TYPE_CONFIG, STATUS_CONFIG } from "../../lib/types";
 import type { Plan, PlanLinkedTask, PlanWithLinks, TaskStatus, Task } from "../../lib/types";
 import * as ipc from "../../lib/ipc";
+import { openEntity } from "../../lib/openEntity";
 
 /** Formats a date string for display. */
 function formatDate(iso: string): string {
@@ -44,11 +44,9 @@ export default function DailyPlanView() {
     fetchDailySummary,
     setDailyPlanDate,
     openDialog,
-    fetchPlanWithLinks,
   } = usePlanStore();
   const stickyTasks = useTaskStore((s) => s.stickyTasks);
   const fetchStickyTasks = useTaskStore((s) => s.fetchStickyTasks);
-  const { setActiveView } = useUIStore();
 
   const [initialized, setInitialized] = useState(false);
   /** Map from plan ID to its linked tasks (fetched per time block/event). */
@@ -114,9 +112,9 @@ export default function DailyPlanView() {
 
   const handlePlanClick = useCallback(
     (planId: string) => {
-      fetchPlanWithLinks(planId);
+      openEntity({ type: "plan", id: planId });
     },
-    [fetchPlanWithLinks]
+    [],
   );
 
   const handleAddTimeBlock = useCallback(() => {
@@ -406,7 +404,7 @@ export default function DailyPlanView() {
                           return (
                             <button
                               key={lt.task_id}
-                              onClick={() => setActiveView("tasks")}
+                              onClick={() => openEntity({ type: "task", id: lt.task_id })}
                               className="flex w-full items-center gap-1.5 rounded px-1.5 py-0.5 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                             >
                               <span className={`text-[10px] ${sCfg?.color || "text-zinc-400"}`}>
@@ -440,9 +438,7 @@ export default function DailyPlanView() {
                 return (
                   <button
                     key={lt.task_id}
-                    onClick={() => {
-                      setActiveView("tasks");
-                    }}
+                    onClick={() => openEntity({ type: "task", id: lt.task_id })}
                     className="flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                   >
                     <span className={`text-[10px] ${statusCfg?.color || "text-zinc-400"}`}>
@@ -478,7 +474,7 @@ export default function DailyPlanView() {
                   return (
                     <button
                       key={t.id}
-                      onClick={() => setActiveView("tasks")}
+                      onClick={() => openEntity({ type: "task", id: t.id })}
                       className="flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                     >
                       <span className={`text-[10px] ${statusCfg?.color || "text-zinc-400"}`}>☐</span>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Reference, EntityType, RelationType } from "../../lib/types";
 import * as ipc from "../../lib/ipc";
-import { useTaskStore } from "../../stores/taskStore";
+import { openEntity } from "../../lib/openEntity";
 
 interface ReferencesSectionProps {
   entityType: EntityType;
@@ -25,8 +25,6 @@ export function ReferencesSection({ entityType, entityId }: ReferencesSectionPro
   const [addTargetId, setAddTargetId] = useState("");
   const [addTargetType, setAddTargetType] = useState<EntityType>("task");
   const [allTasks, setAllTasks] = useState<{ id: string; title: string }[]>([]);
-
-  const openDetail = useTaskStore((s) => s.openDetail);
 
   const fetchRefs = async () => {
     setIsLoading(true);
@@ -111,8 +109,8 @@ export function ReferencesSection({ entityType, entityId }: ReferencesSectionPro
             <span className={`font-medium ${relCfg.color}`}>{relCfg.label}:</span>
             <button
               onClick={() => {
-                if (ref.target_type === "task" && ref.target_id) {
-                  openDetail(ref.target_id);
+                if (ref.target_id) {
+                  openEntity({ type: ref.target_type as EntityType, id: ref.target_id });
                 }
               }}
               className="flex-1 truncate text-left text-gray-700 hover:underline dark:text-gray-300"

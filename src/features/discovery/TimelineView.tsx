@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useActivityStore } from "../../stores/activityStore";
-import { useNoteStore } from "../../stores/noteStore";
-import { useTaskStore } from "../../stores/taskStore";
-import { useUIStore } from "../../stores/uiStore";
-import type { ActivityEntry } from "../../lib/types";
+import type { ActivityEntry, EntityType } from "../../lib/types";
+import { openEntity } from "../../lib/openEntity";
 
 /** Date range preset identifiers. */
 type DatePreset = "today" | "week" | "month";
@@ -225,10 +223,6 @@ export default function TimelineView() {
   const loadActivity = useActivityStore((s) => s.loadActivity);
   const loadMore = useActivityStore((s) => s.loadMore);
 
-  const selectNote = useNoteStore((s) => s.selectNote);
-  const selectTask = useTaskStore((s) => s.selectTask);
-  const setActiveView = useUIStore((s) => s.setActiveView);
-
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [activePreset, setActivePreset] = useState<DatePreset>("week");
   const [activeFilter, setActiveFilter] = useState<EntityTypeFilter>("all");
@@ -287,24 +281,9 @@ export default function TimelineView() {
   const handleEntryClick = useCallback(
     (entry: ActivityEntry) => {
       if (entry.action === "deleted") return;
-      switch (entry.entity_type) {
-        case "note":
-          setActiveView("notes");
-          selectNote(entry.entity_id);
-          break;
-        case "task":
-          setActiveView("tasks");
-          selectTask(entry.entity_id);
-          break;
-        case "plan":
-          setActiveView("daily-plan");
-          break;
-        case "time_entry":
-          setActiveView("time-reports");
-          break;
-      }
+      openEntity({ type: entry.entity_type as EntityType, id: entry.entity_id });
     },
-    [setActiveView, selectNote, selectTask],
+    [],
   );
 
   const grouped = groupByDate(entries);
