@@ -264,29 +264,21 @@ pub fn update_note(
 ) -> Result<Note, AppError> {
     let now = now_iso();
 
-    // Capture previous state for undo
-    if let Ok(prev_note) = state.db.with_conn(|conn| {
+    // Capture previous state for undo (push deferred until after successful update)
+    let prev_snapshot = state.db.with_conn(|conn| {
         read_note(conn, &id).map_err(|e| match e {
             AppError::Database(db_err) => db_err,
             _ => rusqlite::Error::InvalidQuery,
         })
-    }) {
+    }).ok().map(|prev_note| {
+        let desc = format!("Edit note: {}", prev_note.title.as_deref().unwrap_or("Untitled"));
         let prev_state = serde_json::json!({
             "title": prev_note.title,
             "body": prev_note.body,
             "body_hash": prev_note.body_hash,
         });
-        if let Ok(mut history) = state.operation_history.lock() {
-            history.push(UndoableOperation {
-                operation_type: OperationType::Update,
-                entity_type: UndoEntityType::Note,
-                entity_id: id.clone(),
-                previous_state: prev_state,
-                description: format!("Edit note: {}", prev_note.title.as_deref().unwrap_or("Untitled")),
-                timestamp: now.clone(),
-            });
-        }
-    }
+        (prev_state, desc)
+    });
 
     state.db.with_conn(|conn| {
         // Verify note exists and is not deleted
@@ -400,6 +392,26 @@ pub fn update_note(
     })
     .map_err(AppError::Database)?;
 
+    // Push undo operation now that the update succeeded
+    if let Some((prev_state, desc)) = prev_snapshot {
+        let after_state = serde_json::json!({
+            "title": note.title,
+            "body": note.body,
+            "body_hash": note.body_hash,
+        });
+        if let Ok(mut history) = state.operation_history.lock() {
+            history.push(UndoableOperation {
+                operation_type: OperationType::Update,
+                entity_type: UndoEntityType::Note,
+                entity_id: id.clone(),
+                previous_state: prev_state,
+                after_state,
+                description: desc,
+                timestamp: now.clone(),
+            });
+        }
+    }
+
     // Best-effort activity logging
     let _ = state.db.with_conn(|conn| {
         log_activity(conn, &note.workspace_id, "note", &id, note.title.as_deref(), "updated", None)
@@ -420,20 +432,6 @@ pub fn delete_note(state: State<'_, AppState>, id: String) -> Result<(), AppErro
         ).ok().map_or(Ok(None), |v| Ok(Some(v)))
     })?;
 
-    // Push undo operation
-    if let Some((ref _ws, ref title)) = meta {
-        if let Ok(mut history) = state.operation_history.lock() {
-            history.push(UndoableOperation {
-                operation_type: OperationType::Delete,
-                entity_type: UndoEntityType::Note,
-                entity_id: id.clone(),
-                previous_state: serde_json::json!({}),
-                description: format!("Delete note: {}", title.as_deref().unwrap_or("Untitled")),
-                timestamp: now_iso(),
-            });
-        }
-    }
-
     let now = now_iso();
     let affected = state.db.with_conn(|conn| {
         conn.execute(
@@ -447,6 +445,21 @@ pub fn delete_note(state: State<'_, AppState>, id: String) -> Result<(), AppErro
             entity: "Note".to_string(),
             id,
         });
+    }
+
+    // Push undo operation after successful delete
+    if let Some((ref _ws, ref title)) = meta {
+        if let Ok(mut history) = state.operation_history.lock() {
+            history.push(UndoableOperation {
+                operation_type: OperationType::Delete,
+                entity_type: UndoEntityType::Note,
+                entity_id: id.clone(),
+                previous_state: serde_json::json!({}),
+                after_state: serde_json::Value::Null,
+                description: format!("Delete note: {}", title.as_deref().unwrap_or("Untitled")),
+                timestamp: now_iso(),
+            });
+        }
     }
 
     // Best-effort activity logging

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
+import { listen } from "@tauri-apps/api/event";
 import * as ipc from "../lib/ipc";
 import type { UndoRedoState } from "../lib/types";
 
-/** Hook for managing undo/redo operations. */
+/** Hook for managing undo/redo operations via event-driven state. */
 export function useUndoRedo() {
   const [state, setState] = useState<UndoRedoState>({
     can_undo: false,
@@ -22,9 +23,10 @@ export function useUndoRedo() {
 
   useEffect(() => {
     refresh();
-    // Poll every 2 seconds
-    const interval = setInterval(refresh, 2000);
-    return () => clearInterval(interval);
+    const unlisten = listen<UndoRedoState>("undo-state-changed", (event) => {
+      setState(event.payload);
+    });
+    return () => { unlisten.then((fn) => fn()); };
   }, [refresh]);
 
   const undo = useCallback(async () => {

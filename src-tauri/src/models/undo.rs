@@ -22,6 +22,7 @@ pub struct UndoableOperation {
     pub entity_type: UndoEntityType,
     pub entity_id: String,
     pub previous_state: serde_json::Value,
+    pub after_state: serde_json::Value,
     pub description: String,
     pub timestamp: String,
 }

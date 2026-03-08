@@ -35,10 +35,21 @@ import { TemplateManager } from "../../features/notes/TemplateManager";
 import { ImportWizard } from "../../features/import/ImportWizard";
 import { CommandPalette } from "../../features/command-palette/CommandPalette";
 import { QuickCapture } from "../../features/capture/QuickCapture";
+import { useUndoRedo } from "../../hooks/useUndoRedo";
 import { usePlanStore } from "../../stores/planStore";
 import { useTrackerStore } from "../../stores/trackerStore";
 import { BreakNotificationBanner } from "../../features/tracker/BreakNotificationBanner";
 import { todayISO } from "../../lib/utils";
+
+function isEditorFocused(): boolean {
+  const el = document.activeElement;
+  if (!el) return false;
+  const tag = el.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA") return true;
+  if ((el as HTMLElement).isContentEditable) return true;
+  if (el.closest?.(".ProseMirror")) return true;
+  return false;
+}
 
 /** Root layout container with sidebar, main content, and status bar. */
 export function AppShell() {
@@ -70,6 +81,8 @@ export function AppShell() {
   const breakNotification = useTrackerStore((s) => s.breakNotification);
   const snoozeBreak = useTrackerStore((s) => s.snoozeBreak);
   const dismissBreakNotification = useTrackerStore((s) => s.dismissBreakNotification);
+
+  const { undo, redo } = useUndoRedo();
 
   useEffect(() => {
     if (activeView === "tasks") {
@@ -199,6 +212,23 @@ export function AppShell() {
 
   useKeyboardShortcuts(shortcuts);
 
+  // Undo/Redo shortcuts — separate from useKeyboardShortcuts to avoid
+  // preventDefault when editor/input is focused (Tiptap has its own undo)
+  useEffect(() => {
+    const handleUndoRedo = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return;
+      if (isEditorFocused()) return;
+      e.preventDefault();
+      if (e.shiftKey) {
+        redo();
+      } else {
+        undo();
+      }
+    };
+    window.addEventListener("keydown", handleUndoRedo);
+    return () => window.removeEventListener("keydown", handleUndoRedo);
+  }, [undo, redo]);
+
   // Register commands for the command palette
   useEffect(() => {
     registerCommands([
@@ -226,8 +256,10 @@ export function AppShell() {
       { id: "action:new-task", title: "New Task", category: "Actions", shortcut: "Ctrl+Shift+T", handler: () => openQuickAdd(), keywords: ["create", "new", "task", "todo"] },
       { id: "action:import", title: "Import Data", category: "Actions", handler: () => setActiveView("import-wizard"), keywords: ["import", "csv", "markdown", "obsidian"] },
       { id: "action:snooze-break", title: "Snooze Break Reminder", category: "Actions", shortcut: "Ctrl+Shift+B", handler: () => { snoozeBreak(); dismissBreakNotification(); }, keywords: ["break", "snooze", "reminder"] },
+      { id: "action:undo", title: "Undo", category: "Actions", shortcut: "Ctrl+Z", handler: () => undo(), keywords: ["undo", "revert"] },
+      { id: "action:redo", title: "Redo", category: "Actions", shortcut: "Ctrl+Shift+Z", handler: () => redo(), keywords: ["redo", "repeat"] },
     ]);
-  }, [registerCommands, setActiveView, handleNewNote, openDailyNote, toggleQuickCapture, openQuickAdd, snoozeBreak, dismissBreakNotification]);
+  }, [registerCommands, setActiveView, handleNewNote, openDailyNote, toggleQuickCapture, openQuickAdd, snoozeBreak, dismissBreakNotification, undo, redo]);
 
   return (
     <div className="flex h-full flex-col bg-white dark:bg-gray-950">

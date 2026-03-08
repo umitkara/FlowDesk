@@ -544,31 +544,24 @@ pub fn update_task(
     updates: UpdateTask,
 ) -> Result<Task, AppError> {
     let now = now_iso();
+    let now_for_undo = now.clone();
 
-    // Capture previous state for undo
-    if let Ok(prev_task) = state.db.with_conn(|conn| {
+    // Capture previous state for undo (push deferred until after successful update)
+    let prev_snapshot = state.db.with_conn(|conn| {
         read_task(conn, &id).map_err(|e| match e {
             AppError::Database(db_err) => db_err,
             _ => rusqlite::Error::InvalidQuery,
         })
-    }) {
+    }).ok().map(|prev_task| {
+        let desc = format!("Edit task: {}", prev_task.title);
         let prev_state = serde_json::json!({
             "title": prev_task.title,
             "description": prev_task.description,
             "status": prev_task.status,
             "priority": prev_task.priority,
         });
-        if let Ok(mut history) = state.operation_history.lock() {
-            history.push(UndoableOperation {
-                operation_type: OperationType::Update,
-                entity_type: UndoEntityType::Task,
-                entity_id: id.clone(),
-                previous_state: prev_state,
-                description: format!("Edit task: {}", prev_task.title),
-                timestamp: now.clone(),
-            });
-        }
-    }
+        (prev_state, desc)
+    });
 
     state.db.with_conn(|conn| {
         // Verify task exists and is not deleted
@@ -763,6 +756,26 @@ pub fn update_task(
         }
     })
     .inspect(|t| {
+        // Push undo operation after successful update
+        if let Some((prev_state, desc)) = prev_snapshot {
+            let after_state = serde_json::json!({
+                "title": t.title,
+                "description": t.description,
+                "status": t.status,
+                "priority": t.priority,
+            });
+            if let Ok(mut history) = state.operation_history.lock() {
+                history.push(UndoableOperation {
+                    operation_type: OperationType::Update,
+                    entity_type: UndoEntityType::Task,
+                    entity_id: t.id.clone(),
+                    previous_state: prev_state,
+                    after_state,
+                    description: desc,
+                    timestamp: now_for_undo.clone(),
+                });
+            }
+        }
         // Best-effort activity logging
         let _ = state.db.with_conn(|conn| {
             log_activity(conn, &t.workspace_id, "task", &t.id, Some(&t.title), "updated", None)
@@ -775,24 +788,6 @@ pub fn update_task(
 pub fn delete_task(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let now = now_iso();
 
-    // Push undo operation
-    if let Ok(prev_task) = state.db.with_conn(|conn| {
-        read_task(conn, &id).map_err(|e| match e {
-            AppError::Database(db_err) => db_err,
-            _ => rusqlite::Error::InvalidQuery,
-        })
-    }) {
-        if let Ok(mut history) = state.operation_history.lock() {
-            history.push(UndoableOperation {
-                operation_type: OperationType::Delete,
-                entity_type: UndoEntityType::Task,
-                entity_id: id.clone(),
-                previous_state: serde_json::json!({}),
-                description: format!("Delete task: {}", prev_task.title),
-                timestamp: now.clone(),
-            });
-        }
-    }
     let task_meta = state
         .db
         .with_conn(|conn| {
@@ -836,6 +831,19 @@ pub fn delete_task(state: State<'_, AppState>, id: String) -> Result<(), AppErro
                 AppError::Database(e)
             }
         })?;
+
+    // Push undo operation after successful delete
+    if let Ok(mut history) = state.operation_history.lock() {
+        history.push(UndoableOperation {
+            operation_type: OperationType::Delete,
+            entity_type: UndoEntityType::Task,
+            entity_id: id.clone(),
+            previous_state: serde_json::json!({}),
+            after_state: serde_json::Value::Null,
+            description: format!("Delete task: {}", task_meta.1),
+            timestamp: now.clone(),
+        });
+    }
 
     // Best-effort activity logging
     let _ = state.db.with_conn(|conn| {
@@ -920,30 +928,7 @@ pub fn toggle_task_status(state: State<'_, AppState>, id: String) -> Result<Task
     let now = now_iso();
     let id_log = id.clone();
 
-    // Push undo operation for status change
-    if let Ok(prev_task) = state.db.with_conn(|conn| {
-        read_task(conn, &id).map_err(|e| match e {
-            AppError::Database(db_err) => db_err,
-            _ => rusqlite::Error::InvalidQuery,
-        })
-    }) {
-        let prev_state = serde_json::json!({
-            "status": prev_task.status,
-            "completed_at": prev_task.completed_at,
-        });
-        if let Ok(mut history) = state.operation_history.lock() {
-            history.push(UndoableOperation {
-                operation_type: OperationType::StatusChange,
-                entity_type: UndoEntityType::Task,
-                entity_id: id.clone(),
-                previous_state: prev_state,
-                description: format!("Toggle task: {}", prev_task.title),
-                timestamp: now.clone(),
-            });
-        }
-    }
-
-    let (old_status, task) = state
+    let (old_status, old_completed_at, task) = state
         .db
         .with_conn(|conn| {
             let existing = read_task(conn, &id).map_err(|e| match e {
@@ -958,6 +943,7 @@ pub fn toggle_task_status(state: State<'_, AppState>, id: String) -> Result<Task
             }
 
             let old_status = existing.status.clone();
+            let old_completed_at = existing.completed_at.clone();
 
             if existing.status == "done" {
                 conn.execute(
@@ -975,7 +961,7 @@ pub fn toggle_task_status(state: State<'_, AppState>, id: String) -> Result<Task
                 AppError::Database(db_err) => db_err,
                 _ => rusqlite::Error::InvalidQuery,
             })?;
-            Ok((old_status, updated))
+            Ok((old_status, old_completed_at, updated))
         })
         .map_err(|e| {
             if matches!(e, rusqlite::Error::QueryReturnedNoRows) {
@@ -987,6 +973,29 @@ pub fn toggle_task_status(state: State<'_, AppState>, id: String) -> Result<Task
                 AppError::Database(e)
             }
         })?;
+
+    // Push undo operation after successful toggle
+    {
+        let prev_state = serde_json::json!({
+            "status": old_status,
+            "completed_at": old_completed_at,
+        });
+        let after_state = serde_json::json!({
+            "status": task.status,
+            "completed_at": task.completed_at,
+        });
+        if let Ok(mut history) = state.operation_history.lock() {
+            history.push(UndoableOperation {
+                operation_type: OperationType::StatusChange,
+                entity_type: UndoEntityType::Task,
+                entity_id: id_log.clone(),
+                previous_state: prev_state,
+                after_state,
+                description: format!("Toggle task: {}", task.title),
+                timestamp: now.clone(),
+            });
+        }
+    }
 
     // Best-effort activity logging
     let action = if task.status == "done" { "completed" } else { "status_changed" };
