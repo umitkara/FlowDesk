@@ -22,7 +22,8 @@ import { VersionHistory } from "./VersionHistory";
 import { timeAgo } from "../../lib/utils";
 import { TaskReferenceExtension, preprocessEntityRefs } from "./extensions/TaskReferenceExtension";
 import { SlashCommandExtension } from "./extensions/SlashCommandExtension";
-import { syncNoteReferences } from "../../lib/ipc";
+import { syncNoteReferences, getVersionHistoryConfig, exportNotesMarkdown } from "../../lib/ipc";
+import { open } from "@tauri-apps/plugin-dialog";
 import { MoveToWorkspaceMenu } from "../../components/shared/MoveToWorkspaceMenu";
 
 /** Tiptap-based markdown editor for notes with title bar and metadata drawer. */
@@ -46,6 +47,13 @@ export function NoteEditor() {
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [localTitle, setLocalTitle] = useState(activeNote?.title ?? "");
   const { scheduleSnapshot } = useVersionHistory(activeNote?.id ?? "");
+  const [vhConfig, setVhConfig] = useState({ enabled: true, snapshot_debounce_secs: 5 });
+
+  useEffect(() => {
+    getVersionHistoryConfig()
+      .then((cfg) => setVhConfig({ enabled: cfg.enabled, snapshot_debounce_secs: cfg.snapshot_debounce_secs }))
+      .catch(() => {});
+  }, []);
 
   // Sync local title when switching notes
   useEffect(() => {
@@ -59,8 +67,10 @@ export function NoteEditor() {
       updateNote(activeNote.id, { body });
       // Sync inline @task[id] references after save
       syncNoteReferences(activeNote.id, body).catch(() => {});
-      // Schedule a version snapshot (5s debounce)
-      scheduleSnapshot(activeNote.workspace_id, activeNote.title, body, 5);
+      // Schedule a version snapshot if enabled
+      if (vhConfig.enabled) {
+        scheduleSnapshot(activeNote.workspace_id, activeNote.title, body, vhConfig.snapshot_debounce_secs);
+      }
     }
   }, delayMs);
 
@@ -396,6 +406,29 @@ export function NoteEditor() {
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </ToolbarButton>
+
+            {/* Export note button */}
+            <ToolbarButton
+              active={false}
+              onClick={async () => {
+                if (!activeNote) return;
+                const dir = await open({ directory: true, title: "Export note to..." });
+                if (typeof dir === "string") {
+                  await exportNotesMarkdown({
+                    workspace_id: activeNote.workspace_id,
+                    output_dir: dir,
+                    note_ids: [activeNote.id],
+                    include_front_matter: true,
+                    flatten_folders: true,
+                  });
+                }
+              }}
+              title="Export Note as Markdown"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </ToolbarButton>
           </div>

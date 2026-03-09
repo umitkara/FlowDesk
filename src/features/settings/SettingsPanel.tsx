@@ -1,14 +1,34 @@
+import { useState, useEffect } from "react";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useUIStore } from "../../stores/uiStore";
 import { ReminderSettings } from "./ReminderSettings";
 import { ThemeSettings } from "./ThemeSettings";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
+import * as ipc from "../../lib/ipc";
+import type { VersionHistoryConfig } from "../../lib/types";
 
 /** Settings panel with grouped configuration options. */
 export function SettingsPanel() {
   const settings = useSettingsStore((s) => s.settings);
   const setSetting = useSettingsStore((s) => s.setSetting);
   const setActiveView = useUIStore((s) => s.setActiveView);
+
+  const [vhConfig, setVhConfig] = useState<VersionHistoryConfig>({
+    enabled: true,
+    max_versions_per_note: 50,
+    auto_prune: true,
+    snapshot_debounce_secs: 5,
+  });
+
+  useEffect(() => {
+    ipc.getVersionHistoryConfig().then(setVhConfig).catch(() => {});
+  }, []);
+
+  const updateVH = (patch: Partial<VersionHistoryConfig>) => {
+    const updated = { ...vhConfig, ...patch };
+    setVhConfig(updated);
+    ipc.updateVersionHistoryConfig(updated).catch(() => {});
+  };
 
   return (
     <div className="mx-auto max-w-2xl overflow-y-auto px-8 py-6">
@@ -46,6 +66,46 @@ export function SettingsPanel() {
             step={100}
             value={settings.auto_save_debounce_ms ?? "1000"}
             onChange={(e) => setSetting("auto_save_debounce_ms", e.target.value)}
+            className="w-20 rounded border border-gray-200 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800"
+          />
+        </SettingRow>
+      </SettingsSection>
+
+      {/* Version History section */}
+      <SettingsSection title="Version History">
+        <SettingRow label="Enabled" description="Automatically save note snapshots">
+          <input
+            type="checkbox"
+            checked={vhConfig.enabled}
+            onChange={(e) => updateVH({ enabled: e.target.checked })}
+            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          />
+        </SettingRow>
+        <SettingRow label="Max Versions" description="Maximum snapshots per note">
+          <input
+            type="number"
+            min={5}
+            max={500}
+            value={vhConfig.max_versions_per_note}
+            onChange={(e) => updateVH({ max_versions_per_note: Math.max(5, parseInt(e.target.value) || 50) })}
+            className="w-20 rounded border border-gray-200 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800"
+          />
+        </SettingRow>
+        <SettingRow label="Auto Prune" description="Delete old versions when over limit">
+          <input
+            type="checkbox"
+            checked={vhConfig.auto_prune}
+            onChange={(e) => updateVH({ auto_prune: e.target.checked })}
+            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          />
+        </SettingRow>
+        <SettingRow label="Snapshot Delay" description="Seconds after last edit before snapshot">
+          <input
+            type="number"
+            min={1}
+            max={60}
+            value={vhConfig.snapshot_debounce_secs}
+            onChange={(e) => updateVH({ snapshot_debounce_secs: Math.max(1, parseInt(e.target.value) || 5) })}
             className="w-20 rounded border border-gray-200 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800"
           />
         </SettingRow>
@@ -148,12 +208,18 @@ export function SettingsPanel() {
 
       {/* Data section */}
       <SettingsSection title="Data">
-        <div className="px-4 py-3">
+        <div className="flex gap-2 px-4 py-3">
           <button
             onClick={() => setActiveView("import-wizard")}
             className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
           >
             Import Data...
+          </button>
+          <button
+            onClick={() => useUIStore.getState().toggleExportDialog()}
+            className="rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Export Data...
           </button>
         </div>
       </SettingsSection>
