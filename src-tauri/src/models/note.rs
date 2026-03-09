@@ -28,6 +28,8 @@ pub struct Note {
     pub front_matter: Option<serde_json::Value>,
     /// SHA-256 hash of the body content.
     pub body_hash: Option<String>,
+    /// Whether the note is pinned to the top of the list.
+    pub pinned: bool,
     /// Tags associated with this note (populated via join).
     pub tags: Vec<String>,
     /// Creation timestamp (ISO 8601).
@@ -84,6 +86,8 @@ pub struct UpdateNoteInput {
     pub color: Option<String>,
     /// New importance level.
     pub importance: Option<String>,
+    /// Whether the note is pinned.
+    pub pinned: Option<bool>,
     /// New custom front matter.
     pub front_matter: Option<serde_json::Value>,
     /// New tag list (replaces existing tags).
@@ -142,6 +146,8 @@ pub struct NoteListItem {
     pub color: Option<String>,
     /// Importance level.
     pub importance: Option<String>,
+    /// Whether the note is pinned.
+    pub pinned: bool,
     /// Associated tag names.
     pub tags: Vec<String>,
     /// Last modification timestamp.

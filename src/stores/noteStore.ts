@@ -180,6 +180,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
                 note_type: updated.note_type,
                 color: updated.color,
                 importance: updated.importance,
+                pinned: updated.pinned,
                 tags: updated.tags,
                 updated_at: updated.updated_at,
               }

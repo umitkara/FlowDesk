@@ -96,6 +96,16 @@ pub fn run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
             "016_break_reminder_fields",
             include_str!("../../migrations/016_break_reminder_fields.sql"),
         ),
+        (
+            17,
+            "017_plan_status",
+            include_str!("../../migrations/017_plan_status.sql"),
+        ),
+        (
+            18,
+            "018_note_pinned",
+            include_str!("../../migrations/018_note_pinned.sql"),
+        ),
     ];
 
     for (version, name, sql) in migrations {

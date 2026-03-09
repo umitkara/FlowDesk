@@ -12,6 +12,7 @@ export interface Note {
   importance: string | null;
   front_matter: Record<string, unknown> | null;
   body_hash: string | null;
+  pinned: boolean;
   tags: string[];
   created_at: string;
   updated_at: string;
@@ -28,6 +29,7 @@ export interface NoteListItem {
   note_type: string | null;
   color: string | null;
   importance: string | null;
+  pinned: boolean;
   tags: string[];
   updated_at: string;
   created_at: string;
@@ -60,6 +62,7 @@ export interface UpdateNoteInput {
   note_type?: string;
   color?: string;
   importance?: string;
+  pinned?: boolean;
   front_matter?: Record<string, unknown>;
   tags?: string[];
 }

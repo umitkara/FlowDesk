@@ -215,6 +215,19 @@ export function NoteEditor() {
           </div>
           <div className="ml-3 flex items-center gap-1">
             <button
+              onClick={() => updateNote(activeNote.id, { pinned: !activeNote.pinned })}
+              title={activeNote.pinned ? "Unpin note" : "Pin note"}
+              className={`rounded-md p-1.5 transition-colors ${
+                activeNote.pinned
+                  ? "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400"
+                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+              }`}
+            >
+              <svg className="h-4 w-4" fill={activeNote.pinned ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+            </button>
+            <button
               onClick={toggleDetailPanel}
               title="Toggle metadata panel"
               className={`rounded-md p-1.5 transition-colors ${

@@ -113,7 +113,7 @@ fn get_note_tags(conn: &rusqlite::Connection, note_id: &str) -> Result<Vec<Strin
 pub fn read_note(conn: &rusqlite::Connection, id: &str) -> Result<Note, AppError> {
     let note = conn.query_row(
         "SELECT id, workspace_id, title, date, body, folder, category, type,
-                color, importance, front_matter, body_hash, created_at, updated_at, deleted_at
+                color, importance, front_matter, body_hash, pinned, created_at, updated_at, deleted_at
          FROM notes WHERE id = ?1",
         [id],
         |row| {
@@ -135,10 +135,11 @@ pub fn read_note(conn: &rusqlite::Connection, id: &str) -> Result<Note, AppError
                 importance: row.get(9)?,
                 front_matter,
                 body_hash: row.get(11)?,
+                pinned: row.get::<_, i32>(12)? != 0,
                 tags: Vec::new(), // populated below
-                created_at: row.get(12)?,
-                updated_at: row.get(13)?,
-                deleted_at: row.get(14)?,
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
+                deleted_at: row.get(15)?,
             })
         },
     );
@@ -343,6 +344,11 @@ pub fn update_note(
         if let Some(ref importance) = input.importance {
             set_clauses.push(format!("importance = ?{}", idx));
             params.push(Box::new(importance.clone()));
+            idx += 1;
+        }
+        if let Some(pinned) = input.pinned {
+            set_clauses.push(format!("pinned = ?{}", idx));
+            params.push(Box::new(pinned as i32));
             idx += 1;
         }
         if let Some(ref fm) = input.front_matter {
@@ -551,7 +557,7 @@ pub fn list_notes(
         .with_conn(|conn| {
             let mut sql = String::from(
                 "SELECT n.id, n.title, n.date, n.folder, n.category, n.type,
-                        n.color, n.importance, n.updated_at, n.created_at, n.body
+                        n.color, n.importance, n.pinned, n.updated_at, n.created_at, n.body
                  FROM notes n
                  WHERE n.workspace_id = ?1",
             );
@@ -616,7 +622,7 @@ pub fn list_notes(
                 Some("asc") => "ASC",
                 _ => "DESC",
             };
-            sql.push_str(&format!(" ORDER BY {} {}", sort_col, sort_dir));
+            sql.push_str(&format!(" ORDER BY n.pinned DESC, {} {}", sort_col, sort_dir));
 
             // Pagination
             let limit = query.limit.unwrap_or(50);
@@ -631,7 +637,7 @@ pub fn list_notes(
             let mut stmt = conn.prepare(&sql)?;
             let items = stmt
                 .query_map(param_refs.as_slice(), |row| {
-                    let body: String = row.get(10)?;
+                    let body: String = row.get(11)?;
                     Ok(NoteListItem {
                         id: row.get(0)?,
                         title: row.get(1)?,
@@ -641,9 +647,10 @@ pub fn list_notes(
                         note_type: row.get(5)?,
                         color: row.get(6)?,
                         importance: row.get(7)?,
+                        pinned: row.get::<_, i32>(8)? != 0,
                         tags: Vec::new(), // populated below
-                        updated_at: row.get(8)?,
-                        created_at: row.get(9)?,
+                        updated_at: row.get(9)?,
+                        created_at: row.get(10)?,
                         word_count: word_count(&body),
                         preview: resolve_entity_refs(&body_preview(&body), conn),
                     })
