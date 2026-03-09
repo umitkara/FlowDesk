@@ -38,6 +38,8 @@ pub struct Plan {
     pub deleted_at: Option<String>,
     /// Whether reminders are muted for this plan.
     pub reminders_muted: bool,
+    /// Plan completion status: scheduled, completed, skipped, deferred.
+    pub status: String,
 }
 
 /// Input for creating a new plan.
@@ -105,6 +107,8 @@ pub struct UpdatePlanInput {
     pub recurrence: Option<Option<serde_json::Value>>,
     /// Whether to mute reminders for this plan.
     pub reminders_muted: Option<bool>,
+    /// Plan completion status: scheduled, completed, skipped, deferred.
+    pub status: Option<String>,
 }
 
 /// Query parameters for listing plans.
@@ -190,6 +194,8 @@ pub struct DailyPlanSummary {
     pub reminders: Vec<Plan>,
     /// Tasks scheduled for this date.
     pub scheduled_tasks: Vec<PlanLinkedTask>,
+    /// Map from plan ID to its linked tasks (eliminates N+1 IPC).
+    pub plan_linked_tasks: std::collections::HashMap<String, Vec<PlanLinkedTask>>,
 }
 
 /// A unified agenda item (plan or task) for the agenda view.

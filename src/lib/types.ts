@@ -511,6 +511,17 @@ export type PlanType = "time_block" | "event" | "daily_plan" | "milestone" | "de
 /** Valid importance levels. */
 export type Importance = "low" | "medium" | "high" | "critical";
 
+/** Valid plan status values. */
+export type PlanStatus = "scheduled" | "completed" | "skipped" | "deferred";
+
+/** Plan status display configuration map. */
+export const PLAN_STATUS_CONFIG: Record<PlanStatus, { label: string; color: string; icon: string }> = {
+  scheduled: { label: "Scheduled", color: "text-zinc-500", icon: "circle" },
+  completed: { label: "Completed", color: "text-green-500", icon: "check-circle" },
+  skipped:   { label: "Skipped",   color: "text-zinc-400", icon: "skip" },
+  deferred:  { label: "Deferred",  color: "text-amber-500", icon: "clock" },
+};
+
 /** A complete plan entity — a calendar-bound block of time. */
 export interface Plan {
   id: string;
@@ -530,6 +541,7 @@ export interface Plan {
   updated_at: string;
   deleted_at: string | null;
   reminders_muted: boolean;
+  status: PlanStatus;
 }
 
 /** Input for creating a new plan. */
@@ -564,6 +576,7 @@ export interface UpdatePlanInput {
   tags?: string[] | null;
   recurrence?: RecurrenceRule | null;
   reminders_muted?: boolean;
+  status?: PlanStatus;
 }
 
 /** Query parameters for listing plans. */
@@ -614,6 +627,7 @@ export interface DailyPlanSummary {
   habits: Plan[];
   reminders: Plan[];
   scheduled_tasks: PlanLinkedTask[];
+  plan_linked_tasks: Record<string, PlanLinkedTask[]>;
 }
 
 /** A unified agenda item (plan or task). */

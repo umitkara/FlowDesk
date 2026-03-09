@@ -15,7 +15,7 @@ fn read_plan(conn: &rusqlite::Connection, id: &str) -> Result<Plan, AppError> {
         "SELECT id, workspace_id, title, description, start_time, end_time,
                 all_day, type, category, color, importance,
                 tags, recurrence, created_at, updated_at, deleted_at,
-                reminders_muted
+                reminders_muted, status
          FROM plans WHERE id = ?1",
         [id],
         |row| {
@@ -47,6 +47,7 @@ fn read_plan(conn: &rusqlite::Connection, id: &str) -> Result<Plan, AppError> {
                 updated_at: row.get(14)?,
                 deleted_at: row.get(15)?,
                 reminders_muted: row.get(16)?,
+                status: row.get(17)?,
             })
         },
     );
@@ -195,8 +196,8 @@ pub fn create_plan(state: State<'_, AppState>, input: CreatePlanInput) -> Result
             conn.execute(
                 "INSERT INTO plans (id, workspace_id, title, description, start_time, end_time,
                                     all_day, type, category, color, importance,
-                                    tags, recurrence, created_at, updated_at, reminders_muted)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+                                    tags, recurrence, created_at, updated_at, reminders_muted, status)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, 'scheduled')",
                 rusqlite::params![
                     id,
                     input.workspace_id,
@@ -378,6 +379,11 @@ pub fn update_plan(state: State<'_, AppState>, input: UpdatePlanInput) -> Result
             if let Some(muted) = input.reminders_muted {
                 set_clauses.push(format!("reminders_muted = ?{}", pidx));
                 params.push(Box::new(muted));
+                pidx += 1;
+            }
+            if let Some(ref status) = input.status {
+                set_clauses.push(format!("status = ?{}", pidx));
+                params.push(Box::new(status.clone()));
                 pidx += 1;
             }
 
@@ -578,7 +584,7 @@ pub fn list_plans(state: State<'_, AppState>, query: PlanQuery) -> Result<Vec<Pl
                 "SELECT id, workspace_id, title, description, start_time, end_time,
                         all_day, type, category, color, importance,
                         tags, recurrence, created_at, updated_at, deleted_at,
-                        reminders_muted
+                        reminders_muted, status
                  FROM plans WHERE workspace_id = ?1",
             );
             let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -662,6 +668,7 @@ pub fn list_plans(state: State<'_, AppState>, query: PlanQuery) -> Result<Vec<Pl
                         updated_at: row.get(14)?,
                         deleted_at: row.get(15)?,
                         reminders_muted: row.get(16)?,
+                        status: row.get(17)?,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -692,7 +699,7 @@ pub fn get_daily_plan_summary(
                 "SELECT id, workspace_id, title, description, start_time, end_time,
                         all_day, type, category, color, importance,
                         tags, recurrence, created_at, updated_at, deleted_at,
-                        reminders_muted
+                        reminders_muted, status
                  FROM plans
                  WHERE workspace_id = ?1
                    AND deleted_at IS NULL
@@ -730,6 +737,7 @@ pub fn get_daily_plan_summary(
                         updated_at: row.get(14)?,
                         deleted_at: row.get(15)?,
                         reminders_muted: row.get(16)?,
+                        status: row.get(17)?,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -787,53 +795,79 @@ pub fn get_daily_plan_summary(
 
             scheduled_tasks.extend(direct_tasks);
 
-            // Tasks linked to plans on this day via references
+            // Tasks linked to plans on this day via references (both directions)
             let plan_ids: Vec<String> = time_blocks
                 .iter()
                 .chain(events.iter())
+                .chain(meetings.iter())
+                .chain(reviews.iter())
                 .map(|p| p.id.clone())
                 .collect();
 
+            let mut plan_linked_tasks: std::collections::HashMap<String, Vec<PlanLinkedTask>> =
+                std::collections::HashMap::new();
+
             if !plan_ids.is_empty() {
-                let placeholders: Vec<String> = plan_ids
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| format!("?{}", i + 1))
-                    .collect();
+                let n = plan_ids.len();
+                let ph1: Vec<String> = (1..=n).map(|i| format!("?{}", i)).collect();
+                let ph2: Vec<String> = (n + 1..=2 * n).map(|i| format!("?{}", i)).collect();
+                let ph1_str = ph1.join(", ");
+                let ph2_str = ph2.join(", ");
+                // Both directions: task→plan and plan→task
                 let ref_sql = format!(
-                    "SELECT r.source_id, t.title, t.status, t.priority, r.relation
+                    "SELECT r.target_id AS plan_id, r.source_id AS task_id, t.title, t.status, t.priority, r.relation
                      FROM refs r
                      JOIN tasks t ON r.source_id = t.id
                      WHERE r.source_type = 'task'
                        AND r.target_type = 'plan'
-                       AND r.target_id IN ({})
-                       AND t.deleted_at IS NULL",
-                    placeholders.join(", ")
+                       AND r.target_id IN ({ph1_str})
+                       AND t.deleted_at IS NULL
+                     UNION
+                     SELECT r.source_id AS plan_id, r.target_id AS task_id, t.title, t.status, t.priority, r.relation
+                     FROM refs r
+                     JOIN tasks t ON r.target_id = t.id
+                     WHERE r.source_type = 'plan'
+                       AND r.target_type = 'task'
+                       AND r.source_id IN ({ph2_str})
+                       AND t.deleted_at IS NULL"
                 );
 
-                let ref_params: Vec<Box<dyn rusqlite::types::ToSql>> =
-                    plan_ids.iter().map(|id| Box::new(id.clone()) as Box<dyn rusqlite::types::ToSql>).collect();
+                // Double the params (one set for each UNION leg)
+                let mut ref_params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+                for id in &plan_ids {
+                    ref_params.push(Box::new(id.clone()) as Box<dyn rusqlite::types::ToSql>);
+                }
+                for id in &plan_ids {
+                    ref_params.push(Box::new(id.clone()) as Box<dyn rusqlite::types::ToSql>);
+                }
                 let ref_param_refs: Vec<&dyn rusqlite::types::ToSql> =
                     ref_params.iter().map(|p| p.as_ref()).collect();
 
                 let mut ref_stmt = conn.prepare(&ref_sql)?;
-                let linked_tasks: Vec<PlanLinkedTask> = ref_stmt
+                let linked_rows: Vec<(String, PlanLinkedTask)> = ref_stmt
                     .query_map(ref_param_refs.as_slice(), |row| {
-                        Ok(PlanLinkedTask {
-                            task_id: row.get(0)?,
-                            title: row.get(1)?,
-                            status: row.get(2)?,
-                            priority: row.get(3)?,
-                            relation: row.get(4)?,
-                        })
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            PlanLinkedTask {
+                                task_id: row.get(1)?,
+                                title: row.get(2)?,
+                                status: row.get(3)?,
+                                priority: row.get(4)?,
+                                relation: row.get(5)?,
+                            },
+                        ))
                     })?
                     .collect::<Result<Vec<_>, _>>()?;
 
-                // Avoid duplicates (tasks may appear via both scheduled_date and reference)
-                for lt in linked_tasks {
+                for (pid, lt) in linked_rows {
+                    // Also add to scheduled_tasks (deduped)
                     if !scheduled_tasks.iter().any(|st| st.task_id == lt.task_id) {
-                        scheduled_tasks.push(lt);
+                        scheduled_tasks.push(lt.clone());
                     }
+                    plan_linked_tasks
+                        .entry(pid)
+                        .or_default()
+                        .push(lt);
                 }
             }
 
@@ -849,6 +883,7 @@ pub fn get_daily_plan_summary(
                 habits,
                 reminders,
                 scheduled_tasks,
+                plan_linked_tasks,
             })
         })
         .map_err(AppError::Database)
@@ -1290,7 +1325,7 @@ pub fn search_plans(
                         p.start_time, p.end_time, p.all_day, p.type,
                         p.category, p.color, p.importance,
                         p.tags, p.recurrence, p.created_at, p.updated_at, p.deleted_at,
-                        p.reminders_muted
+                        p.reminders_muted, p.status
                  FROM plans_fts
                  JOIN plans p ON plans_fts.rowid = p.rowid
                  WHERE plans_fts MATCH ?1 AND p.workspace_id = ?2 AND p.deleted_at IS NULL
@@ -1327,6 +1362,7 @@ pub fn search_plans(
                         updated_at: row.get(14)?,
                         deleted_at: row.get(15)?,
                         reminders_muted: row.get(16)?,
+                        status: row.get(17)?,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
