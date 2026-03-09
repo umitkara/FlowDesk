@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { RecurrenceRule, CreateRecurrenceRuleInput, UpdateRecurrenceRuleInput, EntitySummary } from "../lib/types";
+import type { RecurrenceRule, CreateRecurrenceRuleInput, UpdateRecurrenceRuleInput } from "../lib/types";
 import * as ipc from "../lib/ipc";
 
 /** State and actions for recurrence rule management. */
@@ -23,12 +23,6 @@ interface RecurrenceState {
   postponeNext: (ruleId: string, newDate: string) => Promise<RecurrenceRule>;
   /** Detaches a single occurrence from its rule. */
   detachOccurrence: (entityType: string, entityId: string) => Promise<void>;
-  /** Updates rule for all future occurrences. */
-  editFuture: (ruleId: string, update: UpdateRecurrenceRuleInput) => Promise<void>;
-  /** Soft-deletes all occurrences after a given index. */
-  deleteFuture: (ruleId: string, afterIndex: number) => Promise<void>;
-  /** Lists occurrences within a date range. */
-  getOccurrences: (ruleId: string, fromDate: string, toDate: string) => Promise<EntitySummary[]>;
 }
 
 export const useRecurrenceStore = create<RecurrenceState>((set) => ({
@@ -82,22 +76,5 @@ export const useRecurrenceStore = create<RecurrenceState>((set) => ({
 
   detachOccurrence: async (entityType, entityId) => {
     await ipc.detachOccurrence(entityType, entityId);
-  },
-
-  editFuture: async (ruleId, update) => {
-    await ipc.editFutureOccurrences(ruleId, update);
-    // Reload the rule to get updated state
-    try {
-      const rule = await ipc.getRecurrenceRule(ruleId);
-      set((s) => ({ rules: { ...s.rules, [rule.id]: rule } }));
-    } catch { /* rule may have been deleted */ }
-  },
-
-  deleteFuture: async (ruleId, afterIndex) => {
-    await ipc.deleteFutureOccurrences(ruleId, afterIndex);
-  },
-
-  getOccurrences: async (ruleId, fromDate, toDate) => {
-    return ipc.getOccurrences(ruleId, fromDate, toDate);
   },
 }));

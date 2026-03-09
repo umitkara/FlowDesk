@@ -68,8 +68,6 @@ interface TaskState {
 
   /** Select a single task for detail view. */
   selectTask: (id: string) => void;
-  /** Deselect a task from multi-select. */
-  deselectTask: (id: string) => void;
   /** Toggle task in multi-select set. */
   toggleTaskSelection: (id: string) => void;
   /** Select all visible tasks. */
@@ -263,12 +261,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (task) {
       set({ selectedTask: task });
     }
-  },
-
-  deselectTask: (id) => {
-    const next = new Set(get().selectedTaskIds);
-    next.delete(id);
-    set({ selectedTaskIds: next });
   },
 
   toggleTaskSelection: (id) => {

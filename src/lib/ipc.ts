@@ -67,7 +67,6 @@ import type {
   UpdateTemplateInput,
   Reminder,
   ReminderDefaults,
-  CreateReminderInput,
   UpdateReminderInput,
   Suggestion,
   NoteVersion,
@@ -617,10 +616,6 @@ export const deleteFutureOccurrences = (ruleId: string, afterIndex: number) =>
 export const getOccurrences = (ruleId: string, fromDate: string, toDate: string) =>
   invoke<EntitySummary[]>("get_occurrences", { ruleId, fromDate, toDate });
 
-/** Generates any pending plan occurrences up to a date. */
-export const generatePendingOccurrences = (workspaceId: string, upToDate: string) =>
-  invoke<string[]>("generate_pending_occurrences", { workspaceId, upToDate });
-
 // --- Templates ---
 
 /** Lists all available note templates. */
@@ -659,10 +654,6 @@ export const createNoteFromTemplate = (
   date?: string,
 ) => invoke<Note>("create_note_from_template", { workspaceId, templateName, variables, date });
 
-/** Ensures built-in templates exist on disk. */
-export const ensureDefaultTemplates = () =>
-  invoke<void>("ensure_default_templates");
-
 // --- Reminders ---
 
 /** Gets global reminder default settings. */
@@ -673,10 +664,6 @@ export const getReminderDefaults = () =>
 export const updateReminderDefaults = (defaults: ReminderDefaults) =>
   invoke<void>("update_reminder_defaults", { defaults });
 
-/** Creates a custom reminder. */
-export const createReminder = (input: CreateReminderInput) =>
-  invoke<Reminder>("create_reminder", { input });
-
 /** Gets all reminders for an entity. */
 export const getRemindersForEntity = (entityType: string, entityId: string) =>
   invoke<Reminder[]>("get_reminders_for_entity", { entityType, entityId });
@@ -684,10 +671,6 @@ export const getRemindersForEntity = (entityType: string, entityId: string) =>
 /** Updates a reminder. */
 export const updateReminder = (reminderId: string, update: UpdateReminderInput) =>
   invoke<Reminder>("update_reminder", { reminderId, update });
-
-/** Deletes a reminder. */
-export const deleteReminder = (reminderId: string) =>
-  invoke<void>("delete_reminder", { reminderId });
 
 /** Dismisses a fired reminder. */
 export const dismissReminder = (reminderId: string) =>

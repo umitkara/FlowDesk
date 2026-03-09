@@ -13,7 +13,6 @@ interface CommandPaletteState {
   setQuery: (q: string) => void;
   setSelectedIndex: (i: number) => void;
   registerCommands: (cmds: Command[]) => void;
-  unregisterCommands: (ids: string[]) => void;
 }
 
 export const useCommandPaletteStore = create<CommandPaletteState>((set) => ({
@@ -38,7 +37,4 @@ export const useCommandPaletteStore = create<CommandPaletteState>((set) => ({
     }
     return { commands: Array.from(map.values()) };
   }),
-  unregisterCommands: (ids) => set((s) => ({
-    commands: s.commands.filter((c) => !ids.includes(c.id)),
-  })),
 }));
