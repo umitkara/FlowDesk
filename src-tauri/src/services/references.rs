@@ -197,3 +197,157 @@ pub fn get_task_depth(conn: &rusqlite::Connection, task_id: &str) -> Result<u32,
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- parse_inline_references ---
+    #[test]
+    fn parses_task_ref() {
+        let refs = parse_inline_references("See @task[abc123] for details.");
+        assert_eq!(refs, vec![("task".to_string(), "abc123".to_string())]);
+    }
+
+    #[test]
+    fn parses_note_and_plan_refs() {
+        let refs = parse_inline_references("Link @note[n1] and @plan[p2].");
+        assert_eq!(refs.len(), 2);
+        assert_eq!(refs[0], ("note".to_string(), "n1".to_string()));
+        assert_eq!(refs[1], ("plan".to_string(), "p2".to_string()));
+    }
+
+    #[test]
+    fn deduplicates_refs() {
+        let refs = parse_inline_references("@task[a] then @task[a] again.");
+        assert_eq!(refs.len(), 1);
+    }
+
+    #[test]
+    fn ignores_refs_in_code_blocks() {
+        let body = "before\n```\n@task[hidden]\n```\nafter @task[visible]";
+        let refs = parse_inline_references(body);
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].1, "visible");
+    }
+
+    #[test]
+    fn ignores_refs_in_inline_code() {
+        let refs = parse_inline_references("see `@task[hidden]` vs @task[visible]");
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].1, "visible");
+    }
+
+    #[test]
+    fn empty_body_returns_empty() {
+        assert!(parse_inline_references("").is_empty());
+    }
+
+    // --- diff_references ---
+    #[test]
+    fn diff_creates_new_refs() {
+        let existing = vec![];
+        let parsed = vec![("task".to_string(), "t1".to_string())];
+        let (to_create, to_delete) = diff_references(&existing, &parsed, "note", "n1");
+        assert_eq!(to_create.len(), 1);
+        assert!(to_delete.is_empty());
+        assert_eq!(to_create[0].target_type, "task");
+    }
+
+    #[test]
+    fn diff_deletes_removed_refs() {
+        let existing = vec![Reference {
+            id: "ref1".to_string(),
+            source_type: "note".to_string(),
+            source_id: "n1".to_string(),
+            target_type: "task".to_string(),
+            target_id: Some("t1".to_string()),
+            target_uri: None,
+            relation: "references".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+        }];
+        let parsed = vec![];
+        let (to_create, to_delete) = diff_references(&existing, &parsed, "note", "n1");
+        assert!(to_create.is_empty());
+        assert_eq!(to_delete, vec!["ref1"]);
+    }
+
+    #[test]
+    fn diff_preserves_manual_refs() {
+        let existing = vec![Reference {
+            id: "ref1".to_string(),
+            source_type: "note".to_string(),
+            source_id: "n1".to_string(),
+            target_type: "task".to_string(),
+            target_id: Some("t1".to_string()),
+            target_uri: None,
+            relation: "blocks".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+        }];
+        let parsed = vec![];
+        let (to_create, to_delete) = diff_references(&existing, &parsed, "note", "n1");
+        assert!(to_create.is_empty());
+        assert!(to_delete.is_empty()); // manual "blocks" ref preserved
+    }
+
+    #[test]
+    fn diff_no_change_when_matching() {
+        let existing = vec![Reference {
+            id: "ref1".to_string(),
+            source_type: "note".to_string(),
+            source_id: "n1".to_string(),
+            target_type: "task".to_string(),
+            target_id: Some("t1".to_string()),
+            target_uri: None,
+            relation: "references".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+        }];
+        let parsed = vec![("task".to_string(), "t1".to_string())];
+        let (to_create, to_delete) = diff_references(&existing, &parsed, "note", "n1");
+        assert!(to_create.is_empty());
+        assert!(to_delete.is_empty());
+    }
+
+    // --- DB integration tests (cycle detection) ---
+    #[test]
+    fn self_reference_is_cycle() {
+        let conn = crate::test_helpers::test_db();
+        let t1 = crate::test_helpers::insert_test_task(&conn, "Task 1", "todo", None);
+        assert!(would_create_cycle(&conn, &t1, &t1).unwrap());
+    }
+
+    #[test]
+    fn simple_chain_no_cycle() {
+        let conn = crate::test_helpers::test_db();
+        let t1 = crate::test_helpers::insert_test_task(&conn, "A", "todo", None);
+        let t2 = crate::test_helpers::insert_test_task(&conn, "B", "todo", Some(&t1));
+        // Setting t2's parent to t1 should not be a cycle (it already is)
+        assert!(!would_create_cycle(&conn, &t2, &t1).unwrap());
+    }
+
+    #[test]
+    fn detects_cycle_in_chain() {
+        let conn = crate::test_helpers::test_db();
+        let t1 = crate::test_helpers::insert_test_task(&conn, "A", "todo", None);
+        let t2 = crate::test_helpers::insert_test_task(&conn, "B", "todo", Some(&t1));
+        let t3 = crate::test_helpers::insert_test_task(&conn, "C", "todo", Some(&t2));
+        // Setting t1's parent to t3 would create: t1 -> t3 -> t2 -> t1 (cycle)
+        assert!(would_create_cycle(&conn, &t1, &t3).unwrap());
+    }
+
+    #[test]
+    fn get_depth_root_is_zero() {
+        let conn = crate::test_helpers::test_db();
+        let t1 = crate::test_helpers::insert_test_task(&conn, "Root", "todo", None);
+        assert_eq!(get_task_depth(&conn, &t1).unwrap(), 0);
+    }
+
+    #[test]
+    fn get_depth_nested() {
+        let conn = crate::test_helpers::test_db();
+        let t1 = crate::test_helpers::insert_test_task(&conn, "A", "todo", None);
+        let t2 = crate::test_helpers::insert_test_task(&conn, "B", "todo", Some(&t1));
+        let t3 = crate::test_helpers::insert_test_task(&conn, "C", "todo", Some(&t2));
+        assert_eq!(get_task_depth(&conn, &t3).unwrap(), 2);
+    }
+}

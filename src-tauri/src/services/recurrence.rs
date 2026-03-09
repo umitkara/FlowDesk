@@ -228,3 +228,195 @@ pub fn shift_datetime(original_datetime: &str, new_date: &NaiveDate) -> String {
         new_date.format("%Y-%m-%d").to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn d(s: &str) -> NaiveDate {
+        NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap()
+    }
+
+    // --- compute_daily ---
+    #[test]
+    fn daily_interval_1() {
+        let result = compute_next_date("daily", 1, &d("2026-03-01"), &None, None, None, &None, None, 0);
+        assert_eq!(result, Some(d("2026-03-02")));
+    }
+
+    #[test]
+    fn daily_interval_3() {
+        let result = compute_next_date("daily", 3, &d("2026-03-01"), &None, None, None, &None, None, 0);
+        assert_eq!(result, Some(d("2026-03-04")));
+    }
+
+    #[test]
+    fn daily_interval_0_returns_none() {
+        let result = compute_next_date("daily", 0, &d("2026-03-01"), &None, None, None, &None, None, 0);
+        assert_eq!(result, None);
+    }
+
+    // --- compute_weekly ---
+    #[test]
+    fn weekly_no_days() {
+        let result = compute_next_date("weekly", 1, &d("2026-03-01"), &None, None, None, &None, None, 0);
+        assert_eq!(result, Some(d("2026-03-08")));
+    }
+
+    #[test]
+    fn weekly_with_days_same_week() {
+        // 2026-03-02 is Monday (dow=1). days_of_week [3] = Wednesday
+        let days = Some(vec![3]);
+        let result = compute_next_date("weekly", 1, &d("2026-03-02"), &days, None, None, &None, None, 0);
+        assert_eq!(result, Some(d("2026-03-04")));
+    }
+
+    #[test]
+    fn weekly_with_days_next_week() {
+        // 2026-03-04 is Wednesday (dow=3). days_of_week [1] = Monday -> next week
+        let days = Some(vec![1]);
+        let result = compute_next_date("weekly", 1, &d("2026-03-04"), &days, None, None, &None, None, 0);
+        assert_eq!(result, Some(d("2026-03-09")));
+    }
+
+    #[test]
+    fn weekly_interval_2() {
+        let days = Some(vec![1]);
+        let result = compute_next_date("weekly", 2, &d("2026-03-04"), &days, None, None, &None, None, 0);
+        assert_eq!(result, Some(d("2026-03-16")));
+    }
+
+    // --- compute_monthly ---
+    #[test]
+    fn monthly_same_day() {
+        let result = compute_next_date("monthly", 1, &d("2026-01-15"), &None, Some(15), None, &None, None, 0);
+        assert_eq!(result, Some(d("2026-02-15")));
+    }
+
+    #[test]
+    fn monthly_clamp_to_28() {
+        // Jan 31 + 1 month = Feb 28 (non-leap)
+        let result = compute_next_date("monthly", 1, &d("2026-01-31"), &None, Some(31), None, &None, None, 0);
+        assert_eq!(result, Some(d("2026-02-28")));
+    }
+
+    #[test]
+    fn monthly_leap_year() {
+        // Jan 31 + 1 month in leap year 2028 = Feb 29
+        let result = compute_next_date("monthly", 1, &d("2028-01-31"), &None, Some(31), None, &None, None, 0);
+        assert_eq!(result, Some(d("2028-02-29")));
+    }
+
+    #[test]
+    fn monthly_interval_3() {
+        let result = compute_next_date("monthly", 3, &d("2026-01-15"), &None, Some(15), None, &None, None, 0);
+        assert_eq!(result, Some(d("2026-04-15")));
+    }
+
+    // --- compute_yearly ---
+    #[test]
+    fn yearly_basic() {
+        let result = compute_next_date("yearly", 1, &d("2026-03-09"), &None, Some(9), Some(3), &None, None, 0);
+        assert_eq!(result, Some(d("2027-03-09")));
+    }
+
+    #[test]
+    fn yearly_leap_to_non_leap() {
+        // Feb 29 leap year -> Feb 28 non-leap year
+        let result = compute_next_date("yearly", 1, &d("2028-02-29"), &None, Some(29), Some(2), &None, None, 0);
+        assert_eq!(result, Some(d("2029-02-28")));
+    }
+
+    // --- end conditions ---
+    #[test]
+    fn end_after_count_reached() {
+        let result = compute_next_date("daily", 1, &d("2026-03-01"), &None, None, None, &None, Some(5), 5);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn end_date_exceeded() {
+        let end = Some("2026-03-05".to_string());
+        let result = compute_next_date("daily", 1, &d("2026-03-05"), &None, None, None, &end, None, 0);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn end_date_not_exceeded() {
+        let end = Some("2026-03-10".to_string());
+        let result = compute_next_date("daily", 1, &d("2026-03-05"), &None, None, None, &end, None, 0);
+        assert_eq!(result, Some(d("2026-03-06")));
+    }
+
+    #[test]
+    fn unknown_pattern_returns_none() {
+        let result = compute_next_date("biweekly", 1, &d("2026-03-01"), &None, None, None, &None, None, 0);
+        assert_eq!(result, None);
+    }
+
+    // --- days_in_month / is_leap_year ---
+    #[test]
+    fn days_in_february_non_leap() {
+        assert_eq!(days_in_month(2026, 2), 28);
+    }
+
+    #[test]
+    fn days_in_february_leap() {
+        assert_eq!(days_in_month(2028, 2), 29);
+    }
+
+    #[test]
+    fn century_not_leap() {
+        assert!(!is_leap_year(1900));
+    }
+
+    #[test]
+    fn quad_century_is_leap() {
+        assert!(is_leap_year(2000));
+    }
+
+    // --- is_exhausted ---
+    #[test]
+    fn exhausted_by_count() {
+        assert!(is_exhausted(&None, Some(3), 3, &None));
+    }
+
+    #[test]
+    fn not_exhausted_under_count() {
+        assert!(!is_exhausted(&None, Some(3), 2, &None));
+    }
+
+    #[test]
+    fn exhausted_by_end_date() {
+        let end = Some("2026-03-05".to_string());
+        let next = Some("2026-03-06".to_string());
+        assert!(is_exhausted(&end, None, 0, &next));
+    }
+
+    // --- adjust_due_date ---
+    #[test]
+    fn adjust_preserves_offset() {
+        let due = Some("2026-03-05".to_string());
+        let scheduled = Some("2026-03-03".to_string());
+        let new_sched = d("2026-03-10");
+        assert_eq!(adjust_due_date(&due, &scheduled, &new_sched), Some("2026-03-12".to_string()));
+    }
+
+    #[test]
+    fn adjust_returns_none_if_no_due() {
+        assert_eq!(adjust_due_date(&None, &Some("2026-03-03".to_string()), &d("2026-03-10")), None);
+    }
+
+    // --- shift_datetime ---
+    #[test]
+    fn shift_preserves_time() {
+        let result = shift_datetime("2026-03-01T09:30:00", &d("2026-04-15"));
+        assert_eq!(result, "2026-04-15T09:30:00");
+    }
+
+    #[test]
+    fn shift_date_only() {
+        let result = shift_datetime("2026-03-01", &d("2026-04-15"));
+        assert_eq!(result, "2026-04-15");
+    }
+}

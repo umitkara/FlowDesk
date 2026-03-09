@@ -65,3 +65,63 @@ pub fn parse_defaults(json_str: &str) -> Result<ReminderDefaults, String> {
 pub fn serialize_defaults(defaults: &ReminderDefaults) -> Result<String, String> {
     serde_json::to_string(defaults).map_err(|e| e.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn at_time_offset() {
+        let result = compute_remind_at("2026-03-09T10:00:00+00:00", "at_time", None).unwrap();
+        assert!(result.contains("2026-03-09T10:00:00"));
+    }
+
+    #[test]
+    fn fifteen_min_before() {
+        let result = compute_remind_at("2026-03-09T10:00:00+00:00", "15min_before", None).unwrap();
+        assert!(result.contains("09:45:00"));
+    }
+
+    #[test]
+    fn one_hour_before() {
+        let result = compute_remind_at("2026-03-09T10:00:00+00:00", "1hr_before", None).unwrap();
+        assert!(result.contains("09:00:00"));
+    }
+
+    #[test]
+    fn one_day_before() {
+        let result = compute_remind_at("2026-03-09T10:00:00+00:00", "1day_before", None).unwrap();
+        assert!(result.contains("2026-03-08T10:00:00"));
+    }
+
+    #[test]
+    fn custom_offset() {
+        let result = compute_remind_at("2026-03-09T10:00:00+00:00", "custom", Some(-45)).unwrap();
+        assert!(result.contains("09:15:00"));
+    }
+
+    #[test]
+    fn invalid_offset_type() {
+        let result = compute_remind_at("2026-03-09T10:00:00+00:00", "bogus", None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn date_only_input() {
+        let result = compute_remind_at("2026-03-09", "15min_before", None).unwrap();
+        assert!(result.contains("2026-03-08T23:45:00"));
+    }
+
+    #[test]
+    fn defaults_roundtrip() {
+        let defaults = ReminderDefaults {
+            task_due: vec!["15min_before".to_string()],
+            plan_start: vec!["1hr_before".to_string()],
+            enabled: true,
+        };
+        let json = serialize_defaults(&defaults).unwrap();
+        let parsed = parse_defaults(&json).unwrap();
+        assert_eq!(parsed.task_due, defaults.task_due);
+        assert_eq!(parsed.enabled, true);
+    }
+}

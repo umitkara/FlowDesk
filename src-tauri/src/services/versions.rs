@@ -248,3 +248,146 @@ pub fn get_storage_stats(
         largest_notes,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- compute_diff pure tests ---
+    #[test]
+    fn diff_identical() {
+        let (_hunks, stats) = compute_diff("hello\n", "hello\n");
+        assert_eq!(stats.additions, 0);
+        assert_eq!(stats.deletions, 0);
+        assert_eq!(stats.unchanged, 1);
+    }
+
+    #[test]
+    fn diff_addition() {
+        let (_hunks, stats) = compute_diff("line1\n", "line1\nline2\n");
+        assert_eq!(stats.additions, 1);
+        assert_eq!(stats.deletions, 0);
+    }
+
+    #[test]
+    fn diff_deletion() {
+        let (_hunks, stats) = compute_diff("line1\nline2\n", "line1\n");
+        assert_eq!(stats.deletions, 1);
+        assert_eq!(stats.additions, 0);
+    }
+
+    #[test]
+    fn diff_replacement() {
+        let (_hunks, stats) = compute_diff("old\n", "new\n");
+        assert!(stats.additions >= 1);
+        assert!(stats.deletions >= 1);
+    }
+
+    #[test]
+    fn diff_empty_to_content() {
+        let (_hunks, stats) = compute_diff("", "hello\n");
+        assert_eq!(stats.additions, 1);
+        assert_eq!(stats.deletions, 0);
+    }
+
+    #[test]
+    fn diff_content_to_empty() {
+        let (_hunks, stats) = compute_diff("hello\n", "");
+        assert_eq!(stats.deletions, 1);
+        assert_eq!(stats.additions, 0);
+    }
+
+    #[test]
+    fn diff_multiline_change() {
+        let old = "line1\nline2\nline3\n";
+        let new = "line1\nmodified\nline3\n";
+        let (_hunks, stats) = compute_diff(old, new);
+        assert!(stats.additions >= 1);
+        assert!(stats.deletions >= 1);
+        assert!(stats.unchanged >= 2);
+    }
+
+    // --- compute_hash ---
+    #[test]
+    fn hash_deterministic() {
+        let h1 = compute_hash("test content");
+        let h2 = compute_hash("test content");
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn hash_different_for_different_content() {
+        assert_ne!(compute_hash("aaa"), compute_hash("bbb"));
+    }
+
+    // --- DB integration tests ---
+    #[test]
+    fn snapshot_creates_version() {
+        let conn = crate::test_helpers::test_db();
+        let note_id = crate::test_helpers::insert_test_note(&conn, "Test", "body");
+        let v = snapshot_note(&conn, &note_id, crate::test_helpers::TEST_WS_ID, Some("Test"), "body v1", 50).unwrap();
+        assert!(v.is_some());
+        let v = v.unwrap();
+        assert_eq!(v.version_number, 1);
+    }
+
+    #[test]
+    fn snapshot_deduplicates() {
+        let conn = crate::test_helpers::test_db();
+        let note_id = crate::test_helpers::insert_test_note(&conn, "Test", "body");
+        snapshot_note(&conn, &note_id, crate::test_helpers::TEST_WS_ID, Some("Test"), "same body", 50).unwrap();
+        let v2 = snapshot_note(&conn, &note_id, crate::test_helpers::TEST_WS_ID, Some("Test"), "same body", 50).unwrap();
+        assert!(v2.is_none()); // duplicate, skipped
+    }
+
+    #[test]
+    fn snapshot_increments_version() {
+        let conn = crate::test_helpers::test_db();
+        let note_id = crate::test_helpers::insert_test_note(&conn, "Test", "body");
+        snapshot_note(&conn, &note_id, crate::test_helpers::TEST_WS_ID, Some("Test"), "v1", 50).unwrap();
+        let v2 = snapshot_note(&conn, &note_id, crate::test_helpers::TEST_WS_ID, Some("Test"), "v2", 50).unwrap();
+        assert_eq!(v2.unwrap().version_number, 2);
+    }
+
+    #[test]
+    fn list_versions_ordered() {
+        let conn = crate::test_helpers::test_db();
+        let note_id = crate::test_helpers::insert_test_note(&conn, "Test", "body");
+        snapshot_note(&conn, &note_id, crate::test_helpers::TEST_WS_ID, Some("T"), "v1", 50).unwrap();
+        snapshot_note(&conn, &note_id, crate::test_helpers::TEST_WS_ID, Some("T"), "v2", 50).unwrap();
+        let versions = list_versions(&conn, &note_id).unwrap();
+        assert_eq!(versions.len(), 2);
+        assert!(versions[0].version_number > versions[1].version_number); // DESC order
+    }
+
+    #[test]
+    fn get_version_by_id() {
+        let conn = crate::test_helpers::test_db();
+        let note_id = crate::test_helpers::insert_test_note(&conn, "Test", "body");
+        let v = snapshot_note(&conn, &note_id, crate::test_helpers::TEST_WS_ID, Some("T"), "content", 50).unwrap().unwrap();
+        let fetched = get_version(&conn, &v.id).unwrap();
+        assert_eq!(fetched.body, "content");
+    }
+
+    #[test]
+    fn auto_prune_limits_versions() {
+        let conn = crate::test_helpers::test_db();
+        let note_id = crate::test_helpers::insert_test_note(&conn, "Test", "body");
+        for i in 0..5 {
+            snapshot_note(&conn, &note_id, crate::test_helpers::TEST_WS_ID, Some("T"), &format!("v{}", i), 3).unwrap();
+        }
+        let versions = list_versions(&conn, &note_id).unwrap();
+        assert_eq!(versions.len(), 3);
+    }
+
+    #[test]
+    fn storage_stats() {
+        let conn = crate::test_helpers::test_db();
+        let note_id = crate::test_helpers::insert_test_note(&conn, "Test", "body");
+        snapshot_note(&conn, &note_id, crate::test_helpers::TEST_WS_ID, Some("T"), "content", 50).unwrap();
+        let stats = get_storage_stats(&conn, crate::test_helpers::TEST_WS_ID).unwrap();
+        assert_eq!(stats.total_versions, 1);
+        assert_eq!(stats.notes_with_versions, 1);
+        assert!(stats.total_size_bytes > 0);
+    }
+}

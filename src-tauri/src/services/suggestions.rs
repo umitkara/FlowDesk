@@ -272,3 +272,100 @@ fn is_recent(updated_at: &str, stopped_at: &str) -> bool {
         false
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- parse_tags ---
+    #[test]
+    fn parse_tags_valid_json() {
+        let tags = parse_tags(&Some(r#"["rust","testing"]"#.to_string()));
+        assert_eq!(tags, vec!["rust", "testing"]);
+    }
+
+    #[test]
+    fn parse_tags_none() {
+        assert!(parse_tags(&None).is_empty());
+    }
+
+    #[test]
+    fn parse_tags_invalid_json() {
+        assert!(parse_tags(&Some("not json".to_string())).is_empty());
+    }
+
+    #[test]
+    fn parse_tags_empty_array() {
+        assert!(parse_tags(&Some("[]".to_string())).is_empty());
+    }
+
+    // --- tag_overlap ---
+    #[test]
+    fn overlap_full_match() {
+        let a = vec!["rust".to_string(), "test".to_string()];
+        let b = vec!["Rust".to_string(), "Test".to_string()];
+        assert_eq!(tag_overlap(&a, &b), 2);
+    }
+
+    #[test]
+    fn overlap_partial() {
+        let a = vec!["rust".to_string(), "python".to_string()];
+        let b = vec!["rust".to_string()];
+        assert_eq!(tag_overlap(&a, &b), 1);
+    }
+
+    #[test]
+    fn overlap_none() {
+        let a = vec!["rust".to_string()];
+        let b = vec!["python".to_string()];
+        assert_eq!(tag_overlap(&a, &b), 0);
+    }
+
+    #[test]
+    fn overlap_empty() {
+        let a: Vec<String> = vec![];
+        let b = vec!["rust".to_string()];
+        assert_eq!(tag_overlap(&a, &b), 0);
+    }
+
+    // --- keyword_match ---
+    #[test]
+    fn keyword_full_match() {
+        let words = vec!["implement".to_string(), "parser".to_string()];
+        assert!((keyword_match(&words, "Implement a parser") - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn keyword_partial_match() {
+        let words = vec!["implement".to_string(), "parser".to_string()];
+        let score = keyword_match(&words, "Implement feature");
+        assert!((score - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn keyword_no_match() {
+        let words = vec!["deploy".to_string()];
+        assert_eq!(keyword_match(&words, "Write tests"), 0.0);
+    }
+
+    #[test]
+    fn keyword_empty_words() {
+        assert_eq!(keyword_match(&[], "anything"), 0.0);
+    }
+
+    // --- is_recent ---
+    #[test]
+    fn recent_within_two_hours() {
+        assert!(is_recent("2026-03-09T10:00:00Z", "2026-03-09T11:30:00Z"));
+    }
+
+    #[test]
+    fn not_recent_outside_two_hours() {
+        assert!(!is_recent("2026-03-09T10:00:00Z", "2026-03-09T13:00:01Z"));
+    }
+
+    #[test]
+    fn not_recent_short_timestamp() {
+        assert!(!is_recent("short", "2026-03-09T13:00:01Z"));
+    }
+}

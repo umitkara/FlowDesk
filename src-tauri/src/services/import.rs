@@ -273,3 +273,77 @@ pub fn import_warning(file_path: &str, message: &str) -> ImportWarning {
         message: message.to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_simple_markdown() {
+        let content = "---\ntitle: Test Note\ntags: [rust]\n---\nHello world";
+        let result = parse_markdown_file(content, "test.md", None).unwrap();
+        assert_eq!(result.title, Some("Test Note".to_string()));
+        assert_eq!(result.tags, vec!["rust".to_string()]);
+        assert_eq!(result.body, "Hello world");
+    }
+
+    #[test]
+    fn parse_no_frontmatter() {
+        let content = "Just a plain body.";
+        let result = parse_markdown_file(content, "plain.md", None).unwrap();
+        assert_eq!(result.title, Some("plain".to_string())); // from filename
+        assert!(result.tags.is_empty());
+        assert_eq!(result.body, "Just a plain body.");
+    }
+
+    #[test]
+    fn title_falls_back_to_filename() {
+        let content = "---\ntags: []\n---\nBody";
+        let result = parse_markdown_file(content, "notes/my-note.md", None).unwrap();
+        assert_eq!(result.title, Some("my-note".to_string()));
+    }
+
+    #[test]
+    fn folder_override_stored_in_path() {
+        let content = "Hello";
+        let result = parse_markdown_file(content, "test.md", Some("imported")).unwrap();
+        assert_eq!(result.relative_path, "imported:test.md");
+    }
+
+    #[test]
+    fn parse_wikilinks() {
+        let links = parse_obsidian_wikilinks("See [[Page One]] and [[Page Two|display]].");
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0].target, "Page One");
+        assert_eq!(links[0].display_text, None);
+        assert_eq!(links[1].target, "Page Two");
+        assert_eq!(links[1].display_text, Some("display".to_string()));
+    }
+
+    #[test]
+    fn convert_wikilinks_basic() {
+        let result = convert_wikilinks("See [[My Page]].");
+        assert_eq!(result, "See [My Page](My Page).");
+    }
+
+    #[test]
+    fn convert_wikilinks_with_alias() {
+        let result = convert_wikilinks("[[Target|Display Text]]");
+        assert_eq!(result, "[Display Text](Target)");
+    }
+
+    #[test]
+    fn empty_import_result_defaults() {
+        let r = empty_import_result();
+        assert_eq!(r.imported_count, 0);
+        assert_eq!(r.skipped_count, 0);
+        assert!(r.errors.is_empty());
+    }
+
+    #[test]
+    fn import_error_helper() {
+        let err = import_error("test.md", "bad file");
+        assert_eq!(err.file_path, "test.md");
+        assert_eq!(err.message, "bad file");
+    }
+}

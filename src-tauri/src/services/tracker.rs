@@ -303,6 +303,99 @@ pub fn calculate_elapsed_now(
 // State machine transitions
 // ---------------------------------------------------------------------------
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- calculate_active_mins ---
+    #[test]
+    fn active_mins_no_pauses() {
+        let mins = calculate_active_mins(
+            "2026-03-09T10:00:00+00:00",
+            "2026-03-09T11:00:00+00:00",
+            &[],
+        );
+        assert_eq!(mins, 60);
+    }
+
+    #[test]
+    fn active_mins_with_pause() {
+        let mins = calculate_active_mins(
+            "2026-03-09T10:00:00+00:00",
+            "2026-03-09T11:00:00+00:00",
+            &[Pause {
+                paused_at: "2026-03-09T10:20:00+00:00".to_string(),
+                resumed_at: Some("2026-03-09T10:30:00+00:00".to_string()),
+            }],
+        );
+        assert_eq!(mins, 50);
+    }
+
+    #[test]
+    fn active_mins_multiple_pauses() {
+        let mins = calculate_active_mins(
+            "2026-03-09T10:00:00+00:00",
+            "2026-03-09T11:00:00+00:00",
+            &[
+                Pause {
+                    paused_at: "2026-03-09T10:10:00+00:00".to_string(),
+                    resumed_at: Some("2026-03-09T10:20:00+00:00".to_string()),
+                },
+                Pause {
+                    paused_at: "2026-03-09T10:40:00+00:00".to_string(),
+                    resumed_at: Some("2026-03-09T10:50:00+00:00".to_string()),
+                },
+            ],
+        );
+        assert_eq!(mins, 40);
+    }
+
+    #[test]
+    fn active_mins_invalid_start() {
+        assert_eq!(calculate_active_mins("bad", "2026-03-09T10:00:00+00:00", &[]), 0);
+    }
+
+    #[test]
+    fn active_mins_zero_duration() {
+        let mins = calculate_active_mins(
+            "2026-03-09T10:00:00+00:00",
+            "2026-03-09T10:00:00+00:00",
+            &[],
+        );
+        assert_eq!(mins, 0);
+    }
+
+    // --- calculate_elapsed_now ---
+    #[test]
+    fn elapsed_paused_session() {
+        // When paused, elapsed should be measured up to paused_at, not now
+        let elapsed = calculate_elapsed_now(
+            "2026-03-09T10:00:00+00:00",
+            &[],
+            Some("2026-03-09T10:30:00+00:00"),
+        );
+        assert!((elapsed - 30.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn elapsed_with_completed_pause() {
+        let elapsed = calculate_elapsed_now(
+            "2026-03-09T10:00:00+00:00",
+            &[Pause {
+                paused_at: "2026-03-09T10:10:00+00:00".to_string(),
+                resumed_at: Some("2026-03-09T10:20:00+00:00".to_string()),
+            }],
+            Some("2026-03-09T10:30:00+00:00"),
+        );
+        assert!((elapsed - 20.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn elapsed_invalid_start_returns_zero() {
+        assert_eq!(calculate_elapsed_now("bad", &[], None), 0.0);
+    }
+}
+
 /// Starts a new tracking session. Requires the tracker to be idle.
 pub fn start(conn: &Connection, input: StartTrackerInput) -> Result<TrackerState, AppError> {
     let current = get_tracker_state(conn)?;

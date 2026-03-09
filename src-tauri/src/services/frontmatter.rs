@@ -159,3 +159,71 @@ pub fn build_front_matter(note: &Note) -> String {
 
     format!("---\n{}---\n{}", yaml_str, note.body)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_basic_front_matter() {
+        let body = "---\ntitle: Hello\ntags: [a, b]\n---\nBody text";
+        let (fm, remaining) = parse_front_matter(body).unwrap();
+        let fm = fm.unwrap();
+        assert_eq!(fm.title, Some("Hello".to_string()));
+        assert_eq!(fm.tags, vec!["a", "b"]);
+        assert_eq!(remaining, "Body text");
+    }
+
+    #[test]
+    fn parse_no_front_matter() {
+        let body = "Just a normal body.";
+        let (fm, remaining) = parse_front_matter(body).unwrap();
+        assert!(fm.is_none());
+        assert_eq!(remaining, "Just a normal body.");
+    }
+
+    #[test]
+    fn parse_empty_front_matter() {
+        let body = "---\n\n---\nBody";
+        let (fm, remaining) = parse_front_matter(body).unwrap();
+        assert!(fm.is_some()); // empty but valid
+        assert_eq!(remaining, "Body");
+    }
+
+    #[test]
+    fn parse_no_closing_delimiter() {
+        let body = "---\ntitle: Test\nBody without closing";
+        let (fm, remaining) = parse_front_matter(body).unwrap();
+        assert!(fm.is_none());
+        assert_eq!(remaining, body);
+    }
+
+    #[test]
+    fn parse_all_fields() {
+        let body = "---\ntitle: T\ndate: 2026-01-01\ncategory: work\ntype: journal\ncolor: red\nimportance: high\n---\nBody";
+        let (fm, _) = parse_front_matter(body).unwrap();
+        let fm = fm.unwrap();
+        assert_eq!(fm.title, Some("T".to_string()));
+        assert_eq!(fm.date, Some("2026-01-01".to_string()));
+        assert_eq!(fm.category, Some("work".to_string()));
+        assert_eq!(fm.note_type, Some("journal".to_string()));
+        assert_eq!(fm.color, Some("red".to_string()));
+        assert_eq!(fm.importance, Some("high".to_string()));
+    }
+
+    #[test]
+    fn parse_raw_preserved() {
+        let body = "---\ntitle: T\ncustom_field: val\n---\nBody";
+        let (fm, _) = parse_front_matter(body).unwrap();
+        let fm = fm.unwrap();
+        let raw = fm.raw.unwrap();
+        assert!(raw.get("custom_field").is_some());
+    }
+
+    #[test]
+    fn parse_leading_whitespace() {
+        let body = "  ---\ntitle: T\n---\nBody";
+        let (fm, _) = parse_front_matter(body).unwrap();
+        assert!(fm.is_some());
+    }
+}
