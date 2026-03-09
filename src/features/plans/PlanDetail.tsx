@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { usePlanStore } from "../../stores/planStore";
 import { useTaskStore } from "../../stores/taskStore";
-import { useUIStore } from "../../stores/uiStore";
+
 import { useRecurrenceStore } from "../../stores/recurrenceStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { RecurrenceEditor } from "../tasks/RecurrenceEditor";
@@ -11,6 +11,7 @@ import { BacklinksPanel } from "../../components/shared/BacklinksPanel";
 import { EntityReminders } from "../../components/shared/EntityReminders";
 import { useTrackerStore } from "../../stores/trackerStore";
 import { MoveToWorkspaceMenu } from "../../components/shared/MoveToWorkspaceMenu";
+import { openEntity } from "../../lib/openEntity";
 
 /** Side panel showing plan details and linked entities. */
 export default function PlanDetail() {
@@ -28,9 +29,11 @@ export default function PlanDetail() {
     fetchPlans,
   } = usePlanStore();
   const tasks = useTaskStore((s) => s.tasks);
-  const { setActiveView } = useUIStore();
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const { loadRuleForEntity, createRule, updateRule, deleteRule, skipNext, detachOccurrence: detachOcc } = useRecurrenceStore();
+  const trackerStatus = useTrackerStore((s) => s.status);
+  const trackerLinkedPlanId = useTrackerStore((s) => s.linkedPlanId);
+  const trackerStart = useTrackerStore((s) => s.start);
   const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule | null>(null);
 
   const [editingTitle, setEditingTitle] = useState(false);
@@ -279,9 +282,6 @@ export default function PlanDetail() {
           </div>
           <div className="mt-1 flex flex-wrap gap-1">
             {(() => {
-              const trackerStatus = useTrackerStore.getState().status;
-              const trackerLinkedPlanId = useTrackerStore.getState().linkedPlanId;
-              const trackerStart = useTrackerStore.getState().start;
               const isTrackingThis = trackerStatus !== "idle" && trackerLinkedPlanId === selectedPlan.plan.id;
               return (
                 <button
@@ -437,9 +437,7 @@ export default function PlanDetail() {
                       </span>
                       <button
                         className="truncate text-xs text-zinc-700 hover:text-blue-500 dark:text-zinc-300"
-                        onClick={() => {
-                          setActiveView("tasks");
-                        }}
+                        onClick={() => openEntity({ type: "task", id: lt.task_id })}
                       >
                         {lt.title}
                       </button>
@@ -477,7 +475,7 @@ export default function PlanDetail() {
                 >
                   <button
                     className="flex items-center gap-1.5 min-w-0 truncate text-xs text-zinc-700 hover:text-blue-500 dark:text-zinc-300"
-                    onClick={() => setActiveView("notes")}
+                    onClick={() => openEntity({ type: "note", id: ln.note_id })}
                   >
                     <span className="text-[10px]">📝</span>
                     {ln.title || "Untitled"}
