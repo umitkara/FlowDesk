@@ -177,7 +177,8 @@ export function TimeReports() {
   const tags = summary?.by_tag ?? [];
 
   return (
-    <div className="mx-auto h-full max-w-3xl overflow-y-auto p-6">
+    <div className="h-full overflow-y-auto">
+      <div className="px-6 py-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -190,7 +191,7 @@ export function TimeReports() {
               onClick={() => setMode("daily")}
               className={`rounded-l-lg px-3 py-1 text-xs font-medium ${
                 mode === "daily"
-                  ? "bg-blue-600 text-white"
+                  ? "bg-primary-600 text-white"
                   : "bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800"
               }`}
             >
@@ -200,7 +201,7 @@ export function TimeReports() {
               onClick={() => setMode("weekly")}
               className={`rounded-r-lg px-3 py-1 text-xs font-medium ${
                 mode === "weekly"
-                  ? "bg-blue-600 text-white"
+                  ? "bg-primary-600 text-white"
                   : "bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800"
               }`}
             >
@@ -235,14 +236,17 @@ export function TimeReports() {
         </button>
         <button
           onClick={() => setDate(todayISO())}
-          className="rounded-md px-2 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+          className="rounded-md px-2 py-0.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
         >
           Today
         </button>
       </div>
 
       {loading && (
-        <div className="mt-8 text-center text-sm text-gray-400">Loading...</div>
+        <div className="mt-8 flex items-center justify-center gap-2">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-primary-600" />
+          <span className="text-sm text-gray-400">Loading...</span>
+        </div>
       )}
 
       {!loading && (
@@ -272,7 +276,7 @@ export function TimeReports() {
                       <div className="flex-1">
                         <div className="h-4 rounded bg-gray-100 dark:bg-gray-800">
                           <div
-                            className="h-4 rounded bg-blue-500/70 dark:bg-blue-400/50"
+                            className="h-4 rounded bg-primary-500/70 dark:bg-primary-400/50"
                             style={{ width: `${Math.max(pct, 1)}%` }}
                           />
                         </div>
@@ -383,6 +387,7 @@ export function TimeReports() {
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }
@@ -603,7 +608,7 @@ function EntryRow({ entry, entityNames, onRefresh, isSelected, onToggleSelect, h
             </div>
             <div className="flex gap-1.5">
               <button onClick={() => setExpanded(false)} className="rounded px-2 py-1 text-[10px] text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700">Cancel</button>
-              <button onClick={handleSave} disabled={saving} className="rounded bg-blue-600 px-2 py-1 text-[10px] text-white hover:bg-blue-700 disabled:opacity-50">
+              <button onClick={handleSave} disabled={saving} className="rounded bg-primary-600 px-2 py-1 text-[10px] text-white hover:bg-primary-700 disabled:opacity-50">
                 {saving ? "Saving..." : "Save"}
               </button>
             </div>

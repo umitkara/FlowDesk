@@ -31,19 +31,12 @@ export function SettingsPanel() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl overflow-y-auto px-8 py-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto max-w-2xl px-6 py-6">
+      <div className="mb-6">
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           Settings
         </h1>
-        <button
-          onClick={() => setActiveView("notes")}
-          className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-        >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
       </div>
 
       {/* Editor section */}
@@ -232,6 +225,7 @@ export function SettingsPanel() {
         >
           About FlowDesk
         </button>
+      </div>
       </div>
     </div>
   );

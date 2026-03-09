@@ -54,12 +54,12 @@ export function Dashboard() {
   const widgetOrder = widgets.length > 0 ? widgets : activeWorkspace.config.dashboard_widgets;
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="mx-auto max-w-4xl">
+    <div className="h-full overflow-y-auto">
+      <div className="px-6 py-6">
         {/* Header */}
         <div className="mb-6 flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               {activeWorkspace.icon && (
                 <span className="mr-2">{activeWorkspace.icon}</span>
               )}
@@ -111,8 +111,7 @@ export function Dashboard() {
             </p>
             <button
               onClick={startEditing}
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-white"
-              style={{ backgroundColor: "var(--workspace-accent)" }}
+              className="rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
             >
               Add Widgets
             </button>
@@ -148,10 +147,10 @@ function WidgetRenderer({ type, data }: { type: string; data: DashboardData }) {
 /** Loading skeleton for the dashboard. */
 function DashboardSkeleton({ name, icon }: { name: string; icon: string | null }) {
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="mx-auto max-w-4xl">
+    <div className="h-full overflow-y-auto">
+      <div className="px-6 py-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {icon && <span className="mr-2">{icon}</span>}
             {name}
           </h1>
@@ -305,7 +304,7 @@ function TodayPlanWidget({ plans }: { plans: DashboardPlan[] }) {
       )}
       <button
         onClick={() => setActiveView("daily-plan")}
-        className="mt-2 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400"
+        className="mt-2 text-xs text-primary-500 hover:text-primary-600 dark:text-primary-400"
       >
         View daily plan &rarr;
       </button>
@@ -362,7 +361,7 @@ function PendingTasksWidget({ tasks }: { tasks: DashboardTask[] }) {
       )}
       <button
         onClick={() => setActiveView("tasks")}
-        className="mt-2 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400"
+        className="mt-2 text-xs text-primary-500 hover:text-primary-600 dark:text-primary-400"
       >
         View all tasks &rarr;
       </button>
@@ -399,7 +398,7 @@ function RecentNotesWidget({ notes }: { notes: DashboardNote[] }) {
       )}
       <button
         onClick={() => setActiveView("notes")}
-        className="mt-2 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400"
+        className="mt-2 text-xs text-primary-500 hover:text-primary-600 dark:text-primary-400"
       >
         View all notes &rarr;
       </button>
@@ -416,8 +415,7 @@ function TimeTodayWidget({ summary }: { summary: TimeSummary }) {
   return (
     <DashboardCard title="Time Today">
       <div
-        className="text-3xl font-mono font-bold"
-        style={{ color: "var(--workspace-accent)" }}
+        className="text-3xl font-mono font-bold text-primary-600 dark:text-primary-400"
       >
         {formatMinutes(summary.active_mins)}
       </div>
@@ -429,8 +427,7 @@ function TimeTodayWidget({ summary }: { summary: TimeSummary }) {
         {trackerStatus === "idle" ? (
           <button
             onClick={() => trackerStart()}
-            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-white"
-            style={{ backgroundColor: "var(--workspace-accent)" }}
+            className="flex items-center gap-1 rounded-md bg-primary-600 px-2 py-1 text-xs font-medium text-white hover:bg-primary-700"
           >
             <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -455,7 +452,7 @@ function TimeTodayWidget({ summary }: { summary: TimeSummary }) {
         )}
         <button
           onClick={() => setActiveView("time-reports")}
-          className="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400"
+          className="text-xs text-primary-500 hover:text-primary-600 dark:text-primary-400"
         >
           Reports &rarr;
         </button>
@@ -695,8 +692,7 @@ function QuickCaptureWidget() {
           <button
             onClick={handleSubmit}
             disabled={!text.trim() || isSubmitting}
-            className="rounded-md px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
-            style={{ backgroundColor: "var(--workspace-accent)" }}
+            className="rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-40"
           >
             {isSubmitting ? "..." : "Add"}
           </button>

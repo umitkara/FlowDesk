@@ -69,10 +69,11 @@ export function TrashView() {
   }, [trashedNotes, loadTrashed]);
 
   return (
-    <div className="mx-auto max-w-2xl overflow-y-auto px-8 py-6">
+    <div className="h-full overflow-y-auto">
+      <div className="px-6 py-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             Trash
           </h1>
           <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
@@ -145,6 +146,7 @@ export function TrashView() {
             </div>
           </div>
         ))}
+      </div>
       </div>
     </div>
   );

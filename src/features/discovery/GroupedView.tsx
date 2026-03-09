@@ -108,17 +108,17 @@ export default function GroupedView() {
   return (
     <div className="flex h-full flex-col">
       {/* Header with selectors */}
-      <div className="flex-shrink-0 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
+      <div className="flex-shrink-0 border-b border-gray-200 px-6 py-4 dark:border-gray-800">
+        <h1 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
           Grouped View
-        </h2>
+        </h1>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5">
             <span className="text-xs text-gray-500 dark:text-gray-400">Type</span>
             <select
               value={entityType}
               onChange={(e) => handleEntityTypeChange(e.target.value)}
-              className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+              className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
             >
               {ENTITY_TYPES.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -133,7 +133,7 @@ export default function GroupedView() {
             <select
               value={groupBy}
               onChange={(e) => setGroupBy(e.target.value)}
-              className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+              className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
             >
               {groupByOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -148,7 +148,7 @@ export default function GroupedView() {
       {/* Content area */}
       <div className="flex-1 overflow-y-auto">
         {loading && (
-          <div className="space-y-3 p-4">
+          <div className="space-y-3 p-6">
             {[1, 2, 3].map((i) => (
               <div key={i} className="animate-pulse">
                 <div className="mb-2 h-8 rounded bg-gray-100 dark:bg-gray-800" />
@@ -162,7 +162,10 @@ export default function GroupedView() {
         )}
 
         {!loading && result && result.groups.length === 0 && (
-          <div className="p-8 text-center">
+          <div className="flex flex-col items-center py-16">
+            <svg className="mb-3 h-10 w-10 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
             <p className="text-sm text-gray-400 dark:text-gray-500">
               No items found
             </p>

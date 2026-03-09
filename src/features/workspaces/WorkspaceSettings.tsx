@@ -15,13 +15,16 @@ export function WorkspaceSettings() {
   if (!activeWorkspace) return null;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8 overflow-y-auto p-6">
-      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-        Workspace Settings
-      </h2>
-      <p className="text-sm text-gray-500 dark:text-gray-400">
-        Configure settings for <strong>{activeWorkspace.name}</strong>.
-      </p>
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto max-w-2xl space-y-8 px-6 py-6">
+      <div className="mb-6">
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          Workspace Settings
+        </h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Configure settings for <strong>{activeWorkspace.name}</strong>.
+        </p>
+      </div>
 
       {/* General Settings */}
       <GeneralSection workspace={activeWorkspace} onSave={updateWorkspace} />
@@ -67,6 +70,7 @@ export function WorkspaceSettings() {
           setActiveView("dashboard");
         }}
       />
+      </div>
     </div>
   );
 }
@@ -109,7 +113,7 @@ function GeneralSection({
   };
 
   return (
-    <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+    <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
       <h3 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
         General
       </h3>
@@ -122,7 +126,7 @@ function GeneralSection({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
           />
         </div>
         <div className="flex gap-4">
@@ -136,7 +140,7 @@ function GeneralSection({
               onChange={(e) => setIcon(e.target.value)}
               maxLength={2}
               placeholder="e.g., an emoji"
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
             />
           </div>
           <div>
@@ -159,7 +163,7 @@ function GeneralSection({
             <button
               onClick={handleSave}
               disabled={saving || !name.trim()}
-              className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>
@@ -198,7 +202,7 @@ function ListEditor({
   };
 
   return (
-    <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+    <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
       <h3 className="mb-1 text-sm font-semibold text-gray-700 dark:text-gray-300">
         {title}
       </h3>
@@ -234,7 +238,7 @@ function ListEditor({
               handleAdd();
             }
           }}
-          className="flex-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
+          className="flex-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
         />
         <button
           onClick={handleAdd}
@@ -278,7 +282,7 @@ function DashboardWidgetConfig({
   );
 
   return (
-    <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+    <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
       <h3 className="mb-1 text-sm font-semibold text-gray-700 dark:text-gray-300">
         Dashboard Widgets
       </h3>
@@ -295,7 +299,7 @@ function DashboardWidgetConfig({
               type="checkbox"
               checked={widgets.includes(w.id)}
               onChange={() => toggleWidget(w.id)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600"
+              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
             />
             <span className="text-gray-700 dark:text-gray-300">{w.label}</span>
           </label>
