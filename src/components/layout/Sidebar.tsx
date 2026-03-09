@@ -10,7 +10,7 @@ import { todayISO } from "../../lib/utils";
 const activeClass =
   "bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300";
 const inactiveClass =
-  "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800";
+  "text-gray-600 hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-primary-400 dark:text-gray-400 dark:hover:bg-gray-800";
 
 const SECONDARY_VIEWS = [
   "time-reports",

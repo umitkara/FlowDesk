@@ -5,6 +5,7 @@
 @layer base {
   :root,
   [data-theme="light"] {
+    color-scheme: light;
     --workspace-accent: #3b82f6;
     --workspace-accent-light: #3b82f620;
     --workspace-accent-dark: #2563eb;
@@ -29,6 +30,7 @@
   }
 
   [data-theme="dark"] {
+    color-scheme: dark;
     --workspace-accent: #3b82f6;
     --workspace-accent-light: #3b82f620;
     --workspace-accent-dark: #60a5fa;
@@ -72,6 +74,15 @@
 
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-gray-400 dark:bg-gray-600;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -218,35 +229,35 @@
 
   /* FullCalendar theme overrides */
   .fc {
-    --fc-border-color: #e4e4e7; /* zinc-200 */
+    --fc-border-color: #e5e7eb; /* gray-200 */
     --fc-bg-event-opacity: 0.85;
     --fc-today-bg-color: rgba(59, 130, 246, 0.05);
     --fc-now-indicator-color: #3b82f6;
     --fc-page-bg-color: transparent;
-    --fc-neutral-bg-color: #fafafa;
-    --fc-list-event-hover-bg-color: #f4f4f5;
-    --fc-button-bg-color: #f4f4f5;
-    --fc-button-border-color: #e4e4e7;
-    --fc-button-text-color: #52525b;
-    --fc-button-hover-bg-color: #e4e4e7;
-    --fc-button-hover-border-color: #d4d4d8;
+    --fc-neutral-bg-color: #f9fafb;
+    --fc-list-event-hover-bg-color: #f3f4f6;
+    --fc-button-bg-color: #f3f4f6;
+    --fc-button-border-color: #e5e7eb;
+    --fc-button-text-color: #4b5563;
+    --fc-button-hover-bg-color: #e5e7eb;
+    --fc-button-hover-border-color: #d1d5db;
     --fc-button-active-bg-color: #3b82f6;
     --fc-button-active-border-color: #3b82f6;
   }
 
   .dark .fc {
-    --fc-border-color: #3f3f46; /* zinc-700 */
-    --fc-today-bg-color: rgba(63, 63, 70, 0.5);
+    --fc-border-color: #374151; /* gray-700 */
+    --fc-today-bg-color: rgba(55, 65, 81, 0.5);
     --fc-now-indicator-color: #3b82f6;
     --fc-page-bg-color: transparent;
-    --fc-neutral-bg-color: #18181b;
-    --fc-list-event-hover-bg-color: #27272a;
-    --fc-neutral-text-color: #a1a1aa;
-    --fc-button-bg-color: #27272a;
-    --fc-button-border-color: #3f3f46;
-    --fc-button-text-color: #a1a1aa;
-    --fc-button-hover-bg-color: #3f3f46;
-    --fc-button-hover-border-color: #52525b;
+    --fc-neutral-bg-color: #111827;
+    --fc-list-event-hover-bg-color: #1f2937;
+    --fc-neutral-text-color: #9ca3af;
+    --fc-button-bg-color: #1f2937;
+    --fc-button-border-color: #374151;
+    --fc-button-text-color: #9ca3af;
+    --fc-button-hover-bg-color: #374151;
+    --fc-button-hover-border-color: #4b5563;
     --fc-button-active-bg-color: #3b82f6;
     --fc-button-active-border-color: #3b82f6;
   }
@@ -255,11 +266,11 @@
   .dark .fc .fc-daygrid-day-number,
   .dark .fc .fc-list-day-text,
   .dark .fc .fc-list-day-side-text {
-    @apply text-zinc-300;
+    @apply text-gray-300;
   }
 
   .dark .fc .fc-timegrid-slot-label-cushion {
-    @apply text-zinc-500;
+    @apply text-gray-500;
   }
 
   .fc .fc-timegrid-slot {
@@ -277,7 +288,7 @@
   }
 
   .dark .fc .fc-toolbar-title {
-    @apply text-zinc-200;
+    @apply text-gray-200;
   }
 
   .fc .fc-button {
