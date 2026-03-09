@@ -1,6 +1,7 @@
 use crate::db::connection::DbPool;
 use crate::models::undo::OperationHistory;
-use std::sync::{Arc, Mutex};
+use crate::services::backup::BackupCommand;
+use std::sync::{mpsc, Arc, Mutex};
 
 /// Shared application state managed by Tauri.
 ///
@@ -13,4 +14,6 @@ pub struct AppState {
     pub data_dir: String,
     /// In-memory undo/redo operation history.
     pub operation_history: Arc<Mutex<OperationHistory>>,
+    /// Channel sender for reconfiguring the backup scheduler at runtime.
+    pub backup_tx: Mutex<mpsc::Sender<BackupCommand>>,
 }

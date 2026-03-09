@@ -14,10 +14,11 @@ pub mod utils;
 use db::connection::DbPool;
 use models::undo::OperationHistory;
 use state::AppState;
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use tauri::{Emitter, Manager};
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::TrayIconEvent;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_notification::NotificationExt;
 
 /// Backup-related settings loaded from the database.
@@ -99,6 +100,7 @@ fn ensure_default_settings(conn: &rusqlite::Connection) -> Result<(), rusqlite::
             ("font_size", "14"),
             ("auto_save_debounce_ms", "1000"),
             ("sidebar_width", "260"),
+            ("global_hotkey", "Ctrl+Shift+Space"),
         ];
 
         for (key, value) in defaults {
@@ -144,6 +146,40 @@ fn ensure_directories(data_dir: &str) {
     }
 }
 
+/// Registers (or re-registers) the global hotkey with the OS.
+///
+/// Clears any stale registrations, then binds the given shortcut string.
+/// On press, emits `quick-capture:activate` and focuses the main window.
+pub(crate) fn register_global_hotkey(app_handle: &tauri::AppHandle, hotkey: &str) {
+    let manager = app_handle.global_shortcut();
+    let _ = manager.unregister_all();
+
+    if hotkey.is_empty() {
+        return;
+    }
+
+    let shortcut = match hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Failed to parse global hotkey '{}': {}", hotkey, e);
+            return;
+        }
+    };
+
+    if let Err(e) = manager.on_shortcut(shortcut, move |app, _shortcut, event| {
+        if event.state == ShortcutState::Pressed {
+            let _ = app.emit("quick-capture:activate", ());
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }
+    }) {
+        eprintln!("Failed to register global hotkey '{}': {}", hotkey, e);
+    }
+}
+
 /// Starts a background thread that checks for pending reminders every 30 seconds.
 ///
 /// When a reminder is due, it fires a system notification and emits a
@@ -152,6 +188,29 @@ fn start_reminder_scheduler(app_handle: tauri::AppHandle, db: Arc<DbPool>) {
     std::thread::spawn(move || {
         loop {
             std::thread::sleep(std::time::Duration::from_secs(30));
+
+            // Check if reminders are enabled in settings
+            let reminder_enabled = db
+                .with_conn(|conn| {
+                    let json_str: String = conn
+                        .query_row(
+                            "SELECT value FROM settings WHERE key = 'reminder_defaults'",
+                            [],
+                            |row| row.get(0),
+                        )
+                        .unwrap_or_else(|_| r#"{"enabled":true}"#.to_string());
+                    Ok(json_str)
+                })
+                .unwrap_or_else(|_| r#"{"enabled":true}"#.to_string());
+
+            let enabled = serde_json::from_str::<serde_json::Value>(&reminder_enabled)
+                .ok()
+                .and_then(|v| v.get("enabled")?.as_bool())
+                .unwrap_or(true);
+
+            if !enabled {
+                continue;
+            }
 
             let now = utils::time::now_iso();
             let result = db.with_conn(|conn| {
@@ -362,16 +421,17 @@ pub fn run() {
                 })
                 .expect("Failed to seed default data");
 
-            // Start backup scheduler
+            // Start backup scheduler with channel for live reconfiguration
             let settings = load_backup_settings(&db_pool);
-            if settings.backup_enabled {
-                services::backup::start_backup_scheduler(
-                    db_path.clone(),
-                    format!("{}/backups", data_dir),
-                    settings.interval_hours,
-                    settings.retention_days,
-                );
-            }
+            let (backup_tx, backup_rx) = mpsc::channel();
+            services::backup::start_backup_scheduler(
+                db_path.clone(),
+                format!("{}/backups", data_dir),
+                settings.backup_enabled,
+                settings.interval_hours,
+                settings.retention_days,
+                backup_rx,
+            );
 
             // Ensure built-in templates exist
             let _ = services::templates::ensure_defaults(&data_dir);
@@ -382,7 +442,21 @@ pub fn run() {
                 db: Arc::clone(&db_pool_arc),
                 data_dir,
                 operation_history: Arc::new(Mutex::new(OperationHistory::new(100))),
+                backup_tx: Mutex::new(backup_tx),
             });
+
+            // Register global hotkey
+            let global_hotkey = db_pool_arc
+                .with_conn(|conn| {
+                    conn.query_row(
+                        "SELECT value FROM settings WHERE key = 'global_hotkey'",
+                        [],
+                        |row| row.get::<_, String>(0),
+                    )
+                    .or(Ok("Ctrl+Shift+Space".to_string()))
+                })
+                .unwrap_or_else(|_| "Ctrl+Shift+Space".to_string());
+            register_global_hotkey(app.handle(), &global_hotkey);
 
             // Start background reminder scheduler
             start_reminder_scheduler(app.handle().clone(), Arc::clone(&db_pool_arc));

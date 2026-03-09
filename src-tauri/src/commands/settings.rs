@@ -1,10 +1,54 @@
 use crate::models::note_version::VersionHistoryConfig;
+use crate::services::backup::BackupCommand;
 use crate::state::AppState;
 use crate::utils::errors::AppError;
 use crate::utils::time::now_iso;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::{Emitter, State};
+
+/// Setting keys that affect the backup scheduler.
+const BACKUP_KEYS: &[&str] = &[
+    "backup_enabled",
+    "backup_interval_hours",
+    "backup_retention_days",
+];
+
+/// Reads current backup settings from DB and sends a Reconfigure command.
+fn maybe_reconfigure_backup(state: &AppState) {
+    let get = |key: &str, default: &str| -> String {
+        state
+            .db
+            .with_conn(|conn| {
+                conn.query_row(
+                    "SELECT value FROM settings WHERE key = ?1",
+                    [key],
+                    |row| row.get(0),
+                )
+                .or(Ok(default.to_string()))
+            })
+            .unwrap_or_else(|_| default.to_string())
+    };
+
+    let enabled = get("backup_enabled", "true") == "true";
+    let interval_hours: u64 = get("backup_interval_hours", "24").parse().unwrap_or(24);
+    let retention_days: u64 = get("backup_retention_days", "30").parse().unwrap_or(30);
+
+    if let Ok(tx) = state.backup_tx.lock() {
+        let _ = tx.send(BackupCommand::Reconfigure {
+            enabled,
+            interval_hours,
+            retention_days,
+        });
+    }
+}
+
+/// Dispatches side-effects when settings change.
+fn on_settings_changed(state: &AppState, keys: &[&str]) {
+    if keys.iter().any(|k| BACKUP_KEYS.contains(k)) {
+        maybe_reconfigure_backup(state);
+    }
+}
 
 /// Theme settings stored as JSON in the settings table.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,7 +108,10 @@ pub fn set_setting(
             )?;
             Ok(())
         })
-        .map_err(AppError::Database)
+        .map_err(AppError::Database)?;
+
+    on_settings_changed(&state, &[&key]);
+    Ok(())
 }
 
 /// Returns all settings as a key-value map.
@@ -111,7 +158,11 @@ pub fn set_many_settings(
             tx.commit()?;
             Ok(())
         })
-        .map_err(AppError::Database)
+        .map_err(AppError::Database)?;
+
+    let keys: Vec<&str> = settings.keys().map(|k| k.as_str()).collect();
+    on_settings_changed(&state, &keys);
+    Ok(())
 }
 
 /// Gets the customized keyboard shortcuts.

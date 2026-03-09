@@ -107,6 +107,9 @@ export function SettingsPanel() {
             className="w-20 rounded border border-gray-200 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800"
           />
         </SettingRow>
+        <div className="px-4 pb-3 text-xs text-gray-400 dark:text-gray-500">
+          Changes take effect immediately.
+        </div>
       </SettingsSection>
 
       {/* Calendar section */}
