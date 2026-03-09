@@ -28,6 +28,10 @@ interface UIState {
   commandPaletteOpen: boolean;
   /** Whether the quick capture widget is open. */
   quickCaptureOpen: boolean;
+  /** Whether the secondary sidebar section is expanded. */
+  sidebarSecondaryExpanded: boolean;
+  /** Whether the sidebar was auto-collapsed due to narrow window. */
+  sidebarAutoCollapsed: boolean;
 
   /** Toggles sidebar visibility. */
   toggleSidebar: () => void;
@@ -49,19 +53,25 @@ interface UIState {
   toggleCommandPalette: () => void;
   /** Toggles the quick capture widget. */
   toggleQuickCapture: () => void;
+  /** Toggles the secondary sidebar section. */
+  toggleSidebarSecondary: () => void;
+  /** Sets the sidebar auto-collapsed state. */
+  setSidebarAutoCollapsed: (collapsed: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
   sidebarOpen: true,
   sidebarWidth: 260,
   detailPanelOpen: false,
-  activeView: "notes",
+  activeView: "dashboard",
   activeSidebarSection: "folders",
   navigationHistory: [],
   historyIndex: -1,
   quickSwitcherOpen: false,
   commandPaletteOpen: false,
   quickCaptureOpen: false,
+  sidebarSecondaryExpanded: false,
+  sidebarAutoCollapsed: false,
 
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
 
@@ -111,4 +121,9 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   toggleQuickCapture: () =>
     set((s) => ({ quickCaptureOpen: !s.quickCaptureOpen })),
+
+  toggleSidebarSecondary: () =>
+    set((s) => ({ sidebarSecondaryExpanded: !s.sidebarSecondaryExpanded })),
+
+  setSidebarAutoCollapsed: (collapsed) => set({ sidebarAutoCollapsed: collapsed }),
 }));
