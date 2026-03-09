@@ -8,7 +8,9 @@ import { RecurrenceEditor } from "../tasks/RecurrenceEditor";
 import { PLAN_TYPE_CONFIG, IMPORTANCE_CONFIG, STATUS_CONFIG } from "../../lib/types";
 import type { PlanLinkedTask, PlanLinkedNote, TaskStatus, TaskWithChildren, RecurrenceRule, CreateRecurrenceRuleInput, UpdateRecurrenceRuleInput } from "../../lib/types";
 import { BacklinksPanel } from "../../components/shared/BacklinksPanel";
+import { CollapsibleSection } from "../../components/shared/CollapsibleSection";
 import { EntityReminders } from "../../components/shared/EntityReminders";
+import { PlanTimeLog } from "./PlanTimeLog";
 import { useTrackerStore } from "../../stores/trackerStore";
 import { MoveToWorkspaceMenu } from "../../components/shared/MoveToWorkspaceMenu";
 import { openEntity } from "../../lib/openEntity";
@@ -486,6 +488,11 @@ export default function PlanDetail() {
             </div>
           )}
         </div>
+
+        {/* Time Log */}
+        <CollapsibleSection title="Time Log">
+          <PlanTimeLog planId={plan.id} />
+        </CollapsibleSection>
 
         <div className="border-t border-zinc-200 dark:border-zinc-800" />
 
