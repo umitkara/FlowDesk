@@ -4,7 +4,7 @@ import { useDashboardStore } from "../../stores/dashboardStore";
 import { useUIStore } from "../../stores/uiStore";
 import { useNoteStore } from "../../stores/noteStore";
 import { useTaskStore } from "../../stores/taskStore";
-import { formatMinutes } from "../../stores/trackerStore";
+import { useTrackerStore, formatMinutes, formatElapsed } from "../../stores/trackerStore";
 import { DashboardEditor } from "./DashboardEditor";
 import { openEntity } from "../../lib/openEntity";
 import type {
@@ -66,7 +66,7 @@ export function Dashboard() {
               {activeWorkspace.name}
             </h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Welcome to your workspace dashboard.
+              Your day at a glance.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -93,6 +93,9 @@ export function Dashboard() {
             </button>
           </div>
         </div>
+
+        {/* Currently Tracking card */}
+        <CurrentlyTrackingCard />
 
         {/* Widget Grid */}
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -249,6 +252,8 @@ function StatusLabel({ status }: { status: string }) {
 
 function TodayPlanWidget({ plans }: { plans: DashboardPlan[] }) {
   const setActiveView = useUIStore((s) => s.setActiveView);
+  const trackerStatus = useTrackerStore((s) => s.status);
+  const trackerStart = useTrackerStore((s) => s.start);
   return (
     <DashboardCard title="Today's Plan" count={plans.length}>
       {plans.length === 0 ? (
@@ -258,25 +263,42 @@ function TodayPlanWidget({ plans }: { plans: DashboardPlan[] }) {
       ) : (
         <ul className="space-y-1.5">
           {plans.map((plan) => (
-            <li key={plan.id}>
-              <button
-                onClick={() => {
-                  setActiveView("daily-plan");
-                  openEntity({ type: "plan", id: plan.id });
-                }}
-                className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                <span className="flex-shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                  {formatTime(plan.start_time)}
-                </span>
-                <span
-                  className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                  style={{ backgroundColor: plan.color ?? "var(--workspace-accent)" }}
-                />
-                <span className="truncate text-gray-700 dark:text-gray-300">
-                  {plan.title}
-                </span>
-              </button>
+            <li key={plan.id} className="group">
+              <div className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
+                <button
+                  onClick={() => {
+                    setActiveView("daily-plan");
+                    openEntity({ type: "plan", id: plan.id });
+                  }}
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                >
+                  <span className="flex-shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                    {formatTime(plan.start_time)}
+                  </span>
+                  <span
+                    className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                    style={{ backgroundColor: plan.color ?? "var(--workspace-accent)" }}
+                  />
+                  <span className="truncate text-gray-700 dark:text-gray-300">
+                    {plan.title}
+                  </span>
+                </button>
+                {trackerStatus === "idle" && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      trackerStart({ linkedPlanId: plan.id });
+                    }}
+                    className="hidden flex-shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-green-600 group-hover:block dark:hover:bg-gray-700 dark:hover:text-green-400"
+                    title="Start tracking"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -293,6 +315,8 @@ function TodayPlanWidget({ plans }: { plans: DashboardPlan[] }) {
 
 function PendingTasksWidget({ tasks }: { tasks: DashboardTask[] }) {
   const setActiveView = useUIStore((s) => s.setActiveView);
+  const toggleTaskStatus = useTaskStore((s) => s.toggleTaskStatus);
+  const loadDashboard = useWorkspaceStore((s) => s.loadDashboard);
   return (
     <DashboardCard title="Pending Tasks" count={tasks.length}>
       {tasks.length === 0 ? (
@@ -303,16 +327,30 @@ function PendingTasksWidget({ tasks }: { tasks: DashboardTask[] }) {
         <ul className="space-y-1">
           {tasks.slice(0, 8).map((task) => (
             <li key={task.id}>
-              <button
-                onClick={() => openEntity({ type: "task", id: task.id })}
-                className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                <PriorityDot priority={task.priority} />
-                <span className="truncate text-gray-700 dark:text-gray-300">
-                  {task.title}
-                </span>
-                <StatusLabel status={task.status} />
-              </button>
+              <div className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleTaskStatus(task.id).then(() => loadDashboard());
+                  }}
+                  className="flex-shrink-0 rounded border border-gray-300 p-px text-transparent hover:border-green-500 hover:text-green-500 dark:border-gray-600 dark:hover:border-green-400 dark:hover:text-green-400"
+                  title="Complete task"
+                >
+                  <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => openEntity({ type: "task", id: task.id })}
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                >
+                  <PriorityDot priority={task.priority} />
+                  <span className="truncate text-gray-700 dark:text-gray-300">
+                    {task.title}
+                  </span>
+                  <StatusLabel status={task.status} />
+                </button>
+              </div>
             </li>
           ))}
           {tasks.length > 8 && (
@@ -371,6 +409,10 @@ function RecentNotesWidget({ notes }: { notes: DashboardNote[] }) {
 
 function TimeTodayWidget({ summary }: { summary: TimeSummary }) {
   const setActiveView = useUIStore((s) => s.setActiveView);
+  const trackerStatus = useTrackerStore((s) => s.status);
+  const trackerStart = useTrackerStore((s) => s.start);
+  const trackerStop = useTrackerStore((s) => s.stop);
+  const elapsedSeconds = useTrackerStore((s) => s.elapsedSeconds);
   return (
     <DashboardCard title="Time Today">
       <div
@@ -383,17 +425,48 @@ function TimeTodayWidget({ summary }: { summary: TimeSummary }) {
         {summary.entry_count} session{summary.entry_count !== 1 ? "s" : ""} &middot;{" "}
         {formatMinutes(summary.total_mins)} total
       </p>
-      <button
-        onClick={() => setActiveView("time-reports")}
-        className="mt-2 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400"
-      >
-        View time reports &rarr;
-      </button>
+      <div className="mt-2 flex items-center gap-2">
+        {trackerStatus === "idle" ? (
+          <button
+            onClick={() => trackerStart()}
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-white"
+            style={{ backgroundColor: "var(--workspace-accent)" }}
+          >
+            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            </svg>
+            Start Tracking
+          </button>
+        ) : (
+          <>
+            <span className="font-mono text-xs font-medium text-gray-600 dark:text-gray-300">
+              {formatElapsed(elapsedSeconds)}
+            </span>
+            <button
+              onClick={() => trackerStop()}
+              className="flex items-center gap-1 rounded-md bg-red-500 px-2 py-1 text-xs font-medium text-white hover:bg-red-600"
+            >
+              <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="6" width="12" height="12" rx="1" />
+              </svg>
+              Stop
+            </button>
+          </>
+        )}
+        <button
+          onClick={() => setActiveView("time-reports")}
+          className="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400"
+        >
+          Reports &rarr;
+        </button>
+      </div>
     </DashboardCard>
   );
 }
 
 function StickyTasksWidget({ tasks }: { tasks: DashboardTask[] }) {
+  const toggleTaskStatus = useTaskStore((s) => s.toggleTaskStatus);
+  const loadDashboard = useWorkspaceStore((s) => s.loadDashboard);
   return (
     <DashboardCard title="Sticky Tasks" count={tasks.length}>
       {tasks.length === 0 ? (
@@ -404,15 +477,29 @@ function StickyTasksWidget({ tasks }: { tasks: DashboardTask[] }) {
         <ul className="space-y-1">
           {tasks.map((task) => (
             <li key={task.id}>
-              <button
-                onClick={() => openEntity({ type: "task", id: task.id })}
-                className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                <PriorityDot priority={task.priority} />
-                <span className="truncate text-gray-700 dark:text-gray-300">
-                  {task.title}
-                </span>
-              </button>
+              <div className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleTaskStatus(task.id).then(() => loadDashboard());
+                  }}
+                  className="flex-shrink-0 rounded border border-gray-300 p-px text-transparent hover:border-green-500 hover:text-green-500 dark:border-gray-600 dark:hover:border-green-400 dark:hover:text-green-400"
+                  title="Complete task"
+                >
+                  <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => openEntity({ type: "task", id: task.id })}
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                >
+                  <PriorityDot priority={task.priority} />
+                  <span className="truncate text-gray-700 dark:text-gray-300">
+                    {task.title}
+                  </span>
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -453,6 +540,80 @@ function UpcomingDeadlinesWidget({ tasks }: { tasks: DashboardTask[] }) {
         </ul>
       )}
     </DashboardCard>
+  );
+}
+
+/** Currently tracking card shown above widgets when tracker is running. */
+function CurrentlyTrackingCard() {
+  const trackerStatus = useTrackerStore((s) => s.status);
+  const elapsedSeconds = useTrackerStore((s) => s.elapsedSeconds);
+  const linkedTaskId = useTrackerStore((s) => s.linkedTaskId);
+  const linkedPlanId = useTrackerStore((s) => s.linkedPlanId);
+  const trackerPause = useTrackerStore((s) => s.pause);
+  const trackerResume = useTrackerStore((s) => s.resume);
+  const trackerStop = useTrackerStore((s) => s.stop);
+
+  if (trackerStatus === "idle") return null;
+
+  return (
+    <div className="mb-5 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+          </span>
+          <div>
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+              Currently Tracking
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {linkedTaskId && `Task: ${linkedTaskId.slice(0, 8)}...`}
+              {linkedPlanId && `Plan: ${linkedPlanId.slice(0, 8)}...`}
+              {!linkedTaskId && !linkedPlanId && "Unlinked session"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-lg font-bold text-green-700 dark:text-green-300">
+            {formatElapsed(elapsedSeconds)}
+          </span>
+          <div className="flex items-center gap-1">
+            {trackerStatus === "running" ? (
+              <button
+                onClick={() => trackerPause()}
+                className="rounded-md bg-yellow-100 p-1.5 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:hover:bg-yellow-900/50"
+                title="Pause"
+              >
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="5" width="4" height="14" rx="1" />
+                  <rect x="14" y="5" width="4" height="14" rx="1" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                onClick={() => trackerResume()}
+                className="rounded-md bg-green-100 p-1.5 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                title="Resume"
+              >
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </button>
+            )}
+            <button
+              onClick={() => trackerStop()}
+              className="rounded-md bg-red-100 p-1.5 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+              title="Stop"
+            >
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="6" width="12" height="12" rx="1" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
