@@ -1,11 +1,15 @@
 use crate::models::discovery::{
     ActualEntry, BacklinkWithContext, FacetedSearchResponse, FilterConfig, GraphData, GraphQuery,
-    GroupEntry, GroupedViewResult, PlannedBlock, PlannedVsActualData,
+    GroupEntry, GroupedViewResult, PlannedBlock, PlannedVsActualData, UnplannedGroup,
 };
+use crate::models::time_entry::Pause;
 use crate::services::faceted_search::execute_faceted_search;
 use crate::services::graph::compute_graph;
+use crate::services::tracker::calculate_active_mins;
 use crate::state::AppState;
 use crate::utils::errors::AppError;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use std::collections::{HashMap, HashSet};
 use tauri::State;
 
 /// Performs a multi-entity faceted search with filter configuration.
@@ -318,118 +322,274 @@ fn extract_reference_context(body: &str, entity_id: &str, entity_type: &str) -> 
     }
 }
 
+/// Parses a timestamp string into NaiveDateTime.
+/// Handles RFC 3339 (with Z or +00:00) and plain ISO (no timezone).
+fn parse_naive_datetime(s: &str) -> Option<NaiveDateTime> {
+    // Try RFC 3339 first (e.g. "2024-01-15T09:00:00Z" or "2024-01-15T09:00:00+00:00")
+    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
+        return Some(dt.naive_utc());
+    }
+    // Try plain ISO without timezone
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S") {
+        return Some(dt);
+    }
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f") {
+        return Some(dt);
+    }
+    None
+}
+
+/// Clamps an interval to a day window [day_start, day_end) and returns minutes.
+fn clamp_duration_to_day(start: NaiveDateTime, end: NaiveDateTime, day_start: NaiveDateTime, day_end: NaiveDateTime) -> i64 {
+    let clamped_start = start.max(day_start);
+    let clamped_end = end.min(day_end);
+    if clamped_end <= clamped_start {
+        return 0;
+    }
+    (clamped_end - clamped_start).num_minutes()
+}
+
+/// Pro-rates active_mins proportionally to the day fraction for cross-midnight entries.
+fn prorate_active_mins(active_mins: i64, total_start: NaiveDateTime, total_end: NaiveDateTime, day_start: NaiveDateTime, day_end: NaiveDateTime) -> i64 {
+    let total_span = (total_end - total_start).num_minutes();
+    if total_span <= 0 {
+        return active_mins;
+    }
+    let day_span = clamp_duration_to_day(total_start, total_end, day_start, day_end);
+    let fraction = day_span as f64 / total_span as f64;
+    (active_mins as f64 * fraction).round() as i64
+}
+
 /// Computes planned vs actual data for a single date.
 fn compute_planned_vs_actual(
     conn: &rusqlite::Connection,
     workspace_id: &str,
     date: &str,
 ) -> Result<PlannedVsActualData, rusqlite::Error> {
-    let date_start = format!("{}T00:00:00", date);
-    let date_end = format!("{}T23:59:59", date);
+    let naive_date = NaiveDate::parse_from_str(date, "%Y-%m-%d")
+        .unwrap_or_else(|_| NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
+    let day_start = naive_date.and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+    let day_end = naive_date.and_time(NaiveTime::from_hms_opt(23, 59, 59).unwrap());
 
+    let date_start_str = format!("{}T00:00:00", date);
+    let date_end_str = format!("{}T23:59:59", date);
+
+    // Query plans that OVERLAP with the day (not just start within it)
     let mut plan_stmt = conn.prepare(
-        "SELECT id, title, start_time, end_time, color
+        "SELECT id, title, start_time, end_time, color, type
          FROM plans
          WHERE workspace_id = ?1
-           AND start_time >= ?2 AND start_time <= ?3
+           AND start_time < ?2 AND end_time > ?3
            AND deleted_at IS NULL
            AND type IN ('time_block', 'event', 'meeting', 'review')
          ORDER BY start_time ASC",
     )?;
 
-    let planned_blocks: Vec<PlannedBlock> = plan_stmt
+    let raw_plans: Vec<(String, String, String, String, Option<String>, String)> = plan_stmt
         .query_map(
-            rusqlite::params![workspace_id, date_start, date_end],
+            rusqlite::params![workspace_id, date_end_str, date_start_str],
             |row| {
-                let start: String = row.get(2)?;
-                let end: String = row.get(3)?;
-                let duration_mins = compute_duration_mins(&start, &end);
-
-                Ok(PlannedBlock {
-                    plan_id: row.get(0)?,
-                    title: row.get(1)?,
-                    start_time: start,
-                    end_time: end,
-                    duration_mins,
-                    color: row.get(4)?,
-                })
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get::<_, Option<String>>(5)?.unwrap_or_else(|| "time_block".to_string()),
+                ))
             },
         )?
         .collect::<Result<Vec<_>, _>>()?;
 
+    let mut planned_blocks: Vec<PlannedBlock> = Vec::new();
+    for (plan_id, title, start_str, end_str, color, plan_type) in &raw_plans {
+        let start_dt = match parse_naive_datetime(start_str) {
+            Some(dt) => dt,
+            None => continue,
+        };
+        let end_dt = match parse_naive_datetime(end_str) {
+            Some(dt) => dt,
+            None => continue,
+        };
+        let duration_mins = clamp_duration_to_day(start_dt, end_dt, day_start, day_end);
+        if duration_mins <= 0 {
+            continue;
+        }
+        planned_blocks.push(PlannedBlock {
+            plan_id: plan_id.clone(),
+            title: title.clone(),
+            start_time: start_str.clone(),
+            end_time: end_str.clone(),
+            duration_mins,
+            color: color.clone(),
+            plan_type: plan_type.clone(),
+            linked_entries: Vec::new(),
+            actual_mins: 0,
+            variance_mins: 0,
+        });
+    }
+
+    // Query time entries that OVERLAP with the day OR are running (end_time IS NULL)
     let mut entry_stmt = conn.prepare(
         "SELECT id, start_time, end_time, active_mins, category,
-                linked_plan_id, linked_task_id, notes
+                linked_plan_id, linked_task_id, notes, pauses
          FROM time_entries
          WHERE workspace_id = ?1
-           AND start_time >= ?2 AND start_time <= ?3
            AND deleted_at IS NULL
+           AND (
+             (start_time < ?2 AND (end_time > ?3 OR end_time IS NULL))
+           )
          ORDER BY start_time ASC",
     )?;
 
-    let actual_entries: Vec<ActualEntry> = entry_stmt
-        .query_map(
-            rusqlite::params![workspace_id, date_start, date_end],
-            |row| {
-                let notes: Option<String> = row.get(7)?;
-                let preview = notes.map(|n| {
-                    if n.len() > 100 {
-                        let end = n.floor_char_boundary(100);
-                        format!("{}...", &n[..end])
-                    } else {
-                        n
-                    }
-                });
+    let now_utc = Utc::now().naive_utc();
 
-                Ok(ActualEntry {
-                    time_entry_id: row.get(0)?,
-                    start_time: row.get(1)?,
-                    end_time: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
-                    active_mins: row.get::<_, Option<i64>>(3)?.unwrap_or(0),
-                    category: row.get(4)?,
-                    linked_plan_id: row.get(5)?,
-                    linked_task_id: row.get(6)?,
-                    notes_preview: preview,
-                })
-            },
-        )?
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut actual_entries: Vec<ActualEntry> = Vec::new();
+    let mut entry_rows = entry_stmt.query(
+        rusqlite::params![workspace_id, date_end_str, date_start_str],
+    )?;
+
+    while let Some(row) = entry_rows.next()? {
+        let entry_id: String = row.get(0)?;
+        let start_str: String = row.get(1)?;
+        let end_str_opt: Option<String> = row.get(2)?;
+        let stored_active_mins: Option<i64> = row.get(3)?;
+        let category: Option<String> = row.get(4)?;
+        let linked_plan_id: Option<String> = row.get(5)?;
+        let linked_task_id: Option<String> = row.get(6)?;
+        let notes: Option<String> = row.get(7)?;
+        let pauses_json: Option<String> = row.get(8)?;
+
+        let in_progress = end_str_opt.is_none();
+
+        let start_dt = match parse_naive_datetime(&start_str) {
+            Some(dt) => dt,
+            None => continue,
+        };
+
+        // For running entries, compute live active_mins
+        let (effective_end_str, active_mins) = if in_progress {
+            let pauses: Vec<Pause> = pauses_json
+                .as_deref()
+                .and_then(|s| serde_json::from_str(s).ok())
+                .unwrap_or_default();
+            let now_rfc = Utc::now().to_rfc3339();
+            let live_mins = calculate_active_mins(&start_str, &now_rfc, &pauses);
+            (now_rfc, live_mins)
+        } else {
+            let end_s = end_str_opt.clone().unwrap_or_default();
+            let mins = stored_active_mins.unwrap_or(0);
+            (end_s, mins)
+        };
+
+        let end_dt = parse_naive_datetime(&effective_end_str).unwrap_or(now_utc);
+
+        // Pro-rate active_mins to day window for cross-midnight entries
+        let clamped_mins = prorate_active_mins(active_mins, start_dt, end_dt, day_start, day_end);
+        if clamped_mins <= 0 && !in_progress {
+            continue;
+        }
+
+        let preview = notes.map(|n| {
+            if n.len() > 100 {
+                let boundary = n.floor_char_boundary(100);
+                format!("{}...", &n[..boundary])
+            } else {
+                n
+            }
+        });
+
+        actual_entries.push(ActualEntry {
+            time_entry_id: entry_id,
+            start_time: start_str,
+            end_time: effective_end_str,
+            active_mins: clamped_mins,
+            category,
+            linked_plan_id,
+            linked_task_id,
+            notes_preview: preview,
+            in_progress,
+        });
+    }
+
+    // --- Correlation ---
+    // Build a map of plan_id -> list of entries linked to that plan
+    let plan_ids: HashSet<&str> = planned_blocks.iter().map(|b| b.plan_id.as_str()).collect();
+    let mut entries_by_plan: HashMap<String, Vec<ActualEntry>> = HashMap::new();
+    let mut unlinked_entries: Vec<ActualEntry> = Vec::new();
+
+    for entry in &actual_entries {
+        if let Some(ref pid) = entry.linked_plan_id {
+            if plan_ids.contains(pid.as_str()) {
+                entries_by_plan.entry(pid.clone()).or_default().push(entry.clone());
+                continue;
+            }
+        }
+        unlinked_entries.push(entry.clone());
+    }
+
+    // Matched: plans that have at least one linked entry
+    let mut matched: Vec<PlannedBlock> = Vec::new();
+    let mut missed: Vec<PlannedBlock> = Vec::new();
+    for mut block in planned_blocks.clone() {
+        if let Some(linked) = entries_by_plan.remove(&block.plan_id) {
+            let actual_total: i64 = linked.iter().map(|e| e.active_mins).sum();
+            block.linked_entries = linked;
+            block.actual_mins = actual_total;
+            block.variance_mins = actual_total - block.duration_mins;
+            matched.push(block);
+        } else {
+            block.variance_mins = -block.duration_mins;
+            missed.push(block);
+        }
+    }
+
+    // Unplanned: group unlinked entries by category
+    let mut category_map: HashMap<Option<String>, Vec<ActualEntry>> = HashMap::new();
+    for entry in &unlinked_entries {
+        category_map.entry(entry.category.clone()).or_default().push(entry.clone());
+    }
+    let mut unplanned: Vec<UnplannedGroup> = category_map
+        .into_iter()
+        .map(|(cat, entries)| {
+            let total_mins = entries.iter().map(|e| e.active_mins).sum();
+            UnplannedGroup {
+                category: cat,
+                entries,
+                total_mins,
+            }
+        })
+        .collect();
+    unplanned.sort_by(|a, b| b.total_mins.cmp(&a.total_mins));
+
+    // Type breakdown
+    let planned_work_mins: i64 = planned_blocks
+        .iter()
+        .filter(|b| b.plan_type == "time_block" || b.plan_type == "review")
+        .map(|b| b.duration_mins)
+        .sum();
+    let planned_commitment_mins: i64 = planned_blocks
+        .iter()
+        .filter(|b| b.plan_type == "meeting" || b.plan_type == "event")
+        .map(|b| b.duration_mins)
+        .sum();
 
     let planned_total: i64 = planned_blocks.iter().map(|b| b.duration_mins).sum();
     let actual_total: i64 = actual_entries.iter().map(|e| e.active_mins).sum();
 
     Ok(PlannedVsActualData {
         date: date.to_string(),
-        planned_blocks,
-        actual_entries,
+        matched,
+        unplanned,
+        missed,
         planned_total_mins: planned_total,
         actual_total_mins: actual_total,
         difference_mins: actual_total - planned_total,
+        planned_work_mins,
+        planned_commitment_mins,
+        planned_blocks,
+        actual_entries,
     })
-}
-
-/// Computes duration in minutes between two ISO 8601 timestamps.
-fn compute_duration_mins(start: &str, end: &str) -> i64 {
-    let start_mins = extract_minutes_of_day(start);
-    let end_mins = extract_minutes_of_day(end);
-    if end_mins > start_mins {
-        end_mins - start_mins
-    } else {
-        0
-    }
-}
-
-/// Extracts minutes since midnight from an ISO 8601 timestamp.
-fn extract_minutes_of_day(timestamp: &str) -> i64 {
-    if let Some(time_part) = timestamp.split('T').nth(1) {
-        let parts: Vec<&str> = time_part.split(':').collect();
-        if parts.len() >= 2 {
-            let hours: i64 = parts[0].parse().unwrap_or(0);
-            let mins: i64 = parts[1].parse().unwrap_or(0);
-            return hours * 60 + mins;
-        }
-    }
-    0
 }
 
 /// Increments a date string (YYYY-MM-DD) by one day.

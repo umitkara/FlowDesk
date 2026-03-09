@@ -316,20 +316,30 @@ pub struct GroupEntry {
 pub struct PlannedVsActualData {
     /// The date being compared.
     pub date: String,
-    /// Planned time blocks for the day.
-    pub planned_blocks: Vec<PlannedBlock>,
-    /// Actual time entries for the day.
-    pub actual_entries: Vec<ActualEntry>,
+    /// Plans matched with their linked entries.
+    pub matched: Vec<PlannedBlock>,
+    /// Entries without a linked plan, grouped by category.
+    pub unplanned: Vec<UnplannedGroup>,
+    /// Plans with no linked entries.
+    pub missed: Vec<PlannedBlock>,
     /// Total planned minutes.
     pub planned_total_mins: i64,
     /// Total actual minutes tracked.
     pub actual_total_mins: i64,
     /// Difference (actual - planned).
     pub difference_mins: i64,
+    /// Planned minutes from work-type blocks (time_block, review).
+    pub planned_work_mins: i64,
+    /// Planned minutes from commitment blocks (meeting, event).
+    pub planned_commitment_mins: i64,
+    /// Flat list of all planned blocks (backward compat).
+    pub planned_blocks: Vec<PlannedBlock>,
+    /// Flat list of all actual entries (backward compat).
+    pub actual_entries: Vec<ActualEntry>,
 }
 
 /// A planned time block from a plan entity.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PlannedBlock {
     /// Plan ID.
     pub plan_id: String,
@@ -339,14 +349,22 @@ pub struct PlannedBlock {
     pub start_time: String,
     /// End time (ISO 8601).
     pub end_time: String,
-    /// Duration in minutes.
+    /// Duration in minutes (clamped to day).
     pub duration_mins: i64,
     /// Color label.
     pub color: Option<String>,
+    /// Plan type (time_block, meeting, event, review).
+    pub plan_type: String,
+    /// Entries linked to this plan.
+    pub linked_entries: Vec<ActualEntry>,
+    /// Total actual minutes from linked entries.
+    pub actual_mins: i64,
+    /// Variance: actual_mins - duration_mins.
+    pub variance_mins: i64,
 }
 
 /// An actual time entry recorded for the day.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ActualEntry {
     /// Time entry ID.
     pub time_entry_id: String,
@@ -354,7 +372,7 @@ pub struct ActualEntry {
     pub start_time: String,
     /// End time (ISO 8601).
     pub end_time: String,
-    /// Active minutes (excluding pauses).
+    /// Active minutes (excluding pauses, clamped to day).
     pub active_mins: i64,
     /// Category.
     pub category: Option<String>,
@@ -364,6 +382,19 @@ pub struct ActualEntry {
     pub linked_task_id: Option<String>,
     /// Preview of session notes.
     pub notes_preview: Option<String>,
+    /// Whether this entry is currently being tracked (no end_time).
+    pub in_progress: bool,
+}
+
+/// A group of unplanned entries sharing a category.
+#[derive(Debug, Clone, Serialize)]
+pub struct UnplannedGroup {
+    /// Shared category (None = uncategorized).
+    pub category: Option<String>,
+    /// Entries in this group.
+    pub entries: Vec<ActualEntry>,
+    /// Total active minutes in the group.
+    pub total_mins: i64,
 }
 
 // ---------------------------------------------------------------------------

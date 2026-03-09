@@ -1002,11 +1002,16 @@ export interface GroupEntry {
 /** Comparison data between planned blocks and actual time entries for a day. */
 export interface PlannedVsActualData {
   date: string;
-  planned_blocks: PlannedBlock[];
-  actual_entries: ActualEntry[];
+  matched: PlannedBlock[];
+  unplanned: UnplannedGroup[];
+  missed: PlannedBlock[];
   planned_total_mins: number;
   actual_total_mins: number;
   difference_mins: number;
+  planned_work_mins: number;
+  planned_commitment_mins: number;
+  planned_blocks: PlannedBlock[];
+  actual_entries: ActualEntry[];
 }
 
 /** A planned time block from a plan entity. */
@@ -1017,6 +1022,10 @@ export interface PlannedBlock {
   end_time: string;
   duration_mins: number;
   color: string | null;
+  plan_type: string;
+  linked_entries: ActualEntry[];
+  actual_mins: number;
+  variance_mins: number;
 }
 
 /** An actual time entry recorded for the day. */
@@ -1029,6 +1038,14 @@ export interface ActualEntry {
   linked_plan_id: string | null;
   linked_task_id: string | null;
   notes_preview: string | null;
+  in_progress: boolean;
+}
+
+/** A group of unplanned entries sharing a category. */
+export interface UnplannedGroup {
+  category: string | null;
+  entries: ActualEntry[];
+  total_mins: number;
 }
 
 /** A backlink with surrounding context from the source entity. */
