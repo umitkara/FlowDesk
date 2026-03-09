@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import * as ipc from "../lib/ipc";
+import { reportError } from "../lib/errorReporting";
 import type { NoteVersionSummary, VersionDiff, NoteVersion } from "../lib/types";
 
 /** Hook for managing note version history. */
@@ -16,8 +17,8 @@ export function useVersionHistory(noteId: string | null) {
     try {
       const v = await ipc.listVersions(noteId);
       setVersions(v);
-    } catch {
-      // ignore
+    } catch (e) {
+      reportError("useVersionHistory.loadVersions", e);
     } finally {
       setLoading(false);
     }
@@ -27,8 +28,8 @@ export function useVersionHistory(noteId: string | null) {
     try {
       const v = await ipc.getVersion(versionId);
       setSelectedVersion(v);
-    } catch {
-      // ignore
+    } catch (e) {
+      reportError("useVersionHistory.viewVersion", e);
     }
   }, []);
 
@@ -36,8 +37,8 @@ export function useVersionHistory(noteId: string | null) {
     try {
       const d = await ipc.diffVersions(fromId, toId);
       setDiff(d);
-    } catch {
-      // ignore
+    } catch (e) {
+      reportError("useVersionHistory.computeDiff", e);
     }
   }, []);
 
@@ -45,8 +46,8 @@ export function useVersionHistory(noteId: string | null) {
     try {
       await ipc.restoreVersion(versionId);
       await loadVersions();
-    } catch {
-      // ignore
+    } catch (e) {
+      reportError("useVersionHistory.restoreVersion", e);
     }
   }, [loadVersions]);
 

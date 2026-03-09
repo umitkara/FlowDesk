@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { ask } from "@tauri-apps/plugin-dialog";
 import * as ipc from "../lib/ipc";
 import { logActivity } from "../lib/activityLog";
+import { reportError } from "../lib/errorReporting";
 import type {
   Note,
   NoteListItem,
@@ -108,7 +109,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       }
       const notes = await ipc.listNotes(merged);
       set({ notes, currentQuery: merged, isLoading: false, selectedNoteIds: new Set() });
-    } catch {
+    } catch (e) {
+      reportError("noteStore.loadNotes", e);
       set({ isLoading: false });
     }
   },
@@ -118,8 +120,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       const wsId = getWorkspaceId();
       const folderTree = await ipc.getFolderTree(wsId);
       set({ folderTree });
-    } catch {
-      // silently fail
+    } catch (e) {
+      reportError("noteStore.loadFolderTree", e);
     }
   },
 
@@ -128,8 +130,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       const wsId = getWorkspaceId();
       const dates = await ipc.getDatesWithNotes(wsId, year, month);
       set({ datesWithNotes: dates });
-    } catch {
-      // silently fail
+    } catch (e) {
+      reportError("noteStore.loadDatesWithNotes", e);
     }
   },
 
@@ -146,7 +148,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     try {
       const note = await ipc.getNote(id);
       set({ activeNote: note });
-    } catch {
+    } catch (e) {
+      reportError("noteStore.selectNote", e);
       set({ activeNote: null });
     }
   },

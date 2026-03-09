@@ -10,6 +10,7 @@ import type {
   CreateNoteFromSession,
 } from "../lib/types";
 import * as ipc from "../lib/ipc";
+import { reportError } from "../lib/errorReporting";
 import { useWorkspaceStore } from "./workspaceStore";
 
 // ---------------------------------------------------------------------------
@@ -462,6 +463,7 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
         });
       }
     } catch (e) {
+      reportError("trackerStore.recoverSession", e);
       set({ error: String(e), isLoading: false });
     }
   },
@@ -532,8 +534,8 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
           startElapsedTimer(get, set);
         }
       }
-    } catch {
-      // Tracker state not available yet, ignore
+    } catch (e) {
+      reportError("trackerStore.fetchState", e);
     }
   },
 }));

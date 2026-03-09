@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import * as ipc from "../lib/ipc";
+import { reportError } from "../lib/errorReporting";
 import type {
   Workspace,
   WorkspaceSummary,
@@ -88,7 +89,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const workspaces = await ipc.listWorkspaces();
       set({ workspaces, isLoading: false });
-    } catch {
+    } catch (e) {
+      reportError("workspaceStore.loadWorkspaces", e);
       set({ isLoading: false });
     }
   },
@@ -107,7 +109,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       ipc.setSetting("last_workspace_id", id).catch(() => {});
       // Apply accent color
       applyAccentColor(workspace.config.accent_color);
-    } catch {
+    } catch (e) {
+      reportError("workspaceStore.setActiveWorkspace", e);
       set({ isSwitching: false });
     }
   },
@@ -163,8 +166,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         ws.config.dashboard_widgets,
       );
       set({ dashboardData: data });
-    } catch {
-      // silently fail
+    } catch (e) {
+      reportError("workspaceStore.loadDashboard", e);
     }
   },
 

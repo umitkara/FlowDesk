@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { ask } from "@tauri-apps/plugin-dialog";
 import * as ipc from "../lib/ipc";
 import { logActivity } from "../lib/activityLog";
+import { reportError } from "../lib/errorReporting";
 import type {
   Task,
   TaskWithChildren,
@@ -140,8 +141,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       const wsId = getWorkspaceId();
       const stickyTasks = await ipc.getStickyTasks(wsId);
       set({ stickyTasks });
-    } catch {
-      // silently fail
+    } catch (e) {
+      reportError("taskStore.fetchStickyTasks", e);
     }
   },
 
