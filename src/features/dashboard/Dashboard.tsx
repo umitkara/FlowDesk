@@ -6,6 +6,7 @@ import { useNoteStore } from "../../stores/noteStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { formatMinutes } from "../../stores/trackerStore";
 import { DashboardEditor } from "./DashboardEditor";
+import { openEntity } from "../../lib/openEntity";
 import type {
   DashboardData,
   DashboardPlan,
@@ -257,17 +258,25 @@ function TodayPlanWidget({ plans }: { plans: DashboardPlan[] }) {
       ) : (
         <ul className="space-y-1.5">
           {plans.map((plan) => (
-            <li key={plan.id} className="flex items-center gap-2 text-sm">
-              <span className="flex-shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                {formatTime(plan.start_time)}
-              </span>
-              <span
-                className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                style={{ backgroundColor: plan.color ?? "var(--workspace-accent)" }}
-              />
-              <span className="truncate text-gray-700 dark:text-gray-300">
-                {plan.title}
-              </span>
+            <li key={plan.id}>
+              <button
+                onClick={() => {
+                  setActiveView("daily-plan");
+                  openEntity({ type: "plan", id: plan.id });
+                }}
+                className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                <span className="flex-shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                  {formatTime(plan.start_time)}
+                </span>
+                <span
+                  className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                  style={{ backgroundColor: plan.color ?? "var(--workspace-accent)" }}
+                />
+                <span className="truncate text-gray-700 dark:text-gray-300">
+                  {plan.title}
+                </span>
+              </button>
             </li>
           ))}
         </ul>
@@ -293,12 +302,17 @@ function PendingTasksWidget({ tasks }: { tasks: DashboardTask[] }) {
       ) : (
         <ul className="space-y-1">
           {tasks.slice(0, 8).map((task) => (
-            <li key={task.id} className="flex items-center gap-2 text-sm">
-              <PriorityDot priority={task.priority} />
-              <span className="truncate text-gray-700 dark:text-gray-300">
-                {task.title}
-              </span>
-              <StatusLabel status={task.status} />
+            <li key={task.id}>
+              <button
+                onClick={() => openEntity({ type: "task", id: task.id })}
+                className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                <PriorityDot priority={task.priority} />
+                <span className="truncate text-gray-700 dark:text-gray-300">
+                  {task.title}
+                </span>
+                <StatusLabel status={task.status} />
+              </button>
             </li>
           ))}
           {tasks.length > 8 && (
@@ -329,13 +343,18 @@ function RecentNotesWidget({ notes }: { notes: DashboardNote[] }) {
       ) : (
         <ul className="space-y-1">
           {notes.map((note) => (
-            <li key={note.id} className="flex items-center justify-between text-sm">
-              <span className="truncate text-gray-700 dark:text-gray-300">
-                {note.title || "Untitled"}
-              </span>
-              <span className="flex-shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
-                {relativeTime(note.updated_at)}
-              </span>
+            <li key={note.id}>
+              <button
+                onClick={() => openEntity({ type: "note", id: note.id })}
+                className="flex w-full items-center justify-between rounded px-1 py-0.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                <span className="truncate text-gray-700 dark:text-gray-300">
+                  {note.title || "Untitled"}
+                </span>
+                <span className="flex-shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
+                  {relativeTime(note.updated_at)}
+                </span>
+              </button>
             </li>
           ))}
         </ul>
@@ -384,11 +403,16 @@ function StickyTasksWidget({ tasks }: { tasks: DashboardTask[] }) {
       ) : (
         <ul className="space-y-1">
           {tasks.map((task) => (
-            <li key={task.id} className="flex items-center gap-2 text-sm">
-              <PriorityDot priority={task.priority} />
-              <span className="truncate text-gray-700 dark:text-gray-300">
-                {task.title}
-              </span>
+            <li key={task.id}>
+              <button
+                onClick={() => openEntity({ type: "task", id: task.id })}
+                className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                <PriorityDot priority={task.priority} />
+                <span className="truncate text-gray-700 dark:text-gray-300">
+                  {task.title}
+                </span>
+              </button>
             </li>
           ))}
         </ul>
@@ -407,18 +431,23 @@ function UpcomingDeadlinesWidget({ tasks }: { tasks: DashboardTask[] }) {
       ) : (
         <ul className="space-y-1">
           {tasks.map((task) => (
-            <li key={task.id} className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-2">
-                <PriorityDot priority={task.priority} />
-                <span className="truncate text-gray-700 dark:text-gray-300">
-                  {task.title}
+            <li key={task.id}>
+              <button
+                onClick={() => openEntity({ type: "task", id: task.id })}
+                className="flex w-full items-center justify-between rounded px-1 py-0.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                <span className="flex items-center gap-2">
+                  <PriorityDot priority={task.priority} />
+                  <span className="truncate text-gray-700 dark:text-gray-300">
+                    {task.title}
+                  </span>
                 </span>
-              </span>
-              {task.due_date && (
-                <span className="flex-shrink-0 text-[10px] text-gray-400">
-                  {task.due_date}
-                </span>
-              )}
+                {task.due_date && (
+                  <span className="flex-shrink-0 text-[10px] text-gray-400">
+                    {task.due_date}
+                  </span>
+                )}
+              </button>
             </li>
           ))}
         </ul>
