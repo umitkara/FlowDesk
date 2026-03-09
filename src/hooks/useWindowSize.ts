@@ -1,0 +1,14 @@
+import { useState, useEffect } from "react";
+
+/** Returns the current window inner width, updating on resize. */
+export function useWindowWidth(): number {
+  const [width, setWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return width;
+}

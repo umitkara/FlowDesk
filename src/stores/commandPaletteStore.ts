@@ -32,9 +32,11 @@ export const useCommandPaletteStore = create<CommandPaletteState>((set) => ({
   setQuery: (q) => set({ query: q, selectedIndex: 0 }),
   setSelectedIndex: (i) => set({ selectedIndex: i }),
   registerCommands: (cmds) => set((s) => {
-    const existingIds = new Set(s.commands.map((c) => c.id));
-    const newCmds = cmds.filter((c) => !existingIds.has(c.id));
-    return { commands: [...s.commands, ...newCmds] };
+    const map = new Map(s.commands.map((c) => [c.id, c]));
+    for (const cmd of cmds) {
+      map.set(cmd.id, cmd);
+    }
+    return { commands: Array.from(map.values()) };
   }),
   unregisterCommands: (ids) => set((s) => ({
     commands: s.commands.filter((c) => !ids.includes(c.id)),
