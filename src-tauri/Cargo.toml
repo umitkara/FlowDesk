@@ -1,6 +1,6 @@
 [package]
 name = "flowdesk"
-version = "0.8.6"
+version = "0.8.20"
 description = "A unified personal productivity system"
 authors = ["FlowDesk"]
 edition = "2021"
