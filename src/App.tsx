@@ -85,6 +85,16 @@ function App() {
   useEffect(() => {
     const unlisten = listen<{ title: string; body: string }>("break-reminder-fired", (event) => {
       setBreakNotification(event.payload);
+      useTrackerStore.setState({ isOnBreak: true });
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [setBreakNotification]);
+
+  // Listen for backend break-over events
+  useEffect(() => {
+    const unlisten = listen<{ title: string; body: string }>("break-over", (event) => {
+      setBreakNotification(event.payload);
+      useTrackerStore.setState({ isOnBreak: false });
     });
     return () => { unlisten.then((fn) => fn()); };
   }, [setBreakNotification]);

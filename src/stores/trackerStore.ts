@@ -11,11 +11,6 @@ import type {
 } from "../lib/types";
 import * as ipc from "../lib/ipc";
 import { useWorkspaceStore } from "./workspaceStore";
-import {
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
-} from "@tauri-apps/plugin-notification";
 
 // ---------------------------------------------------------------------------
 // Elapsed time calculation (client-side, updated every second)
@@ -127,8 +122,6 @@ interface TrackerStore {
   breakNotification: { title: string; body: string } | null;
   /** Whether the user is currently on a break. */
   isOnBreak: boolean;
-  /** Elapsed seconds at which the break ends (for "break over" notification). */
-  breakEndsAtSeconds: number | null;
   /** The workspace ID where the current tracking session was started. */
   trackerWorkspaceId: string | null;
 
@@ -176,7 +169,6 @@ let intervalId: number | null = null;
 /** Starts the 1-second elapsed timer. */
 function startElapsedTimer(get: () => TrackerStore, set: (partial: Partial<TrackerStore>) => void) {
   stopElapsedTimer();
-  initBreakReminder(get);
   let trayCounter = 0;
   intervalId = window.setInterval(() => {
     const { startedAt, pauses, pausedAt, status } = get();
@@ -184,8 +176,6 @@ function startElapsedTimer(get: () => TrackerStore, set: (partial: Partial<Track
     const elapsed = calculateElapsedSeconds(startedAt, pauses, pausedAt);
     const session = calculateCurrentSessionSeconds(startedAt, pauses, pausedAt);
     set({ elapsedSeconds: elapsed, currentSessionSeconds: session });
-    // Check break reminder on every tick
-    checkBreakReminder(get, set);
     // Update tray tooltip every 5 seconds to avoid excessive IPC
     trayCounter++;
     if (trayCounter % 5 === 0) {
@@ -200,124 +190,6 @@ function stopElapsedTimer() {
     clearInterval(intervalId);
     intervalId = null;
   }
-}
-
-// ---------------------------------------------------------------------------
-// Break reminder logic (frontend-driven)
-// ---------------------------------------------------------------------------
-
-/** Tracks the next break threshold in active seconds so we fire exactly once per interval. */
-let nextBreakAtSeconds: number | null = null;
-
-/** Sends an OS notification for break reminders (if sound_enabled) and always sets in-app banner. */
-async function fireBreakNotification(title: string, body: string, set: (partial: Partial<TrackerStore>) => void, get: () => TrackerStore) {
-  // Always set in-app break notification banner
-  set({ breakNotification: { title, body } });
-
-  // Only send OS notification if sound_enabled
-  if (!get().breakConfig.sound_enabled) return;
-  try {
-    let granted = await isPermissionGranted();
-    if (!granted) {
-      const perm = await requestPermission();
-      granted = perm === "granted";
-    }
-    if (granted) {
-      sendNotification({ title, body });
-    }
-  } catch {
-    // notification unavailable — silently ignore
-  }
-}
-
-/** Computes the next break threshold (in active seconds) based on mode + config. */
-function computeNextBreakSeconds(
-  mode: BreakMode,
-  config: BreakConfig,
-  _pomodoroCycle: number,
-  currentElapsed: number,
-): number | null {
-  if (mode === "none") return null;
-
-  if (mode === "custom") {
-    const intervalSec = config.custom.interval_mins * 60;
-    if (intervalSec <= 0) return null;
-    // Next multiple of interval after current elapsed
-    return (Math.floor(currentElapsed / intervalSec) + 1) * intervalSec;
-  }
-
-  if (mode === "pomodoro") {
-    const workSec = config.pomodoro.work_mins * 60;
-    if (workSec <= 0) return null;
-    // In Pomodoro mode, each work interval triggers a break notification
-    // The cycle count determines short vs long break messaging
-    return (Math.floor(currentElapsed / workSec) + 1) * workSec;
-  }
-
-  return null;
-}
-
-/** Checks whether a break should fire and sends notification if so. Also checks for break-over. */
-function checkBreakReminder(get: () => TrackerStore, set: (partial: Partial<TrackerStore>) => void) {
-  const { breakMode, breakConfig, pomodoroCycle, elapsedSeconds, status, isOnBreak, breakEndsAtSeconds } = get();
-
-  // Check break-over first
-  if (isOnBreak && breakEndsAtSeconds !== null && elapsedSeconds >= breakEndsAtSeconds) {
-    fireBreakNotification("Break Over!", "Time to get back to work.", set, get);
-    set({ isOnBreak: false, breakEndsAtSeconds: null });
-    return;
-  }
-
-  if (status !== "running" || breakMode === "none") return;
-  if (nextBreakAtSeconds === null) return;
-
-  if (elapsedSeconds >= nextBreakAtSeconds) {
-    // Compute break duration for the break-over timer
-    let breakDurationSecs: number;
-    if (breakMode === "pomodoro") {
-      const cyclesBeforeLong = breakConfig.pomodoro.cycles_before_long || 4;
-      const currentCycle = Math.floor(nextBreakAtSeconds / (breakConfig.pomodoro.work_mins * 60));
-      const isLongBreak = currentCycle % cyclesBeforeLong === 0;
-      const breakMins = isLongBreak
-        ? breakConfig.pomodoro.long_break_mins
-        : breakConfig.pomodoro.short_break_mins;
-      breakDurationSecs = breakMins * 60;
-      fireBreakNotification(
-        isLongBreak ? "Long Break Time!" : "Short Break Time!",
-        `You've been working for ${breakConfig.pomodoro.work_mins} minutes. Take a ${breakMins}-minute break.`,
-        set, get,
-      );
-    } else {
-      breakDurationSecs = breakConfig.custom.interval_mins * 60;
-      fireBreakNotification(
-        "Break Reminder",
-        `You've been working for ${breakConfig.custom.interval_mins} minutes. Time for a break!`,
-        set, get,
-      );
-    }
-
-    // Set break-over timer
-    set({ isOnBreak: true, breakEndsAtSeconds: elapsedSeconds + breakDurationSecs });
-
-    // Advance to next threshold
-    nextBreakAtSeconds = computeNextBreakSeconds(
-      breakMode,
-      breakConfig,
-      pomodoroCycle,
-      elapsedSeconds,
-    );
-  }
-}
-
-/** Initializes the break reminder threshold based on current state. */
-function initBreakReminder(get: () => TrackerStore) {
-  const { breakMode, breakConfig, pomodoroCycle, elapsedSeconds } = get();
-  nextBreakAtSeconds = computeNextBreakSeconds(breakMode, breakConfig, pomodoroCycle, elapsedSeconds);
-}
-
-/** Resets the break reminder state. */
-function resetBreakReminder() {
-  nextBreakAtSeconds = null;
 }
 
 /** Syncs the store from a backend TrackerState response. */
@@ -393,7 +265,6 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
   error: null,
   breakNotification: null,
   isOnBreak: false,
-  breakEndsAtSeconds: null,
   trackerWorkspaceId: null,
 
   start: async (params) => {
@@ -416,7 +287,6 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
         trackerWorkspaceId: wsId,
         breakNotification: null,
         isOnBreak: false,
-        breakEndsAtSeconds: null,
       });
       startElapsedTimer(get, set);
     } catch (e) {
@@ -447,7 +317,6 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
     try {
       const result = await ipc.trackerStop();
       stopElapsedTimer();
-      resetBreakReminder();
       ipc.updateTrayStatus("idle", "").catch(() => {});
       set({
         ...syncFromBackend(result),
@@ -456,7 +325,6 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
         stoppedEndTime: result.end_time ?? null,
         breakNotification: null,
         isOnBreak: false,
-        breakEndsAtSeconds: null,
       });
     } catch (e) {
       set({ error: String(e) });
@@ -473,7 +341,6 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
         ...params,
       });
       ipc.updateTrayStatus("idle", "").catch(() => {});
-      resetBreakReminder();
       set({
         status: "idle",
         timeEntryId: null,
@@ -494,7 +361,6 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
         isLoading: false,
         breakNotification: null,
         isOnBreak: false,
-        breakEndsAtSeconds: null,
         trackerWorkspaceId: null,
       });
       return entry;
@@ -510,7 +376,6 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
     try {
       await ipc.trackerDiscard(timeEntryId);
       stopElapsedTimer();
-      resetBreakReminder();
       ipc.updateTrayStatus("idle", "").catch(() => {});
       set({
         status: "idle",
@@ -530,7 +395,6 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
         stoppedEndTime: null,
         breakNotification: null,
         isOnBreak: false,
-        breakEndsAtSeconds: null,
         trackerWorkspaceId: null,
       });
     } catch (e) {
@@ -563,8 +427,6 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
       await ipc.trackerSetBreakMode(mode, config);
       set({ breakMode: mode });
       if (config) set({ breakConfig: config });
-      // Reinitialize break reminder with new settings
-      initBreakReminder(get);
     } catch (e) {
       set({ error: String(e) });
     }
@@ -573,9 +435,7 @@ export const useTrackerStore = create<TrackerStore>((set, get) => ({
   snoozeBreak: async () => {
     try {
       await ipc.trackerSnoozeBreak();
-      // Delay next break by snooze_mins from current elapsed
-      const { elapsedSeconds, breakConfig } = get();
-      nextBreakAtSeconds = elapsedSeconds + breakConfig.snooze_mins * 60;
+      set({ breakNotification: null, isOnBreak: false });
     } catch (e) {
       set({ error: String(e) });
     }
