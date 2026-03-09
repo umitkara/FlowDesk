@@ -1,7 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useUIStore } from "../../stores/uiStore";
 import { useNoteStore } from "../../stores/noteStore";
-import type { NoteListItem } from "../../lib/types";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
+import * as ipc from "../../lib/ipc";
+
+interface QuickSwitcherResult {
+  id: string;
+  title: string | null;
+  folder: string | null;
+  snippet: string | null;
+  updated_at: string;
+}
 
 /** Quick note switcher overlay (Ctrl+P). */
 export function QuickSwitcher() {
@@ -10,26 +19,87 @@ export function QuickSwitcher() {
   const selectNote = useNoteStore((s) => s.selectNote);
   const navigateTo = useUIStore((s) => s.navigateTo);
   const setActiveView = useUIStore((s) => s.setActiveView);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [results, setResults] = useState<QuickSwitcherResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const filtered: NoteListItem[] = query
-    ? notes.filter(
-        (n) =>
-          (n.title ?? "").toLowerCase().includes(query.toLowerCase()) ||
-          n.preview.toLowerCase().includes(query.toLowerCase()),
-      )
-    : notes.slice(0, 10);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
+  // Show store notes when query is short; search backend when >= 2 chars
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (query.length < 2) {
+      setResults(
+        notes.slice(0, 10).map((n) => ({
+          id: n.id,
+          title: n.title,
+          folder: n.folder,
+          snippet: n.preview || null,
+          updated_at: n.updated_at,
+        })),
+      );
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const searchResults = await ipc.searchEntities({
+          workspace_id: activeWorkspaceId ?? "",
+          query,
+          entity_types: ["note"],
+          limit: 20,
+        });
+        setResults(
+          searchResults.map((r) => ({
+            id: r.id,
+            title: r.title,
+            folder: r.folder,
+            snippet: r.snippet || null,
+            updated_at: r.updated_at,
+          })),
+        );
+      } catch {
+        // Fallback to in-memory filter
+        const q = query.toLowerCase();
+        setResults(
+          notes
+            .filter(
+              (n) =>
+                (n.title ?? "").toLowerCase().includes(q) ||
+                n.preview.toLowerCase().includes(q),
+            )
+            .slice(0, 20)
+            .map((n) => ({
+              id: n.id,
+              title: n.title,
+              folder: n.folder,
+              snippet: n.preview || null,
+              updated_at: n.updated_at,
+            })),
+        );
+      } finally {
+        setIsSearching(false);
+      }
+    }, 200);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query, notes, activeWorkspaceId]);
+
   useEffect(() => {
     setSelectedIndex(0);
-  }, [query]);
+  }, [results]);
 
   const handleSelect = useCallback(
     (id: string) => {
@@ -47,15 +117,15 @@ export function QuickSwitcher() {
         toggleQuickSwitcher();
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIndex((i) => Math.min(i + 1, filtered.length - 1));
+        setSelectedIndex((i) => Math.min(i + 1, results.length - 1));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setSelectedIndex((i) => Math.max(i - 1, 0));
-      } else if (e.key === "Enter" && filtered[selectedIndex]) {
-        handleSelect(filtered[selectedIndex].id);
+      } else if (e.key === "Enter" && results[selectedIndex]) {
+        handleSelect(results[selectedIndex].id);
       }
     },
-    [filtered, selectedIndex, handleSelect, toggleQuickSwitcher],
+    [results, selectedIndex, handleSelect, toggleQuickSwitcher],
   );
 
   return (
@@ -82,19 +152,22 @@ export function QuickSwitcher() {
             placeholder="Search notes..."
             className="w-full bg-transparent py-3 text-sm text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500"
           />
+          {isSearching && (
+            <span className="ml-2 text-xs text-gray-400">...</span>
+          )}
         </div>
 
         {/* Results */}
         <div className="max-h-80 overflow-y-auto py-1">
-          {filtered.length === 0 && (
+          {results.length === 0 && !isSearching && (
             <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-gray-500">
               No notes found
             </div>
           )}
-          {filtered.map((note, index) => (
+          {results.map((item, index) => (
             <button
-              key={note.id}
-              onClick={() => handleSelect(note.id)}
+              key={item.id}
+              onClick={() => handleSelect(item.id)}
               className={`flex w-full items-center gap-3 px-4 py-2 text-left ${
                 index === selectedIndex
                   ? "bg-primary-50 dark:bg-primary-900/20"
@@ -103,17 +176,17 @@ export function QuickSwitcher() {
             >
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">
-                  {note.title || "Untitled"}
+                  {item.title || "Untitled"}
                 </div>
-                {note.folder && (
+                {item.folder && (
                   <div className="truncate text-xs text-gray-400 dark:text-gray-500">
-                    {note.folder}
+                    {item.folder}
                   </div>
                 )}
               </div>
-              {note.date && (
+              {item.updated_at && (
                 <span className="flex-shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                  {note.date}
+                  {item.updated_at.slice(0, 10)}
                 </span>
               )}
             </button>
