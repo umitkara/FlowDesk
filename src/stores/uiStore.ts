@@ -32,6 +32,8 @@ interface UIState {
   sidebarSecondaryExpanded: boolean;
   /** Whether the sidebar was auto-collapsed due to narrow window. */
   sidebarAutoCollapsed: boolean;
+  /** Whether the export dialog is open. */
+  showExportDialog: boolean;
 
   /** Toggles sidebar visibility. */
   toggleSidebar: () => void;
@@ -57,6 +59,8 @@ interface UIState {
   toggleSidebarSecondary: () => void;
   /** Sets the sidebar auto-collapsed state. */
   setSidebarAutoCollapsed: (collapsed: boolean) => void;
+  /** Toggles the export dialog. */
+  toggleExportDialog: () => void;
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
@@ -72,6 +76,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   quickCaptureOpen: false,
   sidebarSecondaryExpanded: false,
   sidebarAutoCollapsed: false,
+  showExportDialog: false,
 
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
 
@@ -126,4 +131,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     set((s) => ({ sidebarSecondaryExpanded: !s.sidebarSecondaryExpanded })),
 
   setSidebarAutoCollapsed: (collapsed) => set({ sidebarAutoCollapsed: collapsed }),
+
+  toggleExportDialog: () =>
+    set((s) => ({ showExportDialog: !s.showExportDialog })),
 }));

@@ -48,6 +48,7 @@ export function useAppCommands() {
       { id: "action:quick-capture", title: "Quick Capture", category: "Actions", shortcut: "Ctrl+Shift+Space", handler: () => useUIStore.getState().toggleQuickCapture(), keywords: ["capture", "quick", "inbox"] },
       { id: "action:new-task", title: "New Task", category: "Actions", shortcut: "Ctrl+Shift+T", handler: () => useTaskStore.getState().openQuickAdd(), keywords: ["create", "new", "task", "todo"] },
       { id: "action:import", title: "Import Data", category: "Actions", handler: () => useUIStore.getState().setActiveView("import-wizard"), keywords: ["import", "csv", "markdown", "obsidian"] },
+      { id: "action:export", title: "Export Data", category: "Actions", handler: () => useUIStore.getState().toggleExportDialog(), keywords: ["export", "json", "csv", "markdown", "backup"] },
       {
         id: "action:snooze-break",
         title: "Snooze Break Reminder",

@@ -28,6 +28,7 @@ import { Dashboard } from "../../features/dashboard/Dashboard";
 import { CommandPalette } from "../../features/command-palette/CommandPalette";
 import { QuickCapture } from "../../features/capture/QuickCapture";
 import { BreakNotificationBanner } from "../../features/tracker/BreakNotificationBanner";
+import { ExportDialog } from "../../features/export/ExportDialog";
 
 // Lazy-loaded secondary views
 const TimeReports = lazy(() => import("../../features/tracker/TimeReports").then(m => ({ default: m.TimeReports })));
@@ -163,6 +164,7 @@ export function AppShell() {
 
       <CommandPalette />
       <QuickCapture />
+      <ExportDialog />
       <TaskQuickAdd />
       <PlanDialog />
       <TrackerDetailForm />
