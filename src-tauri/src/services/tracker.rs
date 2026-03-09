@@ -533,14 +533,11 @@ pub fn save_detail(conn: &Connection, input: SaveDetailInput) -> Result<TimeEntr
     // Update linked task's actual_mins
     if let Some(ref task_id) = linked_task_id {
         if let Some(active) = entry.active_mins {
-            // Only add if this link is new (entry didn't already have this task linked)
-            if entry.linked_task_id.as_ref() != Some(task_id) {
-                conn.execute(
-                    "UPDATE tasks SET actual_mins = actual_mins + ?1, updated_at = ?2 WHERE id = ?3",
-                    rusqlite::params![active, now, task_id],
-                )?;
-                create_time_logged_ref(conn, &input.time_entry_id, "task", task_id)?;
-            }
+            conn.execute(
+                "UPDATE tasks SET actual_mins = actual_mins + ?1, updated_at = ?2 WHERE id = ?3",
+                rusqlite::params![active, now, task_id],
+            )?;
+            create_time_logged_ref(conn, &input.time_entry_id, "task", task_id)?;
         }
     }
 

@@ -34,6 +34,8 @@ export function TrackerDetailForm() {
   const [createNote, setCreateNote] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [linkedTask, setLinkedTask] = useState<Task | null>(null);
+  const [markComplete, setMarkComplete] = useState(false);
 
   // Task/plan suggestions
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -47,7 +49,18 @@ export function TrackerDetailForm() {
     setTagsStr(tagsFromTracker.join(", "));
     setTaskId(linkedTaskId || "");
     setPlanId(linkedPlanId || "");
+    setMarkComplete(false);
   }, [notes, categoryFromTracker, tagsFromTracker, linkedTaskId, linkedPlanId]);
+
+  // Fetch linked task info for status prompt
+  useEffect(() => {
+    if (linkedTaskId && showDetailForm) {
+      ipc.getTask(linkedTaskId).then(setLinkedTask).catch(() => setLinkedTask(null));
+    } else {
+      setLinkedTask(null);
+    }
+    setMarkComplete(false);
+  }, [linkedTaskId, showDetailForm]);
 
   // Load suggested tasks and plans
   useEffect(() => {
@@ -115,6 +128,13 @@ export function TrackerDetailForm() {
         ? { title: noteTitle.trim() }
         : undefined,
     });
+
+    // Mark linked task complete if requested
+    if (markComplete && taskId) {
+      try {
+        await ipc.toggleTaskStatus(taskId);
+      } catch { /* best effort */ }
+    }
   };
 
   const handleDiscard = () => {
@@ -166,6 +186,38 @@ export function TrackerDetailForm() {
             </>
           )}
         </div>
+
+        {/* Task status prompt */}
+        {linkedTask && linkedTask.status !== "done" && linkedTask.status !== "cancelled" && (
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700">
+            <div className="min-w-0 flex-1 text-xs">
+              <span className="text-gray-500 dark:text-gray-400">Working on: </span>
+              <span className="truncate font-medium text-gray-800 dark:text-gray-200">{linkedTask.title}</span>
+            </div>
+            <div className="ml-2 flex flex-shrink-0 gap-1">
+              <button
+                onClick={() => setMarkComplete(true)}
+                className={`rounded px-2 py-0.5 text-[10px] font-medium ${
+                  markComplete
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Mark Complete
+              </button>
+              <button
+                onClick={() => setMarkComplete(false)}
+                className={`rounded px-2 py-0.5 text-[10px] font-medium ${
+                  !markComplete
+                    ? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                    : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                Keep In Progress
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Session timeline */}
         {sessionNotes.length > 0 && (
