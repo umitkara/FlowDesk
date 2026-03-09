@@ -257,10 +257,26 @@ fn start_reminder_scheduler(app_handle: tauri::AppHandle, db: Arc<DbPool>) {
     });
 }
 
+#[derive(serde::Serialize, Clone)]
+struct BreakReminderPayload {
+    title: String,
+    body: String,
+}
+
+fn update_break_tracking(db: &DbPool, snooze_until: Option<f64>, break_ends_at: Option<f64>) {
+    let _ = db.with_conn(|conn| {
+        conn.execute(
+            "UPDATE tracker_state SET snooze_until_secs = ?1, break_ends_at_secs = ?2 WHERE id = 1",
+            rusqlite::params![snooze_until, break_ends_at],
+        )?;
+        Ok(())
+    });
+}
+
 /// Starts a background thread that checks whether a break reminder should fire.
 ///
-/// This ensures break notifications fire even when the app window is minimized
-/// to tray and the frontend timer is suspended.
+/// This is the single authority for all break timing. It handles snooze awareness,
+/// break-over detection, and fires both OS notifications and frontend events.
 fn start_break_reminder_scheduler(app_handle: tauri::AppHandle, db: Arc<DbPool>) {
     std::thread::spawn(move || {
         let mut last_break_fired_at_secs: f64 = -1.0;
@@ -296,7 +312,26 @@ fn start_break_reminder_scheduler(app_handle: tauri::AppHandle, db: Arc<DbPool>)
             );
             let elapsed_secs = elapsed_mins * 60.0;
 
-            // Determine the break interval in seconds
+            // --- Break-over check ---
+            if let Some(ends_at) = state.break_ends_at_secs {
+                if elapsed_secs >= ends_at {
+                    let payload = BreakReminderPayload {
+                        title: "Break Over!".to_string(),
+                        body: "Time to get back to work.".to_string(),
+                    };
+                    let _ = app_handle
+                        .notification()
+                        .builder()
+                        .title(&payload.title)
+                        .body(&payload.body)
+                        .show();
+                    let _ = app_handle.emit("break-over", payload);
+                    update_break_tracking(&db, None, None);
+                    continue;
+                }
+            }
+
+            // --- Break fire check ---
             let interval_secs = match state.break_mode {
                 models::time_entry::BreakMode::Pomodoro => {
                     (state.break_config.pomodoro.work_mins as f64) * 60.0
@@ -309,17 +344,23 @@ fn start_break_reminder_scheduler(app_handle: tauri::AppHandle, db: Arc<DbPool>)
 
             if interval_secs <= 0.0 { continue; }
 
-            // How many full intervals have passed
             let intervals_passed = (elapsed_secs / interval_secs).floor();
             let threshold = intervals_passed * interval_secs;
 
-            // Fire if we crossed a new threshold since last check
             if threshold > 0.0 && threshold > last_break_fired_at_secs {
+                // --- Snooze check ---
+                if let Some(snooze_until) = state.snooze_until_secs {
+                    if elapsed_secs < snooze_until {
+                        continue;
+                    }
+                }
+
                 last_break_fired_at_secs = threshold;
 
-                let (title, body) = match state.break_mode {
+                let (title, body, break_duration_secs) = match state.break_mode {
                     models::time_entry::BreakMode::Pomodoro => {
-                        let cycles_before_long = state.break_config.pomodoro.cycles_before_long.max(1);
+                        let cycles_before_long =
+                            state.break_config.pomodoro.cycles_before_long.max(1);
                         let current_cycle = intervals_passed as u32;
                         let is_long = current_cycle.is_multiple_of(cycles_before_long);
                         let break_mins = if is_long {
@@ -327,26 +368,31 @@ fn start_break_reminder_scheduler(app_handle: tauri::AppHandle, db: Arc<DbPool>)
                         } else {
                             state.break_config.pomodoro.short_break_mins
                         };
-                        let title = if is_long { "Long Break Time!" } else { "Short Break Time!" };
+                        let title = if is_long {
+                            "Long Break Time!"
+                        } else {
+                            "Short Break Time!"
+                        };
                         let body = format!(
                             "You've been working for {} minutes. Take a {}-minute break.",
                             state.break_config.pomodoro.work_mins, break_mins
                         );
-                        (title.to_string(), body)
+                        (title.to_string(), body, (break_mins as f64) * 60.0)
                     }
                     models::time_entry::BreakMode::Custom => {
+                        let break_mins = state.break_config.custom.interval_mins;
                         (
                             "Break Reminder".to_string(),
                             format!(
                                 "You've been working for {} minutes. Time for a break!",
-                                state.break_config.custom.interval_mins
+                                break_mins
                             ),
+                            (break_mins as f64) * 60.0,
                         )
                     }
                     _ => continue,
                 };
 
-                // Fire OS notification
                 let _ = app_handle
                     .notification()
                     .builder()
@@ -354,15 +400,15 @@ fn start_break_reminder_scheduler(app_handle: tauri::AppHandle, db: Arc<DbPool>)
                     .body(&body)
                     .show();
 
-                // Emit event to frontend for in-app banner
-                #[derive(serde::Serialize, Clone)]
-                struct BreakReminderPayload {
-                    title: String,
-                    body: String,
-                }
                 let _ = app_handle.emit(
                     "break-reminder-fired",
                     BreakReminderPayload { title, body },
+                );
+
+                update_break_tracking(
+                    &db,
+                    None,
+                    Some(elapsed_secs + break_duration_secs),
                 );
             }
         }

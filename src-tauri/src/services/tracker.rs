@@ -17,7 +17,8 @@ pub fn get_tracker_state(conn: &Connection) -> Result<TrackerState, AppError> {
     let row = conn.query_row(
         "SELECT status, time_entry_id, started_at, paused_at, pauses,
                 notes, session_notes, linked_plan_id, linked_task_id,
-                category, tags, break_mode, break_config, pomodoro_cycle, updated_at
+                category, tags, break_mode, break_config, pomodoro_cycle, updated_at,
+                snooze_until_secs, break_ends_at_secs
          FROM tracker_state WHERE id = 1",
         [],
         |row| {
@@ -44,6 +45,8 @@ pub fn get_tracker_state(conn: &Connection) -> Result<TrackerState, AppError> {
                 break_config_json,
                 row.get::<_, u32>(13)?,
                 row.get::<_, String>(14)?,
+                row.get::<_, Option<f64>>(15)?,
+                row.get::<_, Option<f64>>(16)?,
             ))
         },
     )?;
@@ -82,6 +85,8 @@ pub fn get_tracker_state(conn: &Connection) -> Result<TrackerState, AppError> {
         break_mode,
         break_config,
         pomodoro_cycle: row.13,
+        snooze_until_secs: row.15,
+        break_ends_at_secs: row.16,
         active_mins: None,
         end_time: None,
         updated_at: row.14,
@@ -118,7 +123,8 @@ fn persist_state(conn: &Connection, state: &TrackerState) -> Result<(), AppError
             status = ?1, time_entry_id = ?2, started_at = ?3, paused_at = ?4,
             pauses = ?5, notes = ?6, session_notes = ?7, linked_plan_id = ?8,
             linked_task_id = ?9, category = ?10, tags = ?11, break_mode = ?12,
-            break_config = ?13, pomodoro_cycle = ?14, updated_at = ?15
+            break_config = ?13, pomodoro_cycle = ?14, updated_at = ?15,
+            snooze_until_secs = ?16, break_ends_at_secs = ?17
          WHERE id = 1",
         rusqlite::params![
             status_str,
@@ -136,6 +142,8 @@ fn persist_state(conn: &Connection, state: &TrackerState) -> Result<(), AppError
             break_config_json,
             state.pomodoro_cycle,
             now,
+            state.snooze_until_secs,
+            state.break_ends_at_secs,
         ],
     )?;
 
@@ -151,7 +159,8 @@ fn reset_state(conn: &Connection) -> Result<(), AppError> {
             status = 'idle', time_entry_id = NULL, started_at = NULL, paused_at = NULL,
             pauses = '[]', notes = '', session_notes = '[]', linked_plan_id = NULL,
             linked_task_id = NULL, category = NULL, tags = '[]', break_mode = 'none',
-            break_config = ?1, pomodoro_cycle = 0, updated_at = ?2
+            break_config = ?1, pomodoro_cycle = 0, updated_at = ?2,
+            snooze_until_secs = NULL, break_ends_at_secs = NULL
          WHERE id = 1",
         rusqlite::params![default_config, now],
     )?;
@@ -363,6 +372,8 @@ pub fn start(conn: &Connection, input: StartTrackerInput) -> Result<TrackerState
         break_mode,
         break_config: BreakConfig::default(),
         pomodoro_cycle: 0,
+        snooze_until_secs: None,
+        break_ends_at_secs: None,
         active_mins: None,
         end_time: None,
         updated_at: now,
@@ -797,17 +808,24 @@ pub fn set_break_mode(
 }
 
 /// Delays the next break reminder by the configured snooze duration.
-/// In Pomodoro mode, increments the cycle counter so the frontend can
-/// schedule the correct next interval after the snooze elapses.
+/// Sets `snooze_until_secs` so the backend scheduler skips firing until
+/// the snooze elapses, and clears `break_ends_at_secs`.
 pub fn snooze_break(conn: &Connection) -> Result<(), AppError> {
-    let mut state = get_tracker_state(conn)?;
-
-    if state.break_mode == BreakMode::Pomodoro {
-        state.pomodoro_cycle += 1;
+    let state = get_tracker_state(conn)?;
+    if state.status != TrackerStatus::Running {
+        return Ok(());
     }
-
-    state.updated_at = now_iso();
-    persist_state(conn, &state)?;
+    let elapsed_secs = match state.started_at.as_deref() {
+        Some(started_at) => {
+            calculate_elapsed_now(started_at, &state.pauses, state.paused_at.as_deref()) * 60.0
+        }
+        None => return Ok(()),
+    };
+    let snooze_until = elapsed_secs + (state.break_config.snooze_mins as f64 * 60.0);
+    conn.execute(
+        "UPDATE tracker_state SET snooze_until_secs = ?1, break_ends_at_secs = NULL, updated_at = ?2 WHERE id = 1",
+        rusqlite::params![snooze_until, now_iso()],
+    )?;
     Ok(())
 }
 

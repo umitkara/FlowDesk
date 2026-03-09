@@ -179,6 +179,12 @@ pub struct TrackerState {
     pub break_config: BreakConfig,
     /// Current Pomodoro work cycle count.
     pub pomodoro_cycle: u32,
+    /// Elapsed seconds at which a snooze expires (backend-driven).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snooze_until_secs: Option<f64>,
+    /// Elapsed seconds at which the current break ends (backend-driven).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub break_ends_at_secs: Option<f64>,
     /// Computed active minutes so far (for stopped sessions / detail form).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_mins: Option<i64>,
