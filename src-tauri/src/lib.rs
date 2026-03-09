@@ -11,6 +11,9 @@ pub mod state;
 /// Shared utility functions (errors, id generation, timestamps).
 pub mod utils;
 
+#[cfg(test)]
+mod test_helpers;
+
 use db::connection::DbPool;
 use models::undo::OperationHistory;
 use state::AppState;
