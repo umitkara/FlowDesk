@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -99,6 +99,9 @@ export function TaskBoard() {
   const tasks = useTaskStore((s) => s.tasks);
   const moveTaskStatus = useTaskStore((s) => s.moveTaskStatus);
   const fetchTasks = useTaskStore((s) => s.fetchTasks);
+
+  useEffect(() => { fetchTasks(); }, [fetchTasks]);
+
   const [activeTask, setActiveTask] = useState<TaskWithChildren | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
     done: true,

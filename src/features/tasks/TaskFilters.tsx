@@ -8,6 +8,8 @@ export function TaskFilters() {
   const setFilter = useTaskStore((s) => s.setFilter);
   const viewMode = useTaskStore((s) => s.viewMode);
   const setViewMode = useTaskStore((s) => s.setViewMode);
+  const treeMode = useTaskStore((s) => s.treeMode);
+  const setTreeMode = useTaskStore((s) => s.setTreeMode);
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
@@ -176,12 +178,21 @@ export function TaskFilters() {
 
       <div className="ml-auto flex items-center gap-1">
         <button
-          onClick={() => setViewMode("list")}
-          className={`rounded-md p-1 ${viewMode === "list" ? "bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300" : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`}
+          onClick={() => { setViewMode("list"); setTreeMode(false); }}
+          className={`rounded-md p-1 ${viewMode === "list" && !treeMode ? "bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300" : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`}
           title="List view"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+          </svg>
+        </button>
+        <button
+          onClick={() => { setViewMode("list"); setTreeMode(true); }}
+          className={`rounded-md p-1 ${viewMode === "list" && treeMode ? "bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300" : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`}
+          title="Tree view"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h4m0 0v4m0-4h10m0 0v4m-10 4v4m0 0h4m-4 0H3m10-4v4m0 0h4m-4 0h-4" />
           </svg>
         </button>
         <button
