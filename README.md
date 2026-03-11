@@ -6,6 +6,24 @@ Current version: v0.8.22 (pre-1.0). There are no automated tests yet. The app is
 
 ---
 
+## Why FlowDesk
+
+Most productivity tools solve one problem well and leave you stitching the rest together yourself. Notion is a great notes app. Linear is a great task tracker. Toggl is a great time tracker. But your work doesn't stay in neat silos — a task comes from a meeting note, a time entry belongs to a plan, a plan references a task that's blocking three others.
+
+FlowDesk keeps all of it in one place, on your machine, connected:
+
+**Everything is linked.** Notes can reference tasks, plans, and other notes with inline `@` chips. The Graph view shows the full web of relationships across your workspace. Backlinks tell you which notes mention a given task. You don't lose context when switching between views.
+
+**Time tracking is a first-class citizen, not an afterthought.** Sessions link directly to plans and tasks. The Planned vs. Actual report shows where your day actually went versus where you intended it to go. The tracker lives in the system tray and stays out of the way until you need it.
+
+**It's entirely local.** No account. No sync server. No subscription. Your data is a single SQLite file you can back up, inspect, and move. Nothing leaves your machine.
+
+**It's fast to navigate.** The Command Palette (Ctrl+K) searches across every note, task, and plan simultaneously. Keyboard shortcuts cover the full workflow. Quick Capture (Ctrl+Shift+Space) lets you record a thought or start a task without breaking focus.
+
+**Workspaces are isolated by design.** Work, personal, and side projects each get their own notes, tasks, plans, and accent color. Cross-workspace references are supported when you genuinely need them, but the default is clean separation.
+
+---
+
 ## Features
 
 ### Notes
@@ -59,7 +77,24 @@ Current version: v0.8.22 (pre-1.0). There are no automated tests yet. The app is
 
 ## Screenshots
 
-Screenshots will be added before the v1.0 release.
+![Dashboard](assets/screenshots/1_dashboard.png)
+
+<table>
+<tr>
+<td><img src="assets/screenshots/2_notes.png" alt="Notes editor"/></td>
+<td><img src="assets/screenshots/3_tasks.png" alt="Kanban board"/></td>
+</tr>
+<tr>
+<td><img src="assets/screenshots/4_plans.png" alt="Plans calendar"/></td>
+<td><img src="assets/screenshots/5_time_tracker.png" alt="Time tracker"/></td>
+</tr>
+<tr>
+<td><img src="assets/screenshots/6_graph.png" alt="Graph view"/></td>
+<td><img src="assets/screenshots/7_command_palette.png" alt="Command palette"/></td>
+</tr>
+</table>
+
+![Theme](assets/screenshots/8_theme.png)
 
 ---
 
