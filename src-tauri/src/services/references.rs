@@ -4,9 +4,9 @@ use regex::Regex;
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
-/// Regex for matching inline entity references: @task[id], @note[id], @plan[id].
+/// Regex for matching inline entity references: @task[id], @note[id], @plan[id], @time_entry[id].
 static INLINE_REF_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"@(task|note|plan)\[([a-zA-Z0-9_-]+)\]").unwrap());
+    LazyLock::new(|| Regex::new(r"@(task|note|plan|time_entry)\[([a-zA-Z0-9_-]+)\]").unwrap());
 
 /// Regex for matching fenced code blocks (triple backtick).
 static CODE_BLOCK_RE: LazyLock<Regex> =
@@ -18,7 +18,7 @@ static INLINE_CODE_RE: LazyLock<Regex> =
 
 /// Parses inline references from markdown text.
 ///
-/// Matches patterns: `@task[<id>]`, `@note[<id>]`, `@plan[<id>]`.
+/// Matches patterns: `@task[<id>]`, `@note[<id>]`, `@plan[<id>]`, `@time_entry[<id>]`.
 /// Ignores references inside fenced code blocks and inline code spans.
 /// Deduplicates results.
 pub fn parse_inline_references(body: &str) -> Vec<(String, String)> {
@@ -215,6 +215,12 @@ mod tests {
         assert_eq!(refs.len(), 2);
         assert_eq!(refs[0], ("note".to_string(), "n1".to_string()));
         assert_eq!(refs[1], ("plan".to_string(), "p2".to_string()));
+    }
+
+    #[test]
+    fn parses_time_entry_ref() {
+        let refs = parse_inline_references("Tracked @time_entry[te123] session.");
+        assert_eq!(refs, vec![("time_entry".to_string(), "te123".to_string())]);
     }
 
     #[test]

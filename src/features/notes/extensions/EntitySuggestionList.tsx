@@ -9,7 +9,7 @@ import { STATUS_CONFIG } from "../../../lib/types";
 
 /** A single suggestion item displayed in the autocomplete dropdown. */
 export interface SuggestionItem {
-  entityType: "task" | "note" | "plan";
+  entityType: "task" | "note" | "plan" | "time_entry";
   id: string;
   title: string;
   status?: string;
@@ -18,6 +18,8 @@ export interface SuggestionItem {
   planType?: string;
   /** Start time ISO string — only set for plan items. */
   startTime?: string;
+  /** Duration string — only set for time_entry items. */
+  duration?: string;
 }
 
 interface EntitySuggestionListProps {
@@ -119,10 +121,12 @@ export const EntitySuggestionList = forwardRef<
                       ? "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
                       : item.entityType === "plan"
                         ? "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400"
-                        : "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                        : item.entityType === "time_entry"
+                          ? "bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400"
+                          : "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                   }`}
                 >
-                  {item.entityType === "plan" ? (item.planType ?? "plan") : item.entityType}
+                  {item.entityType === "plan" ? (item.planType ?? "plan") : item.entityType === "time_entry" ? "session" : item.entityType}
                 </span>
                 <span className="flex-1 truncate">{item.title}</span>
                 {statusCfg && (
@@ -133,6 +137,11 @@ export const EntitySuggestionList = forwardRef<
                 {item.startTime && (
                   <span className="flex-shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
                     {formatPlanTime(item.startTime)}
+                  </span>
+                )}
+                {item.duration && (
+                  <span className="flex-shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
+                    {item.duration}
                   </span>
                 )}
               </>

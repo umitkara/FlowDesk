@@ -1,10 +1,11 @@
 import * as ipc from "../../../lib/ipc";
-import type { TaskFilter, TaskWithChildren, Plan } from "../../../lib/types";
+import type { TaskFilter, TaskWithChildren, Plan, TimeEntry } from "../../../lib/types";
 import type { SuggestionItem } from "./EntitySuggestionList";
 import { useWorkspaceStore } from "../../../stores/workspaceStore";
 
 let cachedTasks: TaskWithChildren[] | null = null;
 let cachedPlans: Plan[] | null = null;
+let cachedTimeEntries: TimeEntry[] | null = null;
 let cacheExpiry = 0;
 let cachedWorkspaceId = "";
 
@@ -24,23 +25,26 @@ export async function getSuggestionItems(query: string): Promise<SuggestionItem[
     if (wsId !== cachedWorkspaceId) {
       cachedTasks = null;
       cachedPlans = null;
+      cachedTimeEntries = null;
       cachedWorkspaceId = wsId;
     }
-    if (!cachedTasks || !cachedPlans || Date.now() > cacheExpiry) {
+    if (!cachedTasks || !cachedPlans || !cachedTimeEntries || Date.now() > cacheExpiry) {
       const filter: TaskFilter = { workspace_id: wsId };
       const now = new Date();
       const monthAgo = new Date(now.getTime() - 30 * 86400000);
       const monthAhead = new Date(now.getTime() + 30 * 86400000);
-      const [tasks, plans] = await Promise.all([
+      const [tasks, plans, timeEntries] = await Promise.all([
         ipc.listTasks(filter, { field: "updated_at", direction: "desc" }),
         ipc.listPlans({
           workspace_id: wsId,
           start_after: monthAgo.toISOString(),
           end_before: monthAhead.toISOString(),
         }),
+        ipc.listTimeEntries({ workspaceId: wsId, limit: 20 }),
       ]);
       cachedTasks = tasks;
       cachedPlans = plans;
+      cachedTimeEntries = timeEntries;
       cacheExpiry = Date.now() + 30000;
     }
 
@@ -68,8 +72,41 @@ export async function getSuggestionItems(query: string): Promise<SuggestionItem[
       startTime: p.start_time,
     }));
 
-    return [...taskResults, ...planResults].slice(0, 8);
+    const timeEntryResults: SuggestionItem[] = (q
+      ? cachedTimeEntries.filter((te) => {
+          const label = formatTimeEntryLabel(te);
+          return label.toLowerCase().includes(q);
+        })
+      : cachedTimeEntries
+    ).slice(0, 4).map((te) => ({
+      entityType: "time_entry" as const,
+      id: te.id,
+      title: formatTimeEntryLabel(te),
+      duration: formatDuration(te.active_mins),
+      startTime: te.start_time,
+    }));
+
+    return [...taskResults, ...planResults, ...timeEntryResults].slice(0, 10);
   } catch {
     return [];
   }
+}
+
+function formatTimeEntryLabel(te: TimeEntry): string {
+  if (te.category) return te.category;
+  try {
+    const d = new Date(te.start_time);
+    return `Session on ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  } catch {
+    return "Session";
+  }
+}
+
+function formatDuration(mins: number | null): string {
+  if (mins == null || mins <= 0) return "";
+  const h = Math.floor(mins / 60);
+  const m = Math.round(mins % 60);
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
 }

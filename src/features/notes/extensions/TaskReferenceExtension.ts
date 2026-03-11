@@ -14,7 +14,7 @@ import { TaskReferenceView } from "./TaskReferenceView";
  * Regex matching @task[id], @note[id], @plan[id] at the end of input.
  * Used by the input rule to convert typed text into TaskReference nodes.
  */
-const ENTITY_REF_INPUT_REGEX = /@(task|note|plan)\[([a-zA-Z0-9_-]+)\]$/;
+const ENTITY_REF_INPUT_REGEX = /@(task|note|plan|time_entry)\[([a-zA-Z0-9_-]+)\]$/;
 
 /**
  * Custom Tiptap inline node extension for rendering entity references
@@ -106,7 +106,7 @@ export const TaskReferenceExtension = Node.create({
         allowSpaces: false,
         items: async ({ query }) => {
           // Don't show autocomplete when user is typing the manual @task[id] pattern
-          if (/^(task|note|plan)\[/.test(query)) return [];
+          if (/^(task|note|plan|time_entry)\[/.test(query)) return [];
           const results = await getSuggestionItems(query);
           // Append "Create task" option when there's a non-empty query
           const trimmed = query.trim();
@@ -233,7 +233,8 @@ export function preprocessEntityRefs(html: string): string {
   if (
     !html.includes("@task[") &&
     !html.includes("@note[") &&
-    !html.includes("@plan[")
+    !html.includes("@plan[") &&
+    !html.includes("@time_entry[")
   ) {
     return html;
   }
@@ -250,7 +251,7 @@ export function preprocessEntityRefs(html: string): string {
       if (i % 2 === 1) return part;
       // Even indices are regular HTML — replace bare patterns
       return part.replace(
-        /@(task|note|plan)\[([a-zA-Z0-9_-]+)\]/g,
+        /@(task|note|plan|time_entry)\[([a-zA-Z0-9_-]+)\]/g,
         '<span data-entity-ref="" data-entity-type="$1" data-entity-id="$2">@$1[$2]</span>',
       );
     })

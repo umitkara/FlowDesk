@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { NodeViewWrapper } from "@tiptap/react";
 import type { NodeViewProps } from "@tiptap/react";
-import type { Task, Plan, TaskStatus, EntityType } from "../../../lib/types";
+import type { Task, Plan, TimeEntry, TaskStatus, EntityType } from "../../../lib/types";
 import { STATUS_CONFIG, PRIORITY_CONFIG, PLAN_TYPE_CONFIG } from "../../../lib/types";
 import * as ipc from "../../../lib/ipc";
 import { openEntity } from "../../../lib/openEntity";
@@ -20,6 +20,7 @@ export function TaskReferenceView({ node }: NodeViewProps) {
 
   const [task, setTask] = useState<Task | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [timeEntry, setTimeEntry] = useState<TimeEntry | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -31,6 +32,9 @@ export function TaskReferenceView({ node }: NodeViewProps) {
       } else if (entityType === "plan") {
         const p = await ipc.getPlan(entityId);
         setPlan(p);
+      } else if (entityType === "time_entry") {
+        const te = await ipc.getTimeEntry(entityId);
+        setTimeEntry(te);
       }
       setError(false);
     } catch {
@@ -87,7 +91,7 @@ export function TaskReferenceView({ node }: NodeViewProps) {
   }
 
   // Error / not found state
-  if (error || (entityType === "task" && !task) || (entityType === "plan" && !plan)) {
+  if (error || (entityType === "task" && !task) || (entityType === "plan" && !plan) || (entityType === "time_entry" && !timeEntry)) {
     return (
       <NodeViewWrapper as="span" className="entity-ref-chip entity-ref-error">
         <span className="entity-ref-text">
@@ -120,6 +124,49 @@ export function TaskReferenceView({ node }: NodeViewProps) {
           {plan.title}
         </span>
         <span className="entity-ref-badge">{typeCfg?.label || plan.type}</span>
+      </NodeViewWrapper>
+    );
+  }
+
+  // Time entry reference chip
+  if (entityType === "time_entry" && timeEntry) {
+    const mins = timeEntry.active_mins ?? 0;
+    const h = Math.floor(mins / 60);
+    const m = Math.round(mins % 60);
+    const durationStr = h > 0 && m > 0 ? `${h}h ${m}m` : h > 0 ? `${h}h` : `${m}m`;
+    const dateStr = (() => {
+      try {
+        return new Date(timeEntry.start_time).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      } catch {
+        return "";
+      }
+    })();
+    const label = timeEntry.category || "Session";
+
+    return (
+      <NodeViewWrapper as="span" className="entity-ref-chip entity-ref-time-entry">
+        <span className="entity-ref-badge">
+          <svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor" className="inline-block mr-0.5">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+          </svg>
+          {durationStr}
+        </span>
+        <span
+          role="button"
+          tabIndex={-1}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openEntity({ type: "time_entry", id: entityId });
+          }}
+          className="entity-ref-title"
+          title={`${label} — ${dateStr} — ${durationStr}`}
+        >
+          {label}
+        </span>
+        {dateStr && (
+          <span className="entity-ref-status text-gray-400 dark:text-gray-500">{dateStr}</span>
+        )}
       </NodeViewWrapper>
     );
   }

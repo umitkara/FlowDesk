@@ -449,7 +449,7 @@ fn extract_snippet(body: &str, target_id: &str, conn: &rusqlite::Connection) -> 
 
 /// Syncs inline references for a note.
 ///
-/// Parses the note body for `@task[id]`, `@note[id]`, `@plan[id]` patterns.
+/// Parses the note body for `@task[id]`, `@note[id]`, `@plan[id]`, `@time_entry[id]` patterns.
 /// Diffs against existing references: creates new ones, deletes stale ones.
 /// Only manages auto-created "references" relations; manual relations are preserved.
 #[tauri::command]
@@ -527,6 +527,19 @@ pub fn sync_note_references(
                         if let Some(ref tid) = create_ref.target_id {
                             conn.query_row(
                                 "SELECT COUNT(*) FROM plans WHERE id = ?1 AND deleted_at IS NULL",
+                                [tid],
+                                |row| row.get::<_, i64>(0),
+                            )
+                            .unwrap_or(0)
+                                > 0
+                        } else {
+                            false
+                        }
+                    }
+                    "time_entry" => {
+                        if let Some(ref tid) = create_ref.target_id {
+                            conn.query_row(
+                                "SELECT COUNT(*) FROM time_entries WHERE id = ?1 AND deleted_at IS NULL",
                                 [tid],
                                 |row| row.get::<_, i64>(0),
                             )
