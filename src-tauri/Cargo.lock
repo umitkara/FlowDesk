@@ -988,7 +988,7 @@ dependencies = [
 
 [[package]]
 name = "flowdesk"
-version = "0.8.22"
+version = "0.8.23"
 dependencies = [
  "chrono",
  "csv",
