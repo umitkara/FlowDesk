@@ -31,3 +31,10 @@ coverage/
 # Logs
 *.log
 npm-debug.log*
+
+# Internal planning and AI context (not for public repo)
+.concept/
+.plans/
+.implemented/
+.prompt/
+.claude/
