@@ -18,6 +18,13 @@ pub fn seed_demo_workspace(state: State<'_, AppState>) -> Result<String, AppErro
     state.db.with_conn(do_seed).map_err(AppError::from)
 }
 
+/// Returns a Tiptap-compatible entity reference span.
+fn eref(entity_type: &str, id: &str) -> String {
+    format!(
+        r#"<span data-entity-ref="" data-entity-type="{entity_type}" data-entity-id="{id}">@{entity_type}[{id}]</span>"#
+    )
+}
+
 fn do_seed(conn: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
     let now = now_iso();
 
@@ -40,7 +47,7 @@ fn do_seed(conn: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
     let today_plus_13_str = today_plus_13.format("%Y-%m-%d").to_string();
     let today_plus_20_str = today_plus_20.format("%Y-%m-%d").to_string();
 
-    // ISO datetime helpers (UTC midnight + offset for specific hours)
+    // ISO datetime strings for plans and time entries
     let today_09_00 = format!("{}T09:00:00Z", today_str);
     let today_10_55 = format!("{}T10:55:00Z", today_str);
     let today_11_00 = format!("{}T11:00:00Z", today_str);
@@ -59,10 +66,80 @@ fn do_seed(conn: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
     let today_plus_20_00_00 = format!("{}T00:00:00Z", today_plus_20_str);
 
     // =====================================================================
+    // PRE-GENERATE ALL IDs so note bodies can embed entity refs by ID
+    // =====================================================================
+
+    let ws_id = generate_id();
+
+    // Note IDs
+    let n1 = generate_id(); // Getting Started with FlowDesk
+    let n2 = generate_id(); // Weekly Team Standup
+    let n3 = generate_id(); // Project Alpha: Architecture Notes
+    let n4 = generate_id(); // Daily Journal
+    let n5 = generate_id(); // Research: PKM
+    let n6 = generate_id(); // Q2 Planning Notes
+    let n7 = generate_id(); // UI Component Sketches
+    let n8 = generate_id(); // Reading List
+
+    // Task IDs — done (4)
+    let t_setup      = generate_id();
+    let t_schema     = generate_id();
+    let t_editor     = generate_id();
+    let t_release    = generate_id();
+    // in_progress (3)
+    let t_darkmode   = generate_id();
+    let t_search_fix = generate_id();
+    let t_refactor   = generate_id();
+    // todo (4)
+    let t_shortcuts  = generate_id();
+    let t_docs       = generate_id();
+    let t_csv        = generate_id();
+    let t_profiling  = generate_id();
+    // inbox (3)
+    let t_prs        = generate_id();
+    let t_deps       = generate_id();
+    let t_macos      = generate_id();
+    // cancelled (1)
+    let t_old_auth   = generate_id();
+    // subtask
+    let t_css_vars   = generate_id();
+
+    // Plan IDs
+    let p_deep_work   = generate_id();
+    let p_standup     = generate_id();
+    let p_code_review = generate_id();
+    let p_planning    = generate_id();
+    let p_q2_kickoff  = generate_id();
+    let p_monthly     = generate_id();
+
+    // =====================================================================
     // 1. WORKSPACE
     // =====================================================================
-    let ws_id = generate_id();
     let config_json = r##"{"categories":["work","personal","learning"],"note_types":["journal","meeting","technical","reference","draft"],"task_categories":["feature","bug","research","chore"],"dashboard_widgets":["today_plan","pending_tasks","recent_notes","time_today","sticky_tasks","upcoming_deadlines"],"accent_color":"#8b5cf6"}"##;
+
+    // Generate a unique slug in case multiple demo workspaces are created.
+    let slug = {
+        let base = "flowdesk-demo";
+        let exists: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM workspaces WHERE slug = ?1",
+                rusqlite::params![base],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap_or(0) > 0;
+        if exists {
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM workspaces WHERE slug LIKE 'flowdesk-demo%'",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap_or(1);
+            format!("{}-{}", base, count + 1)
+        } else {
+            base.to_string()
+        }
+    };
 
     conn.execute(
         "INSERT INTO workspaces (id, name, slug, icon, color, sort_order, config, created_at, updated_at)
@@ -70,7 +147,7 @@ fn do_seed(conn: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
         rusqlite::params![
             ws_id,
             "FlowDesk Demo",
-            "flowdesk-demo",
+            slug,
             "🎯",
             "#8b5cf6",
             99,
@@ -118,7 +195,6 @@ fn do_seed(conn: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
              VALUES (?1, ?2, ?3, ?4, ?5)",
             rusqlite::params![tag_id, ws_id, name, color, now],
         )?;
-        // Re-read the actual id in case INSERT OR IGNORE skipped (name already exists)
         let actual_id: String = conn.query_row(
             "SELECT id FROM tags WHERE workspace_id = ?1 AND name = ?2",
             rusqlite::params![ws_id, name],
@@ -128,131 +204,224 @@ fn do_seed(conn: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
     }
 
     // =====================================================================
-    // 3. NOTES
+    // 3. NOTES  (bodies as Tiptap HTML with embedded entity ref spans)
     // =====================================================================
 
-    // Helper: insert a note and return its id
-    // Columns: id, workspace_id, title, date, body, folder, category, type,
-    //          color, importance, front_matter, body_hash, created_at, updated_at,
-    //          deleted_at, pinned
-    macro_rules! note {
-        ($id:expr, $title:expr, $date:expr, $body:expr, $folder:expr,
-         $ntype:expr, $importance:expr, $pinned:expr) => {{
-            conn.execute(
-                "INSERT INTO notes (id, workspace_id, title, date, body, folder, type,
-                                    importance, created_at, updated_at, pinned)
-                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
-                rusqlite::params![
-                    $id, ws_id, $title, $date, $body, $folder, $ntype,
-                    $importance, now, now, $pinned as i64
-                ],
-            )?;
-        }};
+    let body_n1 = format!(
+        concat!(
+            "<h2>Welcome to FlowDesk</h2>",
+            "<p>FlowDesk is a local-first workspace for notes, tasks, plans, and time tracking. ",
+            "This demo workspace is pre-populated so you can explore every feature right away.</p>",
+            "<h3>What&#39;s in this demo</h3>",
+            "<ul>",
+            "<li><p>8 notes across different types and folders</p></li>",
+            "<li><p>15 tasks spread across all Kanban columns</p></li>",
+            "<li><p>6 plans on the calendar (today, yesterday, and upcoming)</p></li>",
+            "<li><p>5 time tracking sessions with category breakdowns</p></li>",
+            "</ul>",
+            "<h3>Current focus</h3>",
+            "<p>The highest-priority in-progress task: {} — a subtask for CSS variables is tracked separately.</p>",
+            "<h3>Tips</h3>",
+            "<ul>",
+            "<li><p>Open the <strong>Command Palette</strong> with <code>Ctrl+K</code> to jump anywhere.</p></li>",
+            "<li><p>The <strong>Graph view</strong> (Discovery sidebar) shows how all entities connect.</p></li>",
+            "<li><p>Type <code>@</code> in any note body to reference a task, note, or plan inline.</p></li>",
+            "</ul>"
+        ),
+        eref("task", &t_darkmode)
+    );
+
+    let body_n2 = format!(
+        concat!(
+            "<h2>Weekly Team Standup — {}</h2>",
+            "<p><strong>Attendees:</strong> Alice, Bob, Carol, Dave</p>",
+            "<h3>Yesterday</h3>",
+            "<ul>",
+            "<li><p>Completed the architecture review for Project Alpha</p></li>",
+            "<li><p>Investigated and patched the search performance regression: {}</p></li>",
+            "</ul>",
+            "<h3>Today</h3>",
+            "<ul>",
+            "<li><p>Continue dark mode implementation: {}</p></li>",
+            "<li><p>Start the Q2 planning document</p></li>",
+            "</ul>",
+            "<h3>Blockers</h3>",
+            "<ul>",
+            "<li><p>Waiting on design assets for the new dashboard widgets</p></li>",
+            "</ul>"
+        ),
+        yesterday_str,
+        eref("task", &t_search_fix),
+        eref("task", &t_darkmode)
+    );
+
+    let body_n3 = format!(
+        concat!(
+            "<h2>Overview</h2>",
+            "<p>Project Alpha uses a layered architecture: a Tauri shell, a Rust backend, ",
+            "and a React frontend communicating via typed IPC commands.</p>",
+            "<h2>Key Decisions</h2>",
+            "<ul>",
+            "<li><p>SQLite for local persistence (bundled via rusqlite)</p></li>",
+            "<li><p>Zustand for frontend state management</p></li>",
+            "<li><p>Tiptap for rich-text editing with custom node extensions</p></li>",
+            "</ul>",
+            "<h2>Open Issues</h2>",
+            "<p>Urgent: {} — needs investigation before the beta launch deadline.</p>",
+            "<p>In progress: {} — subtask {} is tracked separately.</p>",
+            "<h2>Performance Notes</h2>",
+            "<ul>",
+            "<li><p>FTS5 virtual tables on notes, tasks, and plans for full-text search</p></li>",
+            "<li><p>WAL journal mode for crash safety and concurrent reads</p></li>",
+            "<li><p>Connection pool serialises access via a single Mutex&lt;Connection&gt;</p></li>",
+            "</ul>"
+        ),
+        eref("task", &t_search_fix),
+        eref("task", &t_darkmode),
+        eref("task", &t_css_vars)
+    );
+
+    let body_n4 = format!(
+        concat!(
+            "<h2>Morning Reflection — {}</h2>",
+            "<p>Focused on the demo workspace seed today. The time entry schema requires careful ",
+            "handling of the pauses JSON array to compute <code>active_mins</code> correctly.</p>",
+            "<h3>Goals for today</h3>",
+            "<ol>",
+            "<li><p>Finish the backend seed command</p></li>",
+            "<li><p>Wire up the frontend button in WorkspaceCreate</p></li>",
+            "<li><p>Run <code>cargo clippy</code> and <code>tsc --noEmit</code> — target: zero warnings</p></li>",
+            "</ol>",
+            "<h3>Plan for this morning</h3>",
+            "<p>Blocking out 09:00–11:00 for deep work: {}</p>",
+            "<h3>Evening</h3>",
+            "<p>All done. Zero warnings. The demo workspace loads with all 15 tasks, 8 notes, ",
+            "6 plans, and 5 time entries correctly connected.</p>"
+        ),
+        today_str,
+        eref("plan", &p_deep_work)
+    );
+
+    let body_n5 = concat!(
+        "<h2>PKM Systems Overview</h2>",
+        "<p>Exploring different approaches to personal knowledge management:</p>",
+        "<h3>Zettelkasten</h3>",
+        "<p>Atomic notes with bidirectional links. Good for building a long-term knowledge base ",
+        "that compounds over time. Each note should express exactly one idea.</p>",
+        "<h3>PARA</h3>",
+        "<p>Projects, Areas, Resources, Archives. Great for organising actionable information ",
+        "by its relevance to current goals.</p>",
+        "<h3>Building a Second Brain</h3>",
+        "<p>Focuses on the CODE framework: <strong>C</strong>apture, <strong>O</strong>rganise, ",
+        "<strong>D</strong>istill, <strong>E</strong>xpress.</p>",
+        "<h2>FlowDesk&#39;s Approach</h2>",
+        "<p>FlowDesk combines all three: notes as atomic units, tasks and plans for action, ",
+        "workspaces for PARA-style organisation, and the Graph view for Zettelkasten-style ",
+        "link discovery.</p>",
+        "<h2>Key Reading</h2>",
+        "<ul>",
+        "<li><p><em>How to Take Smart Notes</em> — Sönke Ahrens (best intro to Zettelkasten)</p></li>",
+        "<li><p><em>Building a Second Brain</em> — Tiago Forte</p></li>",
+        "</ul>"
+    ).to_string();
+
+    let body_n6 = format!(
+        concat!(
+            "<h2>Q2 Goals</h2>",
+            "<ol>",
+            "<li><p>Ship the export improvements (CSV + JSON workspace export)</p></li>",
+            "<li><p>Complete dark mode across all views: {}</p></li>",
+            "<li><p>Launch the public beta</p></li>",
+            "</ol>",
+            "<h2>Key Milestones</h2>",
+            "<ul>",
+            "<li><p><strong>Apr 1:</strong> Feature freeze</p></li>",
+            "<li><p><strong>Apr 15:</strong> Beta launch</p></li>",
+            "<li><p><strong>May 1:</strong> v1.0 release</p></li>",
+            "</ul>",
+            "<h2>Kickoff Event</h2>",
+            "<p>All-hands Q2 kickoff: {}</p>",
+            "<h2>Resource Allocation</h2>",
+            "<ul>",
+            "<li><p>2 engineers on features</p></li>",
+            "<li><p>1 engineer on infrastructure and reliability</p></li>",
+            "<li><p>Design contractor for the landing page</p></li>",
+            "</ul>"
+        ),
+        eref("task", &t_darkmode),
+        eref("plan", &p_q2_kickoff)
+    );
+
+    let body_n7 = concat!(
+        "<h2>Components in Progress</h2>",
+        "<ul>",
+        "<li><p><strong>CommandPalette</strong> — fuzzy search overlay, triggered with <code>Ctrl+K</code></p></li>",
+        "<li><p><strong>KanbanBoard</strong> — drag-and-drop task columns with priority badges and sticky indicators</p></li>",
+        "<li><p><strong>GraphView</strong> — force-directed graph showing entity relationships</p></li>",
+        "<li><p><strong>TimelineView</strong> — chronological view of plans and time entries</p></li>",
+        "</ul>",
+        "<h2>Design Tokens</h2>",
+        "<p>Using CSS custom properties for workspace-level theming:</p>",
+        "<ul>",
+        "<li><p><code>--workspace-accent</code>: primary action colour</p></li>",
+        "<li><p><code>--workspace-accent-light</code>: hover states</p></li>",
+        "<li><p><code>--workspace-accent-dark</code>: active / pressed states</p></li>",
+        "</ul>",
+        "<h2>Open TODOs</h2>",
+        "<ul>",
+        "<li><p>Add drag animation on kanban card pickup</p></li>",
+        "<li><p>Mobile-friendly breakpoints for the sidebar</p></li>",
+        "<li><p>Contrast ratio audit for dark mode colour tokens</p></li>",
+        "</ul>"
+    ).to_string();
+
+    let body_n8 = concat!(
+        "<h2>Currently Reading</h2>",
+        "<ul>",
+        "<li><p><em>How to Take Smart Notes</em> — Sönke Ahrens</p></li>",
+        "<li><p><em>A Philosophy of Software Design</em> — John Ousterhout</p></li>",
+        "</ul>",
+        "<h2>To Read</h2>",
+        "<ul>",
+        "<li><p><em>Thinking in Systems</em> — Donella Meadows</p></li>",
+        "<li><p><em>The Pragmatic Programmer</em> — Hunt &amp; Thomas</p></li>",
+        "<li><p><em>Staff Engineer</em> — Will Larson</p></li>",
+        "</ul>",
+        "<h2>Recently Finished</h2>",
+        "<ul>",
+        "<li><p><em>Shape Up</em> — Ryan Singer ⭐⭐⭐⭐⭐</p></li>",
+        "<li><p><em>The Manager's Path</em> — Camille Fournier ⭐⭐⭐⭐</p></li>",
+        "</ul>"
+    ).to_string();
+
+    // Insert notes
+    // Columns: id, workspace_id, title, date, body, folder, type, importance, created_at, updated_at, pinned
+    type NoteRow<'a> = (&'a str, &'a str, &'a str, &'a str, &'a str, Option<&'a str>, Option<&'a str>, i64);
+    let notes: &[NoteRow<'_>] = &[
+        (&n1, "Getting Started with FlowDesk", &today_str, &body_n1, "/overview", Some("reference"), Some("high"), 1),
+        (&n2, "Weekly Team Standup", &yesterday_str, &body_n2, "/meetings", Some("meeting"), None, 0),
+        (&n3, "Project Alpha: Architecture Notes", &today_str, &body_n3, "/projects/alpha", Some("technical"), Some("high"), 0),
+        (&n4, "Daily Journal", &today_str, &body_n4, "/daily", Some("journal"), None, 0),
+        (&n5, "Research: Personal Knowledge Management", &today_str, &body_n5, "", Some("reference"), None, 0),
+        (&n6, "Q2 Planning Notes", &today_str, &body_n6, "", Some("reference"), Some("critical"), 1),
+        (&n7, "UI Component Sketches", &today_str, &body_n7, "/projects/alpha", Some("draft"), None, 0),
+        (&n8, "Reading List", &today_str, &body_n8, "/personal", Some("reference"), None, 0),
+    ];
+
+    for (id, title, date, body, folder, ntype, importance, pinned) in notes {
+        let folder_val: Option<&str> = if folder.is_empty() { None } else { Some(folder) };
+        conn.execute(
+            "INSERT INTO notes (id, workspace_id, title, date, body, folder, type, importance, created_at, updated_at, pinned)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            rusqlite::params![id, ws_id, title, date, body, folder_val, ntype, importance, now, now, pinned],
+        )?;
     }
-
-    let n1 = generate_id(); // Getting Started with FlowDesk
-    let n2 = generate_id(); // Weekly Team Standup
-    let n3 = generate_id(); // Project Alpha: Architecture Notes
-    let n4 = generate_id(); // Daily Journal
-    let n5 = generate_id(); // Research: PKM
-    let n6 = generate_id(); // Q2 Planning Notes
-    let n7 = generate_id(); // UI Component Sketches
-    let n8 = generate_id(); // Reading List
-
-    note!(
-        n1,
-        "Getting Started with FlowDesk",
-        &today_str as &str,
-        "Welcome to FlowDesk! This workspace is pre-populated with demo content so you can explore every feature.\n\nUse the sidebar to navigate between Notes, Tasks, Plans, and the Time Tracker. The Command Palette (Ctrl+K) gives you quick access to all actions.\n\nTip: try the Graph view under Discovery to see how entities connect.",
-        "/overview",
-        "reference",
-        "high",
-        1i64
-    );
-
-    note!(
-        n2,
-        "Weekly Team Standup - Mar 10",
-        &yesterday_str as &str,
-        "Attendees: Alice, Bob, Carol, Dave\n\nYesterday:\n- Finished the architecture review\n- Fixed the search performance regression\n\nToday:\n- Continue dark mode implementation\n- Start Q2 planning document\n\nBlockers:\n- Waiting on design assets for the new dashboard widgets",
-        "/meetings",
-        "meeting",
-        Option::<&str>::None,
-        0i64
-    );
-
-    note!(
-        n3,
-        "Project Alpha: Architecture Notes",
-        &today_str as &str,
-        "## Overview\n\nProject Alpha uses a layered architecture with a Tauri shell, a Rust backend, and a React frontend.\n\n## Key Decisions\n\n- SQLite for local persistence (bundled via rusqlite)\n- Zustand for frontend state management\n- Tiptap for rich-text editing\n\n## Open Questions\n\n- Should we split the notes FTS index into a separate virtual table per workspace?\n- Performance profiling needed for large note collections (>10k notes)",
-        "/projects/alpha",
-        "technical",
-        "high",
-        0i64
-    );
-
-    note!(
-        n4,
-        &format!("Daily Journal — {}", today_str) as &str,
-        &today_str as &str,
-        "Morning reflection:\n\nFocused on getting the demo workspace seed working today. The time entry schema is a bit tricky — need to make sure active_mins is calculated correctly from the pauses array.\n\nGoals for today:\n1. Finish the seed command\n2. Wire up the frontend button\n3. Run clippy and tsc to validate",
-        "/daily",
-        "journal",
-        Option::<&str>::None,
-        0i64
-    );
-
-    note!(
-        n5,
-        "Research: Personal Knowledge Management",
-        &today_str as &str,
-        "## PKM Systems\n\nExploring different approaches to personal knowledge management:\n\n**Zettelkasten** — atomic notes with bidirectional links. Good for building a long-term knowledge base.\n\n**PARA** — Projects, Areas, Resources, Archives. Great for actionable information.\n\n**Building a Second Brain** — focuses on capture, organize, distill, express.\n\n## FlowDesk's Take\n\nFlowDesk combines all three: notes as atomic units, tasks and plans for action, workspaces for PARA-style organisation.",
-        Option::<&str>::None,
-        "reference",
-        Option::<&str>::None,
-        0i64
-    );
-
-    note!(
-        n6,
-        "Q2 Planning Notes",
-        &today_str as &str,
-        "## Q2 Goals\n\n1. Ship the export improvements (CSV + JSON workspace)\n2. Complete dark mode across all views\n3. Launch the public beta\n\n## Key Milestones\n\n- Apr 1: Feature freeze\n- Apr 15: Beta launch\n- May 1: v1.0 release\n\n## Resource Allocation\n\n- 2 engineers on features\n- 1 engineer on infrastructure\n- Design contractor for the landing page",
-        Option::<&str>::None,
-        "reference",
-        "critical",
-        1i64
-    );
-
-    note!(
-        n7,
-        "UI Component Sketches",
-        &today_str as &str,
-        "## Components in Progress\n\n- **CommandPalette** — fuzzy search overlay, Ctrl+K\n- **KanbanBoard** — drag-and-drop task columns\n- **GraphView** — force-directed graph of entity links\n\n## Design Tokens\n\nUsing CSS custom properties for theming:\n- `--workspace-accent`: primary action color\n- `--workspace-accent-light`: hover states\n- `--workspace-accent-dark`: active states\n\n## Open TODOs\n\n- Add animation on drag-start\n- Mobile-friendly breakpoints",
-        "/projects/alpha",
-        "draft",
-        Option::<&str>::None,
-        0i64
-    );
-
-    note!(
-        n8,
-        "Reading List",
-        &today_str as &str,
-        "## Currently Reading\n\n- *How to Take Smart Notes* — Sönke Ahrens\n- *A Philosophy of Software Design* — John Ousterhout\n\n## To Read\n\n- *Thinking in Systems* — Donella Meadows\n- *The Pragmatic Programmer* — Hunt & Thomas\n- *Staff Engineer* — Will Larson\n\n## Recently Finished\n\n- *Shape Up* — Ryan Singer ⭐⭐⭐⭐⭐\n- *The Manager's Path* — Camille Fournier ⭐⭐⭐⭐",
-        "/personal",
-        "reference",
-        Option::<&str>::None,
-        0i64
-    );
 
     // Note tags
     let note_tag_map: &[(&str, &[&str])] = &[
         (&n1, &["guide", "overview"]),
         (&n2, &["team", "standup"]),
         (&n3, &["architecture", "backend"]),
-        // n4 has no tags
         (&n5, &["research", "pkm"]),
         (&n6, &["planning", "q2"]),
         (&n7, &["design", "ideas"]),
@@ -273,33 +442,6 @@ fn do_seed(conn: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
     // =====================================================================
     // 4. TASKS  (parents before subtask)
     // =====================================================================
-
-    // done tasks
-    let t_setup      = generate_id();
-    let t_schema     = generate_id();
-    let t_editor     = generate_id();
-    let t_release    = generate_id();
-    // in_progress tasks
-    let t_darkmode   = generate_id(); // parent of subtask
-    let t_search_fix = generate_id();
-    let t_refactor   = generate_id();
-    // todo tasks
-    let t_shortcuts  = generate_id();
-    let t_docs       = generate_id();
-    let t_csv        = generate_id();
-    let t_profiling  = generate_id();
-    // inbox tasks
-    let t_prs        = generate_id();
-    let t_deps       = generate_id();
-    let t_macos      = generate_id();
-    // cancelled tasks
-    let t_old_auth   = generate_id();
-    // subtask
-    let t_css_vars   = generate_id();
-
-    // Columns: id, workspace_id, title, description, status, priority, due_date,
-    //          scheduled_date, completed_at, category, color, tags, estimated_mins,
-    //          actual_mins, recurrence, parent_task_id, is_sticky, created_at, updated_at, deleted_at
 
     // done (4)
     conn.execute(
@@ -386,7 +528,7 @@ fn do_seed(conn: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
         rusqlite::params![t_old_auth, ws_id, "Old authentication approach", now, now],
     )?;
 
-    // subtask of "Add dark mode support"
+    // subtask of t_darkmode
     conn.execute(
         "INSERT INTO tasks (id,workspace_id,title,status,priority,tags,parent_task_id,created_at,updated_at,actual_mins)
          VALUES (?1,?2,?3,'todo','medium','[]',?4,?5,?6,0)",
@@ -397,47 +539,31 @@ fn do_seed(conn: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
     // 5. PLANS
     // =====================================================================
 
-    // Columns: id, workspace_id, title, description, start_time, end_time,
-    //          all_day, type, category, color, importance, tags, recurrence,
-    //          created_at, updated_at, deleted_at, status
-
-    let p_deep_work   = generate_id();
-    let p_standup     = generate_id();
-    let p_code_review = generate_id();
-    let p_planning    = generate_id();
-    let p_q2_kickoff  = generate_id();
-    let p_monthly     = generate_id();
-
     conn.execute(
         "INSERT INTO plans (id,workspace_id,title,start_time,end_time,all_day,type,color,tags,status,created_at,updated_at)
          VALUES (?1,?2,?3,?4,?5,0,'time_block','#3b82f6','[\"focus\"]','scheduled',?6,?7)",
         rusqlite::params![p_deep_work, ws_id, "Morning Deep Work", today_09_00, today_11_00, now, now],
     )?;
-
     conn.execute(
         "INSERT INTO plans (id,workspace_id,title,start_time,end_time,all_day,type,color,tags,status,created_at,updated_at)
          VALUES (?1,?2,?3,?4,?5,0,'event','#10b981','[\"team\"]','scheduled',?6,?7)",
         rusqlite::params![p_standup, ws_id, "Team Standup", today_11_00, today_11_30, now, now],
     )?;
-
     conn.execute(
         "INSERT INTO plans (id,workspace_id,title,start_time,end_time,all_day,type,color,tags,status,created_at,updated_at)
          VALUES (?1,?2,?3,?4,?5,0,'time_block','#6366f1','[\"code\"]','scheduled',?6,?7)",
         rusqlite::params![p_code_review, ws_id, "Code Review Session", today_14_00, today_15_30, now, now],
     )?;
-
     conn.execute(
         "INSERT INTO plans (id,workspace_id,title,start_time,end_time,all_day,type,tags,status,created_at,updated_at)
          VALUES (?1,?2,?3,?4,?5,0,'time_block','[]','completed',?6,?7)",
         rusqlite::params![p_planning, ws_id, "Project Planning Session", yesterday_10_00, yesterday_12_00, now, now],
     )?;
-
     conn.execute(
         "INSERT INTO plans (id,workspace_id,title,start_time,end_time,all_day,type,importance,tags,status,created_at,updated_at)
          VALUES (?1,?2,?3,?4,?5,0,'event','high','[]','scheduled',?6,?7)",
         rusqlite::params![p_q2_kickoff, ws_id, "Q2 Kickoff Meeting", today_plus_8_10_00, today_plus_8_11_00, now, now],
     )?;
-
     conn.execute(
         "INSERT INTO plans (id,workspace_id,title,start_time,end_time,all_day,type,tags,status,created_at,updated_at)
          VALUES (?1,?2,?3,?4,?5,1,'daily_plan','[]','scheduled',?6,?7)",
@@ -448,45 +574,41 @@ fn do_seed(conn: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
     // 6. TIME ENTRIES
     // =====================================================================
 
-    // Columns: id, workspace_id, start_time, end_time, pauses, active_mins,
-    //          notes, category, tags, session_notes, linked_plan_id,
-    //          linked_task_id, created_at, updated_at, deleted_at
-
     let te1 = generate_id();
     let te2 = generate_id();
     let te3 = generate_id();
     let te4 = generate_id();
     let te5 = generate_id();
 
-    // Yesterday 09:15 - 11:00 (105 min) — development — linked to t_refactor
+    // Yesterday 09:15–11:00 (105 min) — development — linked to t_refactor task
     conn.execute(
         "INSERT INTO time_entries (id,workspace_id,start_time,end_time,pauses,active_mins,notes,category,tags,session_notes,linked_task_id,created_at,updated_at)
          VALUES (?1,?2,?3,?4,'[]',105,'','development','[]','[]',?5,?6,?7)",
         rusqlite::params![te1, ws_id, yesterday_09_15, yesterday_11_00, t_refactor, now, now],
     )?;
 
-    // Yesterday 14:00 - 14:45 (45 min) — research — no link
+    // Yesterday 14:00–14:45 (45 min) — research — no link
     conn.execute(
         "INSERT INTO time_entries (id,workspace_id,start_time,end_time,pauses,active_mins,notes,category,tags,session_notes,created_at,updated_at)
          VALUES (?1,?2,?3,?4,'[]',45,'','research','[]','[]',?5,?6)",
         rusqlite::params![te2, ws_id, yesterday_14_00, yesterday_14_45, now, now],
     )?;
 
-    // Today 09:00 - 10:55 (115 min) — development — linked to p_deep_work
+    // Today 09:00–10:55 (115 min) — development — linked to p_deep_work plan
     conn.execute(
         "INSERT INTO time_entries (id,workspace_id,start_time,end_time,pauses,active_mins,notes,category,tags,session_notes,linked_plan_id,created_at,updated_at)
          VALUES (?1,?2,?3,?4,'[]',115,'','development','[]','[]',?5,?6,?7)",
         rusqlite::params![te3, ws_id, today_09_00, today_10_55, p_deep_work, now, now],
     )?;
 
-    // Today 11:00 - 11:28 (28 min) — meetings — linked to p_standup
+    // Today 11:00–11:28 (28 min) — meetings — linked to p_standup plan
     conn.execute(
         "INSERT INTO time_entries (id,workspace_id,start_time,end_time,pauses,active_mins,notes,category,tags,session_notes,linked_plan_id,created_at,updated_at)
          VALUES (?1,?2,?3,?4,'[]',28,'','meetings','[]','[]',?5,?6,?7)",
         rusqlite::params![te4, ws_id, today_11_00, today_11_28, p_standup, now, now],
     )?;
 
-    // Today 14:00 - 15:30 (90 min) — code-review — linked to p_code_review
+    // Today 14:00–15:30 (90 min) — code-review — linked to p_code_review plan
     conn.execute(
         "INSERT INTO time_entries (id,workspace_id,start_time,end_time,pauses,active_mins,notes,category,tags,session_notes,linked_plan_id,created_at,updated_at)
          VALUES (?1,?2,?3,?4,'[]',90,'','code-review','[]','[]',?5,?6,?7)",
@@ -497,17 +619,10 @@ fn do_seed(conn: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
     // 7. REFS
     // =====================================================================
 
-    // Columns: id, source_type, source_id, target_type, target_id, target_uri,
-    //          relation, created_at, source_workspace_id, target_workspace_id
-
     let ref_defs: &[(&str, &str, &str, &str, &str)] = &[
-        // note n3 → task t_search_fix
         (&n3, "note", &t_search_fix, "task", "references"),
-        // note n1 → task t_darkmode
-        (&n1, "note", &t_darkmode, "task", "references"),
-        // note n6 → plan p_q2_kickoff
+        (&n1, "note", &t_darkmode,   "task", "references"),
         (&n6, "note", &p_q2_kickoff, "plan", "references"),
-        // task t_darkmode → task t_css_vars (subtask_of)
         (&t_darkmode, "task", &t_css_vars, "task", "subtask_of"),
     ];
 
@@ -518,15 +633,8 @@ fn do_seed(conn: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
                                created_at, source_workspace_id, target_workspace_id)
              VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
             rusqlite::params![
-                ref_id,
-                source_type,
-                source_id,
-                target_type,
-                target_id,
-                relation,
-                now,
-                ws_id,
-                ws_id,
+                ref_id, source_type, source_id, target_type, target_id,
+                relation, now, ws_id, ws_id,
             ],
         )?;
     }
