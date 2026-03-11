@@ -2,6 +2,8 @@ import { useState, useCallback } from "react";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useUIStore } from "../../stores/uiStore";
+import { ColorPresetPicker } from "../../components/shared/ColorPresetPicker";
+import { EmojiPickerPopover } from "../../components/shared/EmojiPickerPopover";
 import type { Workspace } from "../../lib/types";
 
 /** Workspace settings panel for the active workspace's configuration. */
@@ -129,35 +131,8 @@ function GeneralSection({
             className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
           />
         </div>
-        <div className="flex gap-4">
-          <div className="flex-1">
-            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              Icon (emoji)
-            </label>
-            <input
-              type="text"
-              value={icon}
-              onChange={(e) => setIcon(e.target.value)}
-              maxLength={2}
-              placeholder="e.g., an emoji"
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              Accent Color
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="h-8 w-8 cursor-pointer rounded border border-gray-300 dark:border-gray-600"
-              />
-              <span className="text-xs text-gray-400">{color}</span>
-            </div>
-          </div>
-        </div>
+        <EmojiPickerPopover value={icon} onChange={setIcon} />
+        <ColorPresetPicker value={color} onChange={setColor} />
         {isDirty && (
           <div className="flex justify-end">
             <button

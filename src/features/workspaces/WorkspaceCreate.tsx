@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { ColorPresetPicker } from "../../components/shared/ColorPresetPicker";
+import { EmojiPickerPopover } from "../../components/shared/EmojiPickerPopover";
 
 /** Props for the WorkspaceCreate dialog. */
 interface WorkspaceCreateProps {
@@ -85,45 +87,10 @@ export function WorkspaceCreate({ onClose }: WorkspaceCreateProps) {
           </div>
 
           {/* Icon */}
-          <div>
-            <label
-              htmlFor="ws-icon"
-              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Icon (emoji)
-            </label>
-            <input
-              id="ws-icon"
-              type="text"
-              value={icon}
-              onChange={(e) => setIcon(e.target.value)}
-              placeholder="e.g., a single emoji"
-              maxLength={2}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
-            />
-          </div>
+          <EmojiPickerPopover value={icon} onChange={setIcon} />
 
           {/* Accent Color */}
-          <div>
-            <label
-              htmlFor="ws-color"
-              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Accent Color
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                id="ws-color"
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="h-8 w-8 cursor-pointer rounded border border-gray-300 dark:border-gray-600"
-              />
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                {color}
-              </span>
-            </div>
-          </div>
+          <ColorPresetPicker value={color} onChange={setColor} />
 
           {error && (
             <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
