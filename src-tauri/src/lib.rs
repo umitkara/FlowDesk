@@ -237,27 +237,21 @@ fn start_reminder_scheduler(app_handle: tauri::AppHandle, db: Arc<DbPool>) {
 
             if let Ok(fired_reminders) = result {
                 for (reminder, title) in fired_reminders {
-                    // Emit event to frontend
-                    let _ = app_handle.emit("reminder-fired", &reminder);
-
-                    // Fire system notification
-                    let notif_title = format!("Reminder: {}", title);
-                    let notif_body = if reminder.entity_type == "task" {
-                        format!("Task due: {}", title)
-                    } else {
-                        format!("Plan starting: {}", title)
+                    let payload = ReminderFiredPayload {
+                        reminder,
+                        title,
                     };
-
-                    let _ = app_handle
-                        .notification()
-                        .builder()
-                        .title(&notif_title)
-                        .body(&notif_body)
-                        .show();
+                    let _ = app_handle.emit("reminder-fired", &payload);
                 }
             }
         }
     });
+}
+
+#[derive(serde::Serialize, Clone)]
+struct ReminderFiredPayload {
+    reminder: models::reminder::Reminder,
+    title: String,
 }
 
 #[derive(serde::Serialize, Clone)]

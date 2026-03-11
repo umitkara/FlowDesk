@@ -1,13 +1,21 @@
 import { create } from "zustand";
-import type { Reminder, ReminderDefaults } from "../lib/types";
+import type { ReminderDefaults, ReminderFiredPayload } from "../lib/types";
 import * as ipc from "../lib/ipc";
+
+/** A fired reminder with its resolved entity title. */
+export interface FiredReminderEntry {
+  id: string;
+  entityType: "task" | "plan";
+  entityId: string;
+  title: string;
+}
 
 /** State and actions for reminder management. */
 interface ReminderState {
   /** Global reminder defaults. */
   defaults: ReminderDefaults;
   /** Recently fired reminders for in-app display. */
-  firedReminders: Reminder[];
+  firedReminders: FiredReminderEntry[];
 
   /** Loads global reminder defaults. */
   loadDefaults: () => Promise<void>;
@@ -16,7 +24,7 @@ interface ReminderState {
   /** Dismisses a fired reminder. */
   dismissReminder: (reminderId: string) => Promise<void>;
   /** Adds a fired reminder to the in-app list (called by event listener). */
-  addFiredReminder: (reminder: Reminder) => void;
+  addFiredReminder: (payload: ReminderFiredPayload) => void;
   /** Removes a reminder from the in-app fired list. */
   removeFiredReminder: (reminderId: string) => void;
 }
@@ -46,9 +54,15 @@ export const useReminderStore = create<ReminderState>((set) => ({
     }));
   },
 
-  addFiredReminder: (reminder) => {
+  addFiredReminder: (payload) => {
+    const entry: FiredReminderEntry = {
+      id: payload.reminder.id,
+      entityType: payload.reminder.entity_type,
+      entityId: payload.reminder.entity_id,
+      title: payload.title,
+    };
     set((s) => ({
-      firedReminders: [...s.firedReminders, reminder],
+      firedReminders: [...s.firedReminders, entry],
     }));
   },
 

@@ -28,6 +28,7 @@ import { Dashboard } from "../../features/dashboard/Dashboard";
 import { CommandPalette } from "../../features/command-palette/CommandPalette";
 import { QuickCapture } from "../../features/capture/QuickCapture";
 import { BreakNotificationBanner } from "../../features/tracker/BreakNotificationBanner";
+import { ReminderNotificationBanner } from "../../features/reminders/ReminderNotificationBanner";
 import { ExportDialog } from "../../features/export/ExportDialog";
 
 // Lazy-loaded secondary views
@@ -88,6 +89,7 @@ export function AppShell() {
   return (
     <div className="flex h-full flex-col bg-white dark:bg-gray-950">
       {breakNotification && <BreakNotificationBanner />}
+      <ReminderNotificationBanner />
       <TopBar />
 
       <div className="flex flex-1 overflow-hidden">

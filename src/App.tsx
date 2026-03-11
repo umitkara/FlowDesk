@@ -9,7 +9,7 @@ import { useTaskStore } from "./stores/taskStore";
 import { useTrackerStore } from "./stores/trackerStore";
 import { useReminderStore } from "./stores/reminderStore";
 import { useTheme } from "./hooks/useTheme";
-import type { Reminder } from "./lib/types";
+import type { ReminderFiredPayload } from "./lib/types";
 import * as ipc from "./lib/ipc";
 
 /** Root application component. Loads settings, workspaces, and initial data on mount. */
@@ -65,7 +65,7 @@ function App() {
 
   // Listen for reminder-fired events from backend
   useEffect(() => {
-    const unlisten = listen<Reminder>("reminder-fired", (event) => {
+    const unlisten = listen<ReminderFiredPayload>("reminder-fired", (event) => {
       addFiredReminder(event.payload);
     });
     return () => { unlisten.then((fn) => fn()); };
