@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNoteStore } from "../../stores/noteStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { todayISO } from "../../lib/utils";
 
 const DAYS_OF_WEEK = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -11,13 +12,15 @@ export function DailyCalendar() {
   const openDailyNote = useNoteStore((s) => s.openDailyNote);
   const activeNoteDate = useNoteStore((s) => s.activeNote?.date ?? null);
 
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+
   const today = todayISO();
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
 
   useEffect(() => {
     loadDatesWithNotes(year, month);
-  }, [year, month, loadDatesWithNotes]);
+  }, [year, month, activeWorkspaceId, loadDatesWithNotes]);
 
   const handlePrevMonth = useCallback(() => {
     if (month === 1) {
