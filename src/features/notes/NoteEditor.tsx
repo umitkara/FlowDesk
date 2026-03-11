@@ -104,7 +104,26 @@ export function NoteEditor() {
       },
       handleKeyDown: (_view, event) => {
         if (event.key === "Tab") {
+          const ed = editor;
+          if (!ed) return false;
           event.preventDefault();
+          if (event.shiftKey) {
+            // Shift+Tab: lift/outdent list item or decrease heading
+            if (ed.can().liftListItem("listItem")) {
+              ed.chain().liftListItem("listItem").run();
+            } else if (ed.can().liftListItem("taskItem")) {
+              ed.chain().liftListItem("taskItem").run();
+            }
+          } else {
+            // Tab: sink/indent list item, or insert tab character
+            if (ed.can().sinkListItem("listItem")) {
+              ed.chain().sinkListItem("listItem").run();
+            } else if (ed.can().sinkListItem("taskItem")) {
+              ed.chain().sinkListItem("taskItem").run();
+            } else {
+              ed.chain().insertContent("\t").run();
+            }
+          }
           return true;
         }
         return false;
