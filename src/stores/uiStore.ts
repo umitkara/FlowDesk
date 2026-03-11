@@ -3,6 +3,28 @@ import { create } from "zustand";
 /** Active view identifier. */
 export type ActiveView = "notes" | "settings" | "daily" | "trash" | "tasks" | "about" | "plans" | "daily-plan" | "time-reports" | "dashboard" | "workspace-settings" | "faceted-search" | "graph" | "timeline" | "grouped" | "planned-vs-actual" | "templates" | "import-wizard" | "version-history";
 
+/** Views that are secondary (not reachable without sidebar or direct navigation). */
+export const SECONDARY_VIEWS: readonly ActiveView[] = [
+  "settings",
+  "workspace-settings",
+  "about",
+  "trash",
+  "templates",
+  "import-wizard",
+  "faceted-search",
+  "graph",
+  "timeline",
+  "grouped",
+  "planned-vs-actual",
+  "time-reports",
+  "version-history",
+] as const;
+
+/** Returns true if the given view is a secondary view. */
+export function isSecondaryView(view: ActiveView): boolean {
+  return (SECONDARY_VIEWS as readonly string[]).includes(view);
+}
+
 /** Active sidebar section identifier. */
 export type SidebarSection = "folders" | "calendar" | "search";
 
@@ -34,6 +56,8 @@ interface UIState {
   sidebarAutoCollapsed: boolean;
   /** Whether the export dialog is open. */
   showExportDialog: boolean;
+  /** The previous view before navigating to a secondary view. */
+  previousView: ActiveView | null;
 
   /** Toggles sidebar visibility. */
   toggleSidebar: () => void;
@@ -61,6 +85,8 @@ interface UIState {
   setSidebarAutoCollapsed: (collapsed: boolean) => void;
   /** Toggles the export dialog. */
   toggleExportDialog: () => void;
+  /** Navigates back from a secondary view. */
+  goBackView: () => void;
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
@@ -77,12 +103,20 @@ export const useUIStore = create<UIState>((set, get) => ({
   sidebarSecondaryExpanded: false,
   sidebarAutoCollapsed: false,
   showExportDialog: false,
+  previousView: null,
 
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
 
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
 
-  setActiveView: (view) => set({ activeView: view }),
+  setActiveView: (view) => {
+    const current = get().activeView;
+    if (isSecondaryView(view) && current !== view) {
+      set({ activeView: view, previousView: current });
+    } else {
+      set({ activeView: view });
+    }
+  },
 
   navigateTo: (noteId) => {
     const { navigationHistory, historyIndex } = get();
@@ -134,4 +168,9 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   toggleExportDialog: () =>
     set((s) => ({ showExportDialog: !s.showExportDialog })),
+
+  goBackView: () => {
+    const prev = get().previousView ?? "dashboard";
+    set({ activeView: prev, previousView: null });
+  },
 }));

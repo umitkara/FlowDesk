@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useNoteStore } from "../../stores/noteStore";
-import { useUIStore } from "../../stores/uiStore";
+import { useUIStore, isSecondaryView as checkSecondaryView } from "../../stores/uiStore";
 import { FolderTree } from "../../features/notes/FolderTree";
 import { DailyCalendar } from "../../features/notes/DailyCalendar";
 import { PlanMiniCalendar } from "../../features/plans/PlanMiniCalendar";
@@ -12,17 +12,6 @@ const activeClass =
 const inactiveClass =
   "text-gray-600 hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-primary-400 dark:text-gray-400 dark:hover:bg-gray-800";
 
-const SECONDARY_VIEWS = [
-  "time-reports",
-  "planned-vs-actual",
-  "faceted-search",
-  "graph",
-  "timeline",
-  "grouped",
-  "templates",
-  "import-wizard",
-  "trash",
-] as const;
 
 /** Left sidebar with workspace info, primary navigation, and collapsible secondary sections. */
 export function Sidebar() {
@@ -41,7 +30,7 @@ export function Sidebar() {
     loadFolderTree();
   }, [loadFolderTree]);
 
-  const isSecondaryView = (SECONDARY_VIEWS as readonly string[]).includes(activeView);
+  const isSecondaryView = checkSecondaryView(activeView);
   const showSecondary = secondaryExpanded || isSecondaryView;
 
   return (

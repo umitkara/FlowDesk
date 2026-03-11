@@ -1,4 +1,4 @@
-import { useUIStore } from "../../stores/uiStore";
+import { useUIStore, isSecondaryView } from "../../stores/uiStore";
 import { TrackerWidget } from "../../features/tracker/TrackerWidget";
 
 /** Top navigation bar with sidebar toggle, tracker widget, and search trigger. */
@@ -6,6 +6,9 @@ export function TopBar() {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
+  const activeView = useUIStore((s) => s.activeView);
+  const goBackView = useUIStore((s) => s.goBackView);
+  const showBack = isSecondaryView(activeView);
 
   return (
     <div className="flex h-11 flex-shrink-0 items-center justify-between border-b border-gray-200 bg-white px-3 dark:border-gray-800 dark:bg-gray-950" data-tauri-drag-region>
@@ -20,6 +23,18 @@ export function TopBar() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
+        {showBack && (
+          <button
+            onClick={goBackView}
+            className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-1 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+            aria-label="Go back"
+            title="Go back"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
         <span className="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
           FlowDesk
         </span>
