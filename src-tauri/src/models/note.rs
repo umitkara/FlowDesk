@@ -18,7 +18,6 @@ pub struct Note {
     /// User-defined category.
     pub category: Option<String>,
     /// Note type (journal, meeting, technical, draft, reference, etc.).
-    #[serde(rename = "type")]
     pub note_type: Option<String>,
     /// Visual color label.
     pub color: Option<String>,

@@ -19,7 +19,7 @@ export function FrontMatterPanel() {
   const handleFieldCommit = useCallback(
     (field: keyof UpdateNoteInput, value: string) => {
       if (!activeNote) return;
-      updateNote(activeNote.id, { [field]: value || undefined });
+      updateNote(activeNote.id, { [field]: value });
     },
     [activeNote, updateNote],
   );

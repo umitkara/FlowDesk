@@ -58,10 +58,10 @@ export interface UpdateNoteInput {
   date?: string;
   body?: string;
   folder?: string;
-  category?: string;
-  note_type?: string;
-  color?: string;
-  importance?: string;
+  category?: string | null;
+  note_type?: string | null;
+  color?: string | null;
+  importance?: string | null;
   pinned?: boolean;
   front_matter?: Record<string, unknown>;
   tags?: string[];
@@ -1080,6 +1080,12 @@ export interface BacklinkWithContext {
 
 /** Reminder offset type values. */
 export type ReminderOffsetType = "at_time" | "15min_before" | "1hr_before" | "1day_before" | "custom";
+
+/** Payload emitted when a reminder fires (includes entity title for display). */
+export interface ReminderFiredPayload {
+  reminder: Reminder;
+  title: string;
+}
 
 /** A reminder for a task or plan. */
 export interface Reminder {

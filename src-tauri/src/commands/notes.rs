@@ -323,27 +323,32 @@ pub fn update_note(
         }
         if let Some(ref folder) = input.folder {
             set_clauses.push(format!("folder = ?{}", idx));
-            params.push(Box::new(folder.clone()));
+            let val = if folder.is_empty() { None } else { Some(folder.clone()) };
+            params.push(Box::new(val));
             idx += 1;
         }
         if let Some(ref category) = input.category {
             set_clauses.push(format!("category = ?{}", idx));
-            params.push(Box::new(category.clone()));
+            let val = if category.is_empty() { None } else { Some(category.clone()) };
+            params.push(Box::new(val));
             idx += 1;
         }
         if let Some(ref note_type) = input.note_type {
             set_clauses.push(format!("type = ?{}", idx));
-            params.push(Box::new(note_type.clone()));
+            let val = if note_type.is_empty() { None } else { Some(note_type.clone()) };
+            params.push(Box::new(val));
             idx += 1;
         }
         if let Some(ref color) = input.color {
             set_clauses.push(format!("color = ?{}", idx));
-            params.push(Box::new(color.clone()));
+            let val = if color.is_empty() { None } else { Some(color.clone()) };
+            params.push(Box::new(val));
             idx += 1;
         }
         if let Some(ref importance) = input.importance {
             set_clauses.push(format!("importance = ?{}", idx));
-            params.push(Box::new(importance.clone()));
+            let val = if importance.is_empty() { None } else { Some(importance.clone()) };
+            params.push(Box::new(val));
             idx += 1;
         }
         if let Some(pinned) = input.pinned {
