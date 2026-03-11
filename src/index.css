@@ -134,11 +134,49 @@
   }
 
   .tiptap-editor .ProseMirror pre {
-    @apply my-3 overflow-x-auto rounded-lg bg-gray-900 p-4 text-sm text-gray-100;
+    @apply my-0 overflow-x-auto rounded-b-lg bg-gray-900 p-4 text-sm text-gray-100;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
   }
 
   .tiptap-editor .ProseMirror pre code {
     @apply bg-transparent p-0;
+  }
+
+  /* Code block wrapper with toolbar */
+  .code-block-wrapper {
+    @apply relative my-3 rounded-lg overflow-hidden;
+  }
+
+  .code-block-toolbar {
+    @apply flex items-center justify-between bg-gray-800 px-3 py-1.5;
+    border-top-left-radius: 0.5rem;
+    border-top-right-radius: 0.5rem;
+  }
+
+  .code-block-language-select {
+    @apply bg-gray-700 text-gray-300 text-xs rounded px-2 py-0.5 border-none outline-none cursor-pointer;
+    appearance: auto;
+  }
+
+  .code-block-language-select:hover {
+    @apply bg-gray-600 text-gray-200;
+  }
+
+  .code-block-language-select:focus {
+    @apply ring-1 ring-gray-500;
+  }
+
+  .code-block-copy-btn {
+    @apply flex items-center gap-1 text-gray-400 hover:text-gray-200 rounded px-1.5 py-0.5 transition-colors text-xs;
+  }
+
+  .code-block-copy-btn:hover {
+    @apply bg-gray-700;
+  }
+
+  .code-block-copied-text {
+    @apply text-green-400 text-xs font-medium;
   }
 
   /* Syntax highlighting — light theme */
@@ -178,6 +216,53 @@
 
   .tiptap-editor .ProseMirror mark {
     @apply rounded bg-yellow-200 px-0.5 dark:bg-yellow-800;
+  }
+
+  /* Table styles */
+  .tiptap-editor .ProseMirror table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+    overflow: hidden;
+  }
+  .tiptap-editor .ProseMirror table td,
+  .tiptap-editor .ProseMirror table th {
+    border: 1px solid #d1d5db;
+    padding: 0.5rem 0.75rem;
+    min-width: 80px;
+    vertical-align: top;
+    position: relative;
+  }
+  .tiptap-editor .ProseMirror table th {
+    background: #f3f4f6;
+    font-weight: 600;
+  }
+  .dark .tiptap-editor .ProseMirror table td,
+  .dark .tiptap-editor .ProseMirror table th {
+    border-color: #4b5563;
+  }
+  .dark .tiptap-editor .ProseMirror table th {
+    background: #1f2937;
+  }
+  .tiptap-editor .ProseMirror .selectedCell {
+    background: rgba(59, 130, 246, 0.1);
+  }
+  .tiptap-editor .ProseMirror .column-resize-handle {
+    position: absolute;
+    right: -2px;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    cursor: col-resize;
+    background: #3b82f6;
+    z-index: 10;
+  }
+  .tiptap-editor .ProseMirror.resize-cursor {
+    cursor: col-resize;
+  }
+  .tiptap-editor .ProseMirror .tableWrapper {
+    margin: 1rem 0;
+    overflow-x: auto;
   }
 
   /* Inline entity reference chips (@task[id], @note[id], @plan[id]) */

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -7,7 +7,11 @@ import TaskItem from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
 import Typography from "@tiptap/extension-typography";
 import CharacterCount from "@tiptap/extension-character-count";
-import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import { CodeBlockExtension } from "./extensions/CodeBlockExtension";
+import { Table } from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
 import { common, createLowlight } from "lowlight";
 
 const lowlight = createLowlight(common);
@@ -90,7 +94,11 @@ export function NoteEditor() {
       }),
       Typography,
       CharacterCount,
-      CodeBlockLowlight.configure({ lowlight }),
+      CodeBlockExtension.configure({ lowlight }),
+      Table.configure({ resizable: true, HTMLAttributes: { class: "tiptap-table" } }),
+      TableRow,
+      TableCell,
+      TableHeader,
       TaskReferenceExtension,
       SlashCommandExtension,
     ],
@@ -106,6 +114,8 @@ export function NoteEditor() {
         if (event.key === "Tab") {
           const ed = editor;
           if (!ed) return false;
+          // Let Tiptap table extension handle Tab inside tables
+          if (ed.isActive("table")) return false;
           event.preventDefault();
           if (event.shiftKey) {
             // Shift+Tab: lift/outdent list item or decrease heading
@@ -394,6 +404,8 @@ export function NoteEditor() {
             >
               --
             </ToolbarButton>
+            <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
+            <TableMenu editor={editor} />
 
             {/* Timestamp button — only visible when tracker is running */}
             {trackerStatus !== "idle" && (
@@ -510,6 +522,92 @@ function ToolbarButton({
       }`}
     >
       {children}
+    </button>
+  );
+}
+
+/** Table toolbar dropdown menu. */
+function TableMenu({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  if (!editor) return null;
+
+  const inTable = editor.isActive("table");
+
+  const run = (fn: () => void) => {
+    fn();
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <ToolbarButton
+        active={inTable}
+        onClick={() => setOpen(!open)}
+        title="Table"
+      >
+        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M10 3v18M14 3v18M3 6a3 3 0 013-3h12a3 3 0 013 3v12a3 3 0 01-3 3H6a3 3 0 01-3-3V6z" />
+        </svg>
+      </ToolbarButton>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+          {!inTable ? (
+            <DropdownItem
+              label="Insert Table"
+              onClick={() => run(() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run())}
+            />
+          ) : (
+            <>
+              <DropdownItem label="Add Row Before" onClick={() => run(() => editor.chain().focus().addRowBefore().run())} />
+              <DropdownItem label="Add Row After" onClick={() => run(() => editor.chain().focus().addRowAfter().run())} />
+              <DropdownItem label="Add Column Before" onClick={() => run(() => editor.chain().focus().addColumnBefore().run())} />
+              <DropdownItem label="Add Column After" onClick={() => run(() => editor.chain().focus().addColumnAfter().run())} />
+              <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+              <DropdownItem label="Delete Row" onClick={() => run(() => editor.chain().focus().deleteRow().run())} />
+              <DropdownItem label="Delete Column" onClick={() => run(() => editor.chain().focus().deleteColumn().run())} />
+              <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+              <DropdownItem label="Toggle Header Row" onClick={() => run(() => editor.chain().focus().toggleHeaderRow().run())} />
+              <DropdownItem label="Toggle Header Column" onClick={() => run(() => editor.chain().focus().toggleHeaderColumn().run())} />
+              {editor.can().mergeCells() && (
+                <DropdownItem label="Merge Cells" onClick={() => run(() => editor.chain().focus().mergeCells().run())} />
+              )}
+              {editor.can().splitCell() && (
+                <DropdownItem label="Split Cell" onClick={() => run(() => editor.chain().focus().splitCell().run())} />
+              )}
+              <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+              <DropdownItem label="Delete Table" danger onClick={() => run(() => editor.chain().focus().deleteTable().run())} />
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DropdownItem({ label, onClick, danger }: { label: string; onClick: () => void; danger?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full px-3 py-1.5 text-left text-xs ${
+        danger
+          ? "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+          : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+      }`}
+    >
+      {label}
     </button>
   );
 }

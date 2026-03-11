@@ -18,6 +18,11 @@ const COMMANDS: Omit<SlashCommandItem, "title">[] = [
     label: "Subtask",
     description: "Create a subtask under an existing task",
   },
+  {
+    id: "table",
+    label: "Table",
+    description: "Insert a 3\u00d73 table with header row",
+  },
 ];
 
 export const SlashCommandExtension = Extension.create({
@@ -48,6 +53,11 @@ export const SlashCommandExtension = Extension.create({
           };
           // Always clean up the typed slash command text first
           editor.chain().focus().deleteRange(range).run();
+          // Handle table insertion
+          if (item.id === "table") {
+            editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+            return;
+          }
           // Then insert the reference chip if a task was created
           if (item.taskId) {
             editor

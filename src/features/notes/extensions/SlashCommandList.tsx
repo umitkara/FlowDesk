@@ -80,6 +80,10 @@ export const SlashCommandList = forwardRef<
 
   const handleCommandSelect = useCallback(
     (item: SlashCommandItem) => {
+      if (item.id === "table") {
+        command(item);
+        return;
+      }
       if (item.title.trim()) {
         // Title provided inline — proceed directly
         if (item.id === "subtask") {
