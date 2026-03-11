@@ -1,5 +1,7 @@
 /// Activity log query commands.
 pub mod activity;
+/// Demo workspace seed command.
+pub mod demo;
 /// Global hotkey management.
 pub mod hotkey;
 /// Import commands for markdown, Obsidian, and CSV.

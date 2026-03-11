@@ -772,6 +772,8 @@ pub fn run() {
             commands::settings::update_version_history_config,
             // Global Hotkey
             commands::hotkey::update_global_hotkey,
+            // Demo
+            commands::demo::seed_demo_workspace,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

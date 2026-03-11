@@ -810,3 +810,9 @@ export const updateVersionHistoryConfig = (config: VersionHistoryConfig) =>
 /** Updates the global hotkey binding. */
 export const updateGlobalHotkey = (hotkey: string) =>
   invoke<void>("update_global_hotkey", { hotkey });
+
+// --- Demo ---
+
+/** Seeds the FlowDesk Demo workspace and returns its new workspace ID. */
+export const seedDemoWorkspace = (): Promise<string> =>
+  invoke<string>("seed_demo_workspace");

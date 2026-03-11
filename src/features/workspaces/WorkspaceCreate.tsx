@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { ColorPresetPicker } from "../../components/shared/ColorPresetPicker";
 import { EmojiPickerPopover } from "../../components/shared/EmojiPickerPopover";
+import * as ipc from "../../lib/ipc";
 
 /** Props for the WorkspaceCreate dialog. */
 interface WorkspaceCreateProps {
@@ -21,6 +22,7 @@ function slugify(name: string): string {
 export function WorkspaceCreate({ onClose }: WorkspaceCreateProps) {
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
   const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
+  const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
 
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("");
@@ -110,6 +112,29 @@ export function WorkspaceCreate({ onClose }: WorkspaceCreateProps) {
               className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSubmitting ? "Creating..." : "Create"}
+            </button>
+          </div>
+          <div className="flex justify-center pt-1">
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={async () => {
+                setIsSubmitting(true);
+                setError(null);
+                try {
+                  const id = await ipc.seedDemoWorkspace();
+                  await loadWorkspaces();
+                  await setActiveWorkspace(id);
+                  onClose();
+                } catch (err) {
+                  setError(String(err));
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+              className="text-xs text-gray-400 hover:text-gray-600 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-500 dark:hover:text-gray-300"
+            >
+              or load a demo workspace
             </button>
           </div>
         </form>
