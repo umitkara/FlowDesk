@@ -26,6 +26,7 @@ import { VersionHistory } from "./VersionHistory";
 import { timeAgo } from "../../lib/utils";
 import { TaskReferenceExtension, preprocessEntityRefs } from "./extensions/TaskReferenceExtension";
 import { SlashCommandExtension } from "./extensions/SlashCommandExtension";
+import { handleMarkdownPaste } from "./extensions/markdownPasteHandler";
 import { syncNoteReferences, getVersionHistoryConfig, exportNotesMarkdown } from "../../lib/ipc";
 import { open } from "@tauri-apps/plugin-dialog";
 import { MoveToWorkspaceMenu } from "../../components/shared/MoveToWorkspaceMenu";
@@ -50,6 +51,7 @@ export function NoteEditor() {
 
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [localTitle, setLocalTitle] = useState(activeNote?.title ?? "");
+  const [inTable, setInTable] = useState(false);
   const { scheduleSnapshot } = useVersionHistory(activeNote?.id ?? "");
   const [vhConfig, setVhConfig] = useState({ enabled: true, snapshot_debounce_secs: 5 });
 
@@ -65,6 +67,7 @@ export function NoteEditor() {
   }, [activeNote?.id]);
 
   const delayMs = Math.max(200, Math.min(5000, parseInt(debounceMs, 10) || 1000));
+  const editorRef = useRef<import("@tiptap/core").Editor | null>(null);
 
   const debouncedSave = useDebounce((body: string) => {
     if (activeNote) {
@@ -138,8 +141,24 @@ export function NoteEditor() {
         }
         return false;
       },
+      handlePaste: (_view, event) => {
+        return handleMarkdownPaste(editorRef.current, event);
+      },
     },
   });
+  editorRef.current = editor;
+
+  // Track inTable state via selectionUpdate/transaction (decoupled from mouse events)
+  useEffect(() => {
+    if (!editor) return;
+    const update = () => setInTable(editor.isActive("table"));
+    editor.on("selectionUpdate", update);
+    editor.on("transaction", update);
+    return () => {
+      editor.off("selectionUpdate", update);
+      editor.off("transaction", update);
+    };
+  }, [editor]);
 
   // Sync editor content when switching notes
   useEffect(() => {
@@ -405,7 +424,7 @@ export function NoteEditor() {
               --
             </ToolbarButton>
             <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
-            <TableMenu editor={editor} />
+            <TableMenu editor={editor} inTable={inTable} />
 
             {/* Timestamp button — only visible when tracker is running */}
             {trackerStatus !== "idle" && (
@@ -464,6 +483,9 @@ export function NoteEditor() {
             </ToolbarButton>
           </div>
         )}
+
+        {/* Table Actions Bar — visible only when cursor is inside a table */}
+        {inTable && editor && <TableActionsBar editor={editor} />}
 
         {/* Editor content — font size applied via CSS variable */}
         <div
@@ -530,9 +552,8 @@ function ToolbarButton({
 }
 
 /** Table toolbar dropdown menu. */
-function TableMenu({ editor }: { editor: ReturnType<typeof useEditor> }) {
+function TableMenu({ editor, inTable }: { editor: ReturnType<typeof useEditor>; inTable: boolean }) {
   const [open, setOpen] = useState(false);
-  const [wasInTable, setWasInTable] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -548,18 +569,9 @@ function TableMenu({ editor }: { editor: ReturnType<typeof useEditor> }) {
 
   if (!editor) return null;
 
-  const inTable = open ? wasInTable : editor.isActive("table");
-
   const run = (fn: () => void) => {
     fn();
     setOpen(false);
-  };
-
-  const toggle = () => {
-    if (!open) {
-      setWasInTable(editor.isActive("table"));
-    }
-    setOpen(!open);
   };
 
   return (
@@ -567,7 +579,7 @@ function TableMenu({ editor }: { editor: ReturnType<typeof useEditor> }) {
       <ToolbarButton
         active={inTable}
         onMouseDown={(e) => e.preventDefault()}
-        onClick={toggle}
+        onClick={() => setOpen(!open)}
         title="Table"
       >
         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -605,6 +617,41 @@ function TableMenu({ editor }: { editor: ReturnType<typeof useEditor> }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Contextual action bar shown when cursor is inside a table. */
+function TableActionsBar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  if (!editor) return null;
+  const btn = (label: string, cmd: () => void, danger = false) => (
+    <button
+      key={label}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => { editor.chain().focus(); cmd(); }}
+      className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+        danger
+          ? "text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30"
+          : "text-blue-700 hover:bg-blue-100 dark:text-blue-300 dark:hover:bg-blue-900/30"
+      }`}
+    >
+      {label}
+    </button>
+  );
+  const sep = (key: string) => <div key={key} className="mx-1 h-4 w-px bg-blue-200 dark:bg-blue-800" />;
+
+  return (
+    <div className="flex flex-shrink-0 items-center gap-0.5 border-b border-blue-200 bg-blue-50 px-4 py-1 dark:border-blue-900 dark:bg-blue-950/30">
+      <span className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-blue-400 dark:text-blue-600">Table</span>
+      {btn("+ Row ↑", () => editor.chain().addRowBefore().run())}
+      {btn("+ Row ↓", () => editor.chain().addRowAfter().run())}
+      {btn("✕ Row", () => editor.chain().deleteRow().run(), true)}
+      {sep("s1")}
+      {btn("+ Col ←", () => editor.chain().addColumnBefore().run())}
+      {btn("+ Col →", () => editor.chain().addColumnAfter().run())}
+      {btn("✕ Col", () => editor.chain().deleteColumn().run(), true)}
+      {sep("s2")}
+      {btn("Delete Table", () => editor.chain().deleteTable().run(), true)}
     </div>
   );
 }

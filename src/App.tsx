@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { AppShell } from "./components/layout/AppShell";
+import { ErrorBoundary } from "./components/shared/ErrorBoundary";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useWorkspaceStore } from "./stores/workspaceStore";
 import { useNoteStore } from "./stores/noteStore";
@@ -137,7 +138,11 @@ function App() {
     );
   }
 
-  return <AppShell />;
+  return (
+    <ErrorBoundary>
+      <AppShell />
+    </ErrorBoundary>
+  );
 }
 
 export default App;
