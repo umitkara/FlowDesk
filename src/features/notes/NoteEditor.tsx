@@ -504,16 +504,19 @@ function ToolbarButton({
   children,
   active,
   onClick,
+  onMouseDown,
   title,
 }: {
   children: React.ReactNode;
   active: boolean;
   onClick: () => void;
+  onMouseDown?: (e: React.MouseEvent) => void;
   title: string;
 }) {
   return (
     <button
       onClick={onClick}
+      onMouseDown={onMouseDown}
       title={title}
       className={`rounded px-1.5 py-1 text-xs font-medium transition-colors ${
         active
@@ -529,6 +532,7 @@ function ToolbarButton({
 /** Table toolbar dropdown menu. */
 function TableMenu({ editor }: { editor: ReturnType<typeof useEditor> }) {
   const [open, setOpen] = useState(false);
+  const [wasInTable, setWasInTable] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -544,18 +548,26 @@ function TableMenu({ editor }: { editor: ReturnType<typeof useEditor> }) {
 
   if (!editor) return null;
 
-  const inTable = editor.isActive("table");
+  const inTable = open ? wasInTable : editor.isActive("table");
 
   const run = (fn: () => void) => {
     fn();
     setOpen(false);
   };
 
+  const toggle = () => {
+    if (!open) {
+      setWasInTable(editor.isActive("table"));
+    }
+    setOpen(!open);
+  };
+
   return (
     <div className="relative" ref={menuRef}>
       <ToolbarButton
         active={inTable}
-        onClick={() => setOpen(!open)}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={toggle}
         title="Table"
       >
         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -600,6 +612,7 @@ function TableMenu({ editor }: { editor: ReturnType<typeof useEditor> }) {
 function DropdownItem({ label, onClick, danger }: { label: string; onClick: () => void; danger?: boolean }) {
   return (
     <button
+      onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       className={`w-full px-3 py-1.5 text-left text-xs ${
         danger
