@@ -2,7 +2,7 @@
 
 FlowDesk is a local-first desktop productivity app for managing notes, tasks, plans, and time tracking in a single interface. It runs entirely on your machine with no account, no cloud sync, and no external dependencies at runtime.
 
-Current version: v0.8.22 (pre-1.0). There are no automated tests yet. The app is Windows-first; macOS and Linux builds are untested.
+Current version: v0.8.22 (pre-1.0). There are no automated tests yet. The app is Windows-first; macOS and Linux builds are CI-compiled but untested on real hardware.
 
 ---
 
@@ -108,6 +108,25 @@ FlowDesk keeps all of it in one place, on your machine, connected:
 
 On Windows, the Tauri build also requires the WebView2 runtime (included with Windows 11) and either the MSVC or GNU toolchain.
 
+On **macOS**, Xcode Command Line Tools are required (`xcode-select --install`). For Apple Silicon, add the `aarch64-apple-darwin` Rust target (`rustup target add aarch64-apple-darwin`). For Intel, add `x86_64-apple-darwin` instead.
+
+> **macOS caution:** macOS builds are CI-compiled but not tested on real hardware. System tray behavior, global hotkeys (Ctrl+Shift+Space, Ctrl+K), and the WebView2-equivalent (WKWebView) may behave differently. The app has not been code-signed or notarized, so Gatekeeper will block it on first launch — right-click → Open to bypass.
+
+On **Linux** (Ubuntu/Debian), install the required system libraries before building:
+
+```sh
+sudo apt-get install -y \
+  libwebkit2gtk-4.1-dev \
+  libappindicator3-dev \
+  librsvg2-dev \
+  patchelf \
+  libgtk-3-dev \
+  libsoup-3.0-dev \
+  libjavascriptcoregtk-4.1-dev
+```
+
+> **Linux caution:** Linux builds are CI-compiled but not tested on real hardware. The system tray requires a compatible tray host (e.g., GNOME with AppIndicator extension, KDE, or XFCE). Global hotkeys may not register in all desktop environments. The `libwebkit2gtk-4.1` version requirement means Ubuntu 22.04 or later (or equivalent).
+
 ### Steps
 
 ```sh
@@ -135,6 +154,8 @@ The release binary and installer are written to `src-tauri/target/release/bundle
 FlowDesk stores all data in a SQLite database at:
 
 - Windows: `%APPDATA%\FlowDesk\flowdesk.db` (typically `C:\Users\<name>\AppData\Roaming\FlowDesk\`)
+- macOS: `~/Library/Application Support/FlowDesk/flowdesk.db`
+- Linux: `~/.local/share/FlowDesk/flowdesk.db`
 
 Note templates are stored as Markdown files in the same directory under `templates/`.
 
