@@ -237,6 +237,13 @@ fn start_reminder_scheduler(app_handle: tauri::AppHandle, db: Arc<DbPool>) {
 
             if let Ok(fired_reminders) = result {
                 for (reminder, title) in fired_reminders {
+                    let body = format!("{} reminder is due", reminder.entity_type);
+                    let _ = app_handle
+                        .notification()
+                        .builder()
+                        .title(&title)
+                        .body(&body)
+                        .show();
                     let payload = ReminderFiredPayload {
                         reminder,
                         title,
@@ -774,6 +781,9 @@ pub fn run() {
             commands::hotkey::update_global_hotkey,
             // Demo
             commands::demo::seed_demo_workspace,
+            // Dev Tools (debug builds only)
+            #[cfg(debug_assertions)]
+            commands::dev::dev_fire_reminder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
