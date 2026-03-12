@@ -87,6 +87,23 @@
 }
 
 @layer components {
+  /* Tiptap toolbar */
+  .tiptap-toolbar {
+    @apply gap-0.5;
+  }
+
+  .tiptap-toolbar-group {
+    @apply flex items-center gap-0.5;
+  }
+
+  .tiptap-toolbar .tiptap-separator {
+    @apply mx-1 h-5 w-px flex-shrink-0 bg-gray-200 dark:bg-gray-700;
+  }
+
+  .tiptap-button {
+    @apply flex items-center justify-center;
+  }
+
   /* Tiptap editor styles */
   .tiptap-editor .ProseMirror {
     @apply min-h-[200px] outline-none;
@@ -127,6 +144,15 @@
 
   .tiptap-editor .ProseMirror ul[data-type="taskList"] li label {
     @apply mt-0.5;
+  }
+
+  .tiptap-editor .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+    @apply line-through text-gray-400 dark:text-gray-500;
+  }
+
+  /* Standalone markdown: ~~strikethrough~~ renders as <del> */
+  del, s {
+    @apply line-through text-gray-400 dark:text-gray-500;
   }
 
   .tiptap-editor .ProseMirror code {

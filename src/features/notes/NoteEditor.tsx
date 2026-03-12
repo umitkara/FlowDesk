@@ -320,167 +320,172 @@ export function NoteEditor() {
 
         {/* Toolbar */}
         {editor && (
-          <div className="flex flex-shrink-0 items-center gap-0.5 border-b border-gray-200 px-4 py-1.5 dark:border-gray-800">
-            <ToolbarButton
-              active={editor.isActive("bold")}
-              onClick={() => editor.chain().focus().toggleBold().run()}
-              title="Bold (Ctrl+B)"
-            >
-              <strong>B</strong>
-            </ToolbarButton>
-            <ToolbarButton
-              active={editor.isActive("italic")}
-              onClick={() => editor.chain().focus().toggleItalic().run()}
-              title="Italic (Ctrl+I)"
-            >
-              <em>I</em>
-            </ToolbarButton>
-            <ToolbarButton
-              active={editor.isActive("strike")}
-              onClick={() => editor.chain().focus().toggleStrike().run()}
-              title="Strikethrough"
-            >
-              <s>S</s>
-            </ToolbarButton>
-            <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
-            <ToolbarButton
-              active={editor.isActive("heading", { level: 1 })}
-              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-              title="Heading 1"
-            >
-              H1
-            </ToolbarButton>
-            <ToolbarButton
-              active={editor.isActive("heading", { level: 2 })}
-              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-              title="Heading 2"
-            >
-              H2
-            </ToolbarButton>
-            <ToolbarButton
-              active={editor.isActive("heading", { level: 3 })}
-              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-              title="Heading 3"
-            >
-              H3
-            </ToolbarButton>
-            <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
-            <ToolbarButton
-              active={editor.isActive("bulletList")}
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
-              title="Bullet List"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </ToolbarButton>
-            <ToolbarButton
-              active={editor.isActive("orderedList")}
-              onClick={() => editor.chain().focus().toggleOrderedList().run()}
-              title="Ordered List"
-            >
-              <span className="text-xs">1.</span>
-            </ToolbarButton>
-            <ToolbarButton
-              active={editor.isActive("taskList")}
-              onClick={() => editor.chain().focus().toggleTaskList().run()}
-              title="Task List"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-            </ToolbarButton>
-            <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
-            <ToolbarButton
-              active={editor.isActive("blockquote")}
-              onClick={() => editor.chain().focus().toggleBlockquote().run()}
-              title="Blockquote"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
-            </ToolbarButton>
-            <ToolbarButton
-              active={editor.isActive("code")}
-              onClick={() => editor.chain().focus().toggleCode().run()}
-              title="Inline Code"
-            >
-              {"</>"}
-            </ToolbarButton>
-            <ToolbarButton
-              active={editor.isActive("codeBlock")}
-              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-              title="Code Block"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-              </svg>
-            </ToolbarButton>
-            <ToolbarButton
-              active={false}
-              onClick={() => editor.chain().focus().setHorizontalRule().run()}
-              title="Horizontal Rule"
-            >
-              --
-            </ToolbarButton>
-            <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
-            <TableMenu editor={editor} inTable={inTable} />
+          <div role="toolbar" aria-label="Formatting toolbar" className="tiptap-toolbar flex flex-shrink-0 items-center border-b border-gray-200 px-2 py-1 dark:border-gray-800">
+            {/* Undo / Redo */}
+            <div role="group" className="tiptap-toolbar-group">
+              <ToolbarButton
+                active={false}
+                disabled={!editor.can().undo()}
+                onClick={() => editor.chain().focus().undo().run()}
+                title="Undo (Ctrl+Z)"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7v6h6" /><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton
+                active={false}
+                disabled={!editor.can().redo()}
+                onClick={() => editor.chain().focus().redo().run()}
+                title="Redo (Ctrl+Y)"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 7v6h-6" /><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3L21 13" />
+                </svg>
+              </ToolbarButton>
+            </div>
+
+            <div className="tiptap-separator" role="none" />
+
+            {/* Block type: Headings, Lists, Blockquote, Code Block */}
+            <div role="group" className="tiptap-toolbar-group">
+              <HeadingDropdown editor={editor} />
+              <ListDropdown editor={editor} />
+              <ToolbarButton
+                active={editor.isActive("blockquote")}
+                onClick={() => editor.chain().focus().toggleBlockquote().run()}
+                title="Blockquote"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" />
+                  <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton
+                active={editor.isActive("codeBlock")}
+                onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+                title="Code Block"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+                </svg>
+              </ToolbarButton>
+            </div>
+
+            <div className="tiptap-separator" role="none" />
+
+            {/* Inline formatting: Bold, Italic, Strike, Code, Link */}
+            <div role="group" className="tiptap-toolbar-group">
+              <ToolbarButton
+                active={editor.isActive("bold")}
+                onClick={() => editor.chain().focus().toggleBold().run()}
+                title="Bold (Ctrl+B)"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z" /><path d="M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton
+                active={editor.isActive("italic")}
+                onClick={() => editor.chain().focus().toggleItalic().run()}
+                title="Italic (Ctrl+I)"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="19" y1="4" x2="10" y2="4" /><line x1="14" y1="20" x2="5" y2="20" /><line x1="15" y1="4" x2="9" y2="20" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton
+                active={editor.isActive("strike")}
+                onClick={() => editor.chain().focus().toggleStrike().run()}
+                title="Strikethrough"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 4H9a3 3 0 00-2.83 4" /><path d="M14 12a4 4 0 010 8H6" /><line x1="4" y1="12" x2="20" y2="12" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton
+                active={editor.isActive("code")}
+                onClick={() => editor.chain().focus().toggleCode().run()}
+                title="Inline Code"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+                  <line x1="10" y1="2" x2="14" y2="22" opacity={0.4} />
+                </svg>
+              </ToolbarButton>
+              <LinkButton editor={editor} />
+            </div>
+
+            <div className="tiptap-separator" role="none" />
+
+            {/* Horizontal Rule + Table */}
+            <div role="group" className="tiptap-toolbar-group">
+              <ToolbarButton
+                active={false}
+                onClick={() => editor.chain().focus().setHorizontalRule().run()}
+                title="Horizontal Rule"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                </svg>
+              </ToolbarButton>
+              <TableMenu editor={editor} inTable={inTable} />
+            </div>
 
             {/* Timestamp button — only visible when tracker is running */}
             {trackerStatus !== "idle" && (
               <>
-                <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
-                <ToolbarButton
-                  active={false}
-                  onClick={insertTimestamp}
-                  title="Insert Timestamp (Ctrl+Shift+T)"
-                >
-                  <span className="flex items-center gap-0.5">
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <circle cx="12" cy="12" r="10" strokeWidth={2} />
-                      <path strokeLinecap="round" strokeWidth={2} d="M12 6v6l4 2" />
+                <div className="tiptap-separator" role="none" />
+                <div role="group" className="tiptap-toolbar-group">
+                  <ToolbarButton
+                    active={false}
+                    onClick={insertTimestamp}
+                    title="Insert Timestamp (Ctrl+Shift+T)"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                     </svg>
-                  </span>
-                </ToolbarButton>
+                  </ToolbarButton>
+                </div>
               </>
             )}
 
             {/* Spacer */}
             <div className="flex-1" />
 
-            {/* Version History button */}
-            <ToolbarButton
-              active={versionHistoryOpen}
-              onClick={() => setVersionHistoryOpen(!versionHistoryOpen)}
-              title="Version History"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </ToolbarButton>
-
-            {/* Export note button */}
-            <ToolbarButton
-              active={false}
-              onClick={async () => {
-                if (!activeNote) return;
-                const dir = await open({ directory: true, title: "Export note to..." });
-                if (typeof dir === "string") {
-                  await exportNotesMarkdown({
-                    workspace_id: activeNote.workspace_id,
-                    output_dir: dir,
-                    note_ids: [activeNote.id],
-                    include_front_matter: true,
-                    flatten_folders: true,
-                  });
-                }
-              }}
-              title="Export Note as Markdown"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </ToolbarButton>
+            {/* Version History + Export */}
+            <div role="group" className="tiptap-toolbar-group">
+              <ToolbarButton
+                active={versionHistoryOpen}
+                onClick={() => setVersionHistoryOpen(!versionHistoryOpen)}
+                title="Version History"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton
+                active={false}
+                onClick={async () => {
+                  if (!activeNote) return;
+                  const dir = await open({ directory: true, title: "Export note to..." });
+                  if (typeof dir === "string") {
+                    await exportNotesMarkdown({
+                      workspace_id: activeNote.workspace_id,
+                      output_dir: dir,
+                      note_ids: [activeNote.id],
+                      include_front_matter: true,
+                      flatten_folders: true,
+                    });
+                  }
+                }}
+                title="Export Note as Markdown"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </ToolbarButton>
+            </div>
           </div>
         )}
 
@@ -525,12 +530,14 @@ export function NoteEditor() {
 function ToolbarButton({
   children,
   active,
+  disabled,
   onClick,
   onMouseDown,
   title,
 }: {
   children: React.ReactNode;
   active: boolean;
+  disabled?: boolean;
   onClick: () => void;
   onMouseDown?: (e: React.MouseEvent) => void;
   title: string;
@@ -540,14 +547,215 @@ function ToolbarButton({
       onClick={onClick}
       onMouseDown={onMouseDown}
       title={title}
-      className={`rounded px-1.5 py-1 text-xs font-medium transition-colors ${
-        active
-          ? "bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
-          : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+      disabled={disabled}
+      aria-pressed={active}
+      aria-label={title}
+      className={`tiptap-button rounded-md p-1.5 transition-colors ${
+        disabled
+          ? "cursor-not-allowed text-gray-300 dark:text-gray-600"
+          : active
+            ? "bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+            : "text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
       }`}
     >
       {children}
     </button>
+  );
+}
+
+/** Heading level dropdown. */
+function HeadingDropdown({ editor }: { editor: NonNullable<ReturnType<typeof useEditor>> }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const isHeading = editor.isActive("heading");
+  const currentLevel = isHeading
+    ? ([1, 2, 3] as const).find((l) => editor.isActive("heading", { level: l }))
+    : null;
+
+  const label = currentLevel ? `H${currentLevel}` : "T";
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        onMouseDown={(e) => e.preventDefault()}
+        title="Text style"
+        aria-label="Format text as heading"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={`tiptap-button flex items-center gap-0.5 rounded-md px-1.5 py-1.5 transition-colors ${
+          isHeading
+            ? "bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+            : "text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+        }`}
+      >
+        <span className="text-xs font-semibold leading-none">{label}</span>
+        <svg className="h-3 w-3 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 min-w-[140px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+          <DropdownItem
+            label="Normal text"
+            active={!isHeading}
+            onClick={() => { editor.chain().focus().setParagraph().run(); setOpen(false); }}
+          />
+          {([1, 2, 3] as const).map((level) => (
+            <DropdownItem
+              key={level}
+              label={`Heading ${level}`}
+              active={editor.isActive("heading", { level })}
+              onClick={() => { editor.chain().focus().toggleHeading({ level }).run(); setOpen(false); }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** List type dropdown. */
+function ListDropdown({ editor }: { editor: NonNullable<ReturnType<typeof useEditor>> }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const isList = editor.isActive("bulletList") || editor.isActive("orderedList") || editor.isActive("taskList");
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        onMouseDown={(e) => e.preventDefault()}
+        title="List options"
+        aria-label="List options"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={`tiptap-button flex items-center gap-0.5 rounded-md px-1.5 py-1.5 transition-colors ${
+          isList
+            ? "bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+            : "text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+        }`}
+      >
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+        </svg>
+        <svg className="h-3 w-3 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+          <DropdownItem
+            label="Bullet List"
+            active={editor.isActive("bulletList")}
+            onClick={() => { editor.chain().focus().toggleBulletList().run(); setOpen(false); }}
+          />
+          <DropdownItem
+            label="Ordered List"
+            active={editor.isActive("orderedList")}
+            onClick={() => { editor.chain().focus().toggleOrderedList().run(); setOpen(false); }}
+          />
+          <DropdownItem
+            label="Task List"
+            active={editor.isActive("taskList")}
+            onClick={() => { editor.chain().focus().toggleTaskList().run(); setOpen(false); }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Link toggle button with URL input popover. */
+function LinkButton({ editor }: { editor: NonNullable<ReturnType<typeof useEditor>> }) {
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      const existing = editor.getAttributes("link").href || "";
+      setUrl(existing);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [open, editor]);
+
+  const isActive = editor.isActive("link");
+
+  const apply = () => {
+    if (url.trim()) {
+      editor.chain().focus().extendMarkRange("link").setLink({ href: url.trim() }).run();
+    } else {
+      editor.chain().focus().extendMarkRange("link").unsetLink().run();
+    }
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <ToolbarButton
+        active={isActive}
+        onClick={() => setOpen(!open)}
+        title="Link (Ctrl+K)"
+      >
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+        </svg>
+      </ToolbarButton>
+      {open && (
+        <div className="absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded-lg border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+          <div className="flex items-center gap-1.5">
+            <input
+              ref={inputRef}
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") apply(); if (e.key === "Escape") setOpen(false); }}
+              placeholder="https://..."
+              className="w-48 rounded border border-gray-300 bg-transparent px-2 py-1 text-xs outline-none focus:border-primary-500 dark:border-gray-600"
+            />
+            <button
+              onClick={apply}
+              className="rounded bg-primary-600 px-2 py-1 text-xs font-medium text-white hover:bg-primary-700"
+            >
+              {url.trim() ? "Apply" : "Remove"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -656,7 +864,7 @@ function TableActionsBar({ editor }: { editor: ReturnType<typeof useEditor> }) {
   );
 }
 
-function DropdownItem({ label, onClick, danger }: { label: string; onClick: () => void; danger?: boolean }) {
+function DropdownItem({ label, onClick, danger, active }: { label: string; onClick: () => void; danger?: boolean; active?: boolean }) {
   return (
     <button
       onMouseDown={(e) => e.preventDefault()}
@@ -664,7 +872,9 @@ function DropdownItem({ label, onClick, danger }: { label: string; onClick: () =
       className={`w-full px-3 py-1.5 text-left text-xs ${
         danger
           ? "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-          : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+          : active
+            ? "bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/20 dark:text-primary-300"
+            : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
       }`}
     >
       {label}
