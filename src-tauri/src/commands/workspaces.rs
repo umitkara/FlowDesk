@@ -127,24 +127,38 @@ pub fn create_workspace(
 
     let id = generate_id();
     let now = now_iso();
-    let slug = slugify(&name);
+    let base_slug = slugify(&name);
     let config = input.config.unwrap_or_default();
     let config_json = serde_json::to_string(&config).map_err(AppError::Serialization)?;
 
     state
         .db
         .with_conn(|conn| {
-            // Check slug uniqueness
-            let exists: bool = conn.query_row(
-                "SELECT COUNT(*) > 0 FROM workspaces WHERE slug = ?1 AND deleted_at IS NULL",
-                [&slug],
-                |row| row.get(0),
-            )?;
-            if exists {
-                return Err(rusqlite::Error::ToSqlConversionFailure(Box::new(
-                    std::io::Error::other("WORKSPACE_SLUG_CONFLICT"),
-                )));
-            }
+            // Find a unique slug by incrementing (base, base-2, base-3, ...)
+            let slug = {
+                let exists: bool = conn.query_row(
+                    "SELECT COUNT(*) > 0 FROM workspaces WHERE slug = ?1 AND deleted_at IS NULL",
+                    [&base_slug],
+                    |row| row.get(0),
+                )?;
+                if !exists {
+                    base_slug.clone()
+                } else {
+                    let mut counter: u32 = 2;
+                    loop {
+                        let candidate = format!("{}-{}", base_slug, counter);
+                        let taken: bool = conn.query_row(
+                            "SELECT COUNT(*) > 0 FROM workspaces WHERE slug = ?1 AND deleted_at IS NULL",
+                            [&candidate],
+                            |row| row.get(0),
+                        )?;
+                        if !taken {
+                            break candidate;
+                        }
+                        counter += 1;
+                    }
+                }
+            };
 
             // Next sort_order
             let next_order: i32 = conn.query_row(
@@ -173,14 +187,7 @@ pub fn create_workspace(
             )?;
             Ok(())
         })
-        .map_err(|e| {
-            let msg = e.to_string();
-            if msg.contains("WORKSPACE_SLUG_CONFLICT") {
-                AppError::Validation(format!("A workspace with slug '{}' already exists", slug))
-            } else {
-                AppError::Database(e)
-            }
-        })?;
+        .map_err(AppError::Database)?;
 
     state
         .db
