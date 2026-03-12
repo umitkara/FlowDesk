@@ -288,6 +288,26 @@ export function Sidebar() {
                 Trash
               </button>
             </div>
+
+            {/* Developer section (dev builds only) */}
+            {import.meta.env.DEV && (
+              <div className="space-y-0.5 border-b border-amber-200 bg-amber-50/50 px-2 py-2 dark:border-amber-800/30 dark:bg-amber-900/5">
+                <div className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-amber-500 dark:text-amber-600">
+                  Developer
+                </div>
+                <button
+                  onClick={() => setActiveView("dev-tools")}
+                  className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm ${
+                    activeView === "dev-tools" ? activeClass : inactiveClass
+                  }`}
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  DevTools
+                </button>
+              </div>
+            )}
           </>
         )}
 

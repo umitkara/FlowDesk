@@ -44,6 +44,9 @@ const SettingsPanel = lazy(() => import("../../features/settings/SettingsPanel")
 const TrashView = lazy(() => import("../../features/notes/TrashView").then(m => ({ default: m.TrashView })));
 const AboutPanel = lazy(() => import("../../features/about/AboutPanel").then(m => ({ default: m.AboutPanel })));
 const WorkspaceSettings = lazy(() => import("../../features/workspaces/WorkspaceSettings").then(m => ({ default: m.WorkspaceSettings })));
+const DevToolsPage = import.meta.env.DEV
+  ? lazy(() => import("../../features/dev/DevToolsPage").then(m => ({ default: m.DevToolsPage })))
+  : null;
 
 /** Loading fallback for lazy-loaded views. */
 function ViewLoadingFallback() {
@@ -151,6 +154,7 @@ export function AppShell() {
               {activeView === "planned-vs-actual" && <PlannedVsActual />}
               {activeView === "templates" && <TemplateManager />}
               {activeView === "import-wizard" && <ImportWizard />}
+              {import.meta.env.DEV && activeView === "dev-tools" && DevToolsPage && <DevToolsPage />}
             </Suspense>
           </div>
 

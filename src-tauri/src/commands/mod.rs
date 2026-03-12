@@ -38,3 +38,6 @@ pub mod templates;
 pub mod time_entries;
 /// Workspace CRUD, config, dashboard, and cross-workspace reference commands.
 pub mod workspaces;
+/// Dev-only testing utilities (debug builds only).
+#[cfg(debug_assertions)]
+pub mod dev;

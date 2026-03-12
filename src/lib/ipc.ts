@@ -816,3 +816,9 @@ export const updateGlobalHotkey = (hotkey: string) =>
 /** Seeds the FlowDesk Demo workspace and returns its new workspace ID. */
 export const seedDemoWorkspace = (): Promise<string> =>
   invoke<string>("seed_demo_workspace");
+
+// --- Dev Tools (debug builds only) ---
+
+/** Fires a synthetic reminder event after an optional delay (dev builds only). */
+export const devFireReminder = (title: string, delaySecs: number) =>
+  invoke<void>("dev_fire_reminder", { title, delaySecs });

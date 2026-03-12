@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /** Active view identifier. */
-export type ActiveView = "notes" | "settings" | "daily" | "trash" | "tasks" | "about" | "plans" | "daily-plan" | "time-reports" | "dashboard" | "workspace-settings" | "faceted-search" | "graph" | "timeline" | "grouped" | "planned-vs-actual" | "templates" | "import-wizard" | "version-history";
+export type ActiveView = "notes" | "settings" | "daily" | "trash" | "tasks" | "about" | "plans" | "daily-plan" | "time-reports" | "dashboard" | "workspace-settings" | "faceted-search" | "graph" | "timeline" | "grouped" | "planned-vs-actual" | "templates" | "import-wizard" | "version-history" | "dev-tools";
 
 /** Views that are secondary (not reachable without sidebar or direct navigation). */
 export const SECONDARY_VIEWS: readonly ActiveView[] = [
@@ -18,6 +18,7 @@ export const SECONDARY_VIEWS: readonly ActiveView[] = [
   "planned-vs-actual",
   "time-reports",
   "version-history",
+  "dev-tools",
 ] as const;
 
 /** Returns true if the given view is a secondary view. */
